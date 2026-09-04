@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>القائمة</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap" id="app">
+  <div class="state-msg">جاري تحميل القائمة...</div>
+</div>
+
+<!-- Firebase SDKs (compat, no build step needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+async function loadMenu() {
+  const app = document.getElementById('app');
+  const params = new URLSearchParams(window.location.search);
+  const shopId = params.get('shop');
+
+  if (!shopId) {
+    app.innerHTML = '<div class="state-msg">رابط غير صحيح — لا يوجد معرّف كوفي.</div>';
+    return;
+  }
+
+  try {
+    // 1. Fetch shop info (this shop only — scoped by shopId, never touches other shops)
+    const shopDoc = await db.collection('shops').doc(shopId).get();
+
+    if (!shopDoc.exists) {
+      app.innerHTML = '<div class="state-msg">هذا الكوفي غير موجود.</div>';
+      return;
+    }
+
+    const shop = shopDoc.data();
+    const info = shop.info || {};
+
+    // Check subscription status
+    const isActive = info.subscriptionStatus === 'active';
+    if (!isActive) {
+      app.innerHTML = '<div class="state-msg">القائمة غير متاحة حالياً.</div>';
+      return;
+    }
+
+    // Apply shop's accent color dynamically
+    if (info.primaryColor) {
+      document.documentElement.style.setProperty('--accent', info.primaryColor);
+    }
+    document.title = info.name || 'القائمة';
+
+    // 2. Fetch menu items (sub-collection scoped to this shop only)
+    const menuSnap = await db.collection('shops').doc(shopId)
+                              .collection('menu')
+                              .orderBy('category')
+                              .get();
+
+    // Group items by category
+    const categories = {};
+    menuSnap.forEach(doc => {
+      const item = doc.data();
+      const cat = item.category || 'أخرى';
+      if (!categories[cat]) categories[cat] = [];
+      categories[cat].push(item);
+    });
+
+    // 3. Render
+    let html = `
+      <div class="shop-header">
+        ${info.logo ? `<img src="${info.logo}" class="shop-logo" alt="${info.name || ''}">` : ''}
+        <div>
+          <div class="shop-name display">${info.name || 'القائمة'}</div>
+          ${info.location ? `<div class="shop-meta">${info.location}</div>` : ''}
+        </div>
+      </div>
+    `;
+
+    if (Object.keys(categories).length === 0) {
+      html += '<div class="state-msg">لا توجد أصناف بالقائمة حالياً.</div>';
+    }
+
+    for (const [category, items] of Object.entries(categories)) {
+      html += `<div class="category-title">${category}</div>`;
+      items.forEach(item => {
+        const unavailable = item.available === false;
+        html += `
+          <div class="item-row ${unavailable ? 'unavailable' : ''}">
+            ${item.image ? `<img src="${item.image}" class="item-photo" alt="">` : ''}
+            <div class="item-info">
+              <div class="item-name">${item.name}</div>
+              ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
+            </div>
+            <div class="item-price">${Number(item.price).toFixed(2)} ر.ع</div>
+          </div>
+        `;
+      });
+    }
+
+    app.innerHTML = html;
+
+  } catch (err) {
+    console.error(err);
+    app.innerHTML = '<div class="state-msg">حدث خطأ أثناء تحميل القائمة. حاول مرة أخرى.</div>';
+  }
+}
+
+loadMenu();
+</script>
+
+</body>
+</html>

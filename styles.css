@@ -1,0 +1,239 @@
+/* ============================================
+   Shared Styles — Coffee Menu App
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap');
+
+:root {
+  --ink: #241B15;
+  --paper: #FAF6EF;
+  --paper-dim: #F0E9DC;
+  --stone: #8A7A68;
+  --line: #E4D9C6;
+  --accent: #8B5A2B; /* overridden per-shop from Firestore primaryColor */
+  --accent-ink: #FAF6EF;
+  --radius: 4px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Work Sans', sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .display {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+a { color: inherit; }
+
+button, input, select {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+/* ---- Layout ---- */
+.wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 20px 64px;
+}
+
+.shop-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.shop-logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--paper-dim);
+  flex-shrink: 0;
+}
+
+.shop-name {
+  font-size: 1.5rem;
+}
+
+.shop-meta {
+  color: var(--stone);
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+/* ---- Menu ---- */
+.category-title {
+  font-size: 1.05rem;
+  color: var(--accent);
+  margin: 36px 0 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.item-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.item-row:last-child { border-bottom: none; }
+
+.item-photo {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius);
+  object-fit: cover;
+  background: var(--paper-dim);
+  flex-shrink: 0;
+}
+
+.item-info { flex: 1; min-width: 0; }
+
+.item-name {
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+.item-desc {
+  color: var(--stone);
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+
+.item-price {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+.unavailable {
+  opacity: 0.45;
+}
+
+.unavailable .item-price::after {
+  content: " · غير متاح";
+  font-family: 'Work Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* ---- Forms / Dashboard ---- */
+.card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.field { margin-bottom: 14px; }
+
+.field label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--stone);
+  margin-bottom: 6px;
+}
+
+.field input, .field select, .field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 11px 22px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn:hover { opacity: 0.9; }
+
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.btn-ghost {
+  background: none;
+  color: var(--stone);
+  border: 1px solid var(--line);
+}
+
+.btn-danger {
+  background: none;
+  color: #B3441E;
+  border: 1px solid #E4D9C6;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+}
+
+.state-msg {
+  text-align: center;
+  color: var(--stone);
+  padding: 60px 20px;
+}
+
+.dashboard-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dashboard-item img {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  object-fit: cover;
+  background: var(--paper-dim);
+  flex-shrink: 0;
+}
+
+.dashboard-item .grow { flex: 1; min-width: 0; }
+
+.error-msg {
+  color: #B3441E;
+  font-size: 0.9rem;
+  margin-top: 10px;
+}
+
+@media (max-width: 480px) {
+  .wrap { padding: 0 16px 48px; }
+}

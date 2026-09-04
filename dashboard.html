@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة التحكم</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap" id="app" style="display:none;">
+
+  <div class="top-bar">
+    <div class="shop-name display" id="shopNameHeader">لوحة التحكم</div>
+    <button class="btn btn-ghost" onclick="logout()">تسجيل خروج</button>
+  </div>
+
+  <!-- Add / edit item form -->
+  <div class="card">
+    <h3 style="margin-bottom:16px;" id="formTitle">إضافة صنف جديد</h3>
+    <input type="hidden" id="itemId">
+
+    <div class="field">
+      <label for="itemName">اسم الصنف</label>
+      <input type="text" id="itemName" placeholder="مثال: لاتيه">
+    </div>
+
+    <div class="field">
+      <label for="itemCategory">التصنيف</label>
+      <input type="text" id="itemCategory" placeholder="مثال: مشروبات ساخنة">
+    </div>
+
+    <div class="field">
+      <label for="itemDesc">الوصف (اختياري)</label>
+      <input type="text" id="itemDesc" placeholder="مثال: إسبريسو مع حليب مبخر">
+    </div>
+
+    <div class="field">
+      <label for="itemPrice">السعر (ر.ع)</label>
+      <input type="number" step="0.01" id="itemPrice" placeholder="1.50">
+    </div>
+
+    <div class="field">
+      <label for="itemImage">صورة المنتج</label>
+      <input type="file" id="itemImage" accept="image/*">
+      <div id="uploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
+    </div>
+
+    <div class="field" style="display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="itemAvailable" checked style="width:auto;">
+      <label for="itemAvailable" style="margin:0;">متاح حالياً</label>
+    </div>
+
+    <button class="btn" onclick="saveItem()">حفظ الصنف</button>
+    <button class="btn btn-ghost" onclick="resetForm()" style="margin-right:8px;">إلغاء</button>
+    <div id="formError" class="error-msg"></div>
+  </div>
+
+  <!-- Existing items list -->
+  <h3 style="margin:28px 0 12px;">أصناف القائمة</h3>
+  <div class="card" id="itemsList">
+    <div class="state-msg">جاري التحميل...</div>
+  </div>
+
+</div>
+
+<div id="loadingMsg" class="state-msg">جاري التحقق من تسجيل الدخول...</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+let currentShopId = null;
+let uploadedImageUrl = null;
+
+// ---- Auth guard: redirect to login if not signed in ----
+auth.onAuthStateChanged(async user => {
+  if (!user) {
+    window.location.href = 'login.html';
+    return;
+  }
+  currentShopId = user.uid; // this owner's UID = their shop's document ID
+  document.getElementById('loadingMsg').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  await loadShopInfo();
+  await loadItems();
+});
+
+function logout() {
+  auth.signOut().then(() => window.location.href = 'login.html');
+}
+
+// ---- Load shop name for header ----
+async function loadShopInfo() {
+  const doc = await db.collection('shops').doc(currentShopId).get();
+  if (doc.exists) {
+    const info = doc.data().info || {};
+    document.getElementById('shopNameHeader').textContent = info.name || 'لوحة التحكم';
+  }
+}
+
+// ---- Load & render menu items ----
+async function loadItems() {
+  const listEl = document.getElementById('itemsList');
+  const snap = await db.collection('shops').doc(currentShopId)
+                        .collection('menu').orderBy('category').get();
+
+  if (snap.empty) {
+    listEl.innerHTML = '<div class="state-msg">لا توجد أصناف بعد. أضف أول صنف بالأعلى.</div>';
+    return;
+  }
+
+  let html = '';
+  snap.forEach(doc => {
+    const item = doc.data();
+    html += `
+      <div class="dashboard-item">
+        ${item.image ? `<img src="${item.image}">` : '<div class="item-photo"></div>'}
+        <div class="grow">
+          <div class="item-name">${item.name} — ${Number(item.price).toFixed(2)} ر.ع</div>
+          <div class="item-desc">${item.category}${item.available === false ? ' · غير متاح' : ''}</div>
+        </div>
+        <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>تعديل</button>
+        <button class="btn btn-danger" onclick='deleteItem("${doc.id}")'>حذف</button>
+      </div>
+    `;
+  });
+  listEl.innerHTML = html;
+}
+
+// ---- Handle image upload ----
+document.getElementById('itemImage').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.textContent = 'جاري رفع الصورة...';
+
+  try {
+    const path = `shops/${currentShopId}/${Date.now()}_${file.name}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    uploadedImageUrl = await ref.getDownloadURL();
+    statusEl.textContent = 'تم رفع الصورة ✓';
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'فشل رفع الصورة، حاول مرة أخرى.';
+  }
+});
+
+// ---- Save (add or update) item ----
+async function saveItem() {
+  const errorEl = document.getElementById('formError');
+  errorEl.textContent = '';
+
+  const id = document.getElementById('itemId').value;
+  const name = document.getElementById('itemName').value.trim();
+  const category = document.getElementById('itemCategory').value.trim();
+  const description = document.getElementById('itemDesc').value.trim();
+  const price = parseFloat(document.getElementById('itemPrice').value);
+  const available = document.getElementById('itemAvailable').checked;
+
+  if (!name || !category || isNaN(price)) {
+    errorEl.textContent = 'الرجاء تعبئة الاسم والتصنيف والسعر على الأقل.';
+    return;
+  }
+
+  const itemData = { name, category, description, price, available };
+  if (uploadedImageUrl) itemData.image = uploadedImageUrl;
+
+  try {
+    const menuRef = db.collection('shops').doc(currentShopId).collection('menu');
+    if (id) {
+      await menuRef.doc(id).update(itemData);
+    } else {
+      await menuRef.add(itemData);
+    }
+    resetForm();
+    await loadItems();
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.';
+  }
+}
+
+// ---- Edit existing item (populate form) ----
+async function editItem(id) {
+  const doc = await db.collection('shops').doc(currentShopId).collection('menu').doc(id).get();
+  if (!doc.exists) return;
+  const item = doc.data();
+
+  document.getElementById('itemId').value = id;
+  document.getElementById('itemName').value = item.name || '';
+  document.getElementById('itemCategory').value = item.category || '';
+  document.getElementById('itemDesc').value = item.description || '';
+  document.getElementById('itemPrice').value = item.price || '';
+  document.getElementById('itemAvailable').checked = item.available !== false;
+  document.getElementById('formTitle').textContent = 'تعديل الصنف';
+  uploadedImageUrl = item.image || null;
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ---- Delete item ----
+async function deleteItem(id) {
+  if (!confirm('متأكد تبي تحذف هذا الصنف؟')) return;
+  await db.collection('shops').doc(currentShopId).collection('menu').doc(id).delete();
+  await loadItems();
+}
+
+// ---- Reset form to "add new" state ----
+function resetForm() {
+  document.getElementById('itemId').value = '';
+  document.getElementById('itemName').value = '';
+  document.getElementById('itemCategory').value = '';
+  document.getElementById('itemDesc').value = '';
+  document.getElementById('itemPrice').value = '';
+  document.getElementById('itemAvailable').checked = true;
+  document.getElementById('itemImage').value = '';
+  document.getElementById('uploadStatus').textContent = '';
+  document.getElementById('formTitle').textContent = 'إضافة صنف جديد';
+  document.getElementById('formError').textContent = '';
+  uploadedImageUrl = null;
+}
+</script>
+
+</body>
+</html>
