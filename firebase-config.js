@@ -17,10 +17,21 @@ const firebaseConfig = {
 // Initialize Firebase (compat SDK — works with plain <script> tags, no build step)
 firebase.initializeApp(firebaseConfig);
 
-const auth = firebase.auth();
+// Firestore is used on every page, so initialize it first and unconditionally.
 const db = firebase.firestore();
-const storage = firebase.storage();
 
-// Force session to persist in the browser (prevents unexpected auto sign-outs)
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-  .catch(err => console.error('Auth persistence error:', err));
+// Auth and Storage are only needed on pages that loaded their SDK scripts
+// (menu.html, for example, doesn't need them). Guard against pages missing
+// those <script> tags so this file never crashes and "db" always works.
+let auth = null;
+if (typeof firebase.auth === 'function') {
+  auth = firebase.auth();
+  // Force session to persist in the browser (prevents unexpected auto sign-outs)
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .catch(err => console.error('Auth persistence error:', err));
+}
+
+let storage = null;
+if (typeof firebase.storage === 'function') {
+  storage = firebase.storage();
+}
