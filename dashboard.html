@@ -12,7 +12,20 @@
 
   <div class="top-bar">
     <div class="shop-name display" id="shopNameHeader">لوحة التحكم</div>
-    <button class="btn btn-ghost" onclick="logout()">تسجيل خروج</button>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <div class="bell-wrap" onclick="document.getElementById('ordersList').scrollIntoView({behavior:'smooth'})">
+        🔔<span class="bell-badge" id="bellBadge" style="display:none;">0</span>
+      </div>
+      <button class="btn btn-ghost" onclick="logout()">تسجيل خروج</button>
+    </div>
+  </div>
+
+  <!-- QR code for this shop's menu -->
+  <div class="card" style="text-align:center;">
+    <h3 style="margin-bottom:12px;">باركود قائمتك</h3>
+    <canvas id="myQrCanvas"></canvas>
+    <div id="myMenuUrl" style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:10px 0;"></div>
+    <button class="btn btn-ghost" onclick="downloadMyQr()">تحميل الباركود</button>
   </div>
 
   <!-- Incoming orders -->
@@ -72,6 +85,7 @@
 
 <div id="loadingMsg" class="state-msg">جاري التحقق من تسجيل الدخول...</div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
@@ -106,6 +120,25 @@ const statusLabels = { pending: 'جديد', preparing: 'قيد التحضير', 
 const statusClasses = { pending: 'status-pending', preparing: 'status-preparing', ready: 'status-ready' };
 const nextStatus = { pending: 'preparing', preparing: 'ready' };
 const nextLabel = { pending: 'ابدأ التحضير', preparing: 'تم — جاهز' };
+let isFirstOrdersLoad = true;
+
+// Simple beep using the Web Audio API — no external sound file needed
+function playAlertSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.25].forEach(delay => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + delay);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.18);
+    });
+  } catch (e) { console.error('Sound error:', e); }
+}
 
 function listenToOrders() {
   db.collection('shops').doc(currentShopId).collection('orders')
@@ -113,6 +146,30 @@ function listenToOrders() {
     .orderBy('createdAt', 'desc')
     .onSnapshot(snap => {
       const listEl = document.getElementById('ordersList');
+
+      // Detect brand-new orders (skip the very first load so it doesn't
+      // beep for orders that were already sitting there before you opened the page)
+      if (!isFirstOrdersLoad) {
+        const newOnes = snap.docChanges().filter(c => c.type === 'added');
+        if (newOnes.length > 0) {
+          playAlertSound();
+          const bell = document.querySelector('.bell-wrap');
+          bell.classList.remove('bell-shake');
+          void bell.offsetWidth; // restart animation
+          bell.classList.add('bell-shake');
+        }
+      }
+      isFirstOrdersLoad = false;
+
+      // Update the red badge count (pending orders needing attention)
+      const pendingCount = snap.docs.filter(d => d.data().status === 'pending').length;
+      const badge = document.getElementById('bellBadge');
+      if (pendingCount > 0) {
+        badge.style.display = 'flex';
+        badge.textContent = pendingCount;
+      } else {
+        badge.style.display = 'none';
+      }
 
       if (snap.empty) {
         listEl.innerHTML = '<div class="state-msg">لا توجد طلبات حالياً.</div>';
@@ -156,7 +213,20 @@ async function loadShopInfo() {
   if (doc.exists) {
     const info = doc.data().info || {};
     document.getElementById('shopNameHeader').textContent = info.name || 'لوحة التحكم';
+
+    // Build (or reuse) the menu URL and render its QR code
+    const menuUrl = info.menuUrl || (window.location.href.replace('dashboard.html', '') + 'menu.html?shop=' + currentShopId);
+    document.getElementById('myMenuUrl').textContent = menuUrl;
+    await QRCode.toCanvas(document.getElementById('myQrCanvas'), menuUrl, { width: 180 });
   }
+}
+
+function downloadMyQr() {
+  const canvas = document.getElementById('myQrCanvas');
+  const link = document.createElement('a');
+  link.download = 'qr-code.png';
+  link.href = canvas.toDataURL();
+  link.click();
 }
 
 // ---- Load & render menu items ----

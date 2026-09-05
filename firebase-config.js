@@ -20,3 +20,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+
+// Force session to persist in the browser (prevents unexpected auto sign-outs)
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+  .catch(err => console.error('Auth persistence error:', err));

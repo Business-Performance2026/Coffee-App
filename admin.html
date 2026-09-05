@@ -60,6 +60,7 @@
     <button class="btn" onclick="createShop()">إنشاء الكوفي</button>
     <div id="createError" class="error-msg"></div>
     <div id="createSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
+    <div id="qrResult" style="margin-top:16px; text-align:center;"></div>
   </div>
 
   <!-- Shops list -->
@@ -71,6 +72,7 @@
 
 <div id="loadingMsg" class="state-msg">جاري التحقق...</div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
@@ -121,6 +123,14 @@ function adminLogin() {
 
 function adminLogout() {
   auth.signOut().then(() => window.location.reload());
+}
+
+function downloadQr() {
+  const canvas = document.getElementById('qrCanvas');
+  const link = document.createElement('a');
+  link.download = 'qr-code.png';
+  link.href = canvas.toDataURL();
+  link.click();
 }
 
 // ---- Load all shops ----
@@ -203,7 +213,19 @@ async function createShop() {
       }
     });
 
-    successEl.textContent = `تم إنشاء الكوفي بنجاح ✓ — رابط القائمة: menu.html?shop=${newUid}`;
+    // Build the public menu link for this shop, save it, and generate its QR code
+    const menuUrl = window.location.href.replace('admin.html', '') + 'menu.html?shop=' + newUid;
+    await db.collection('shops').doc(newUid).update({ 'info.menuUrl': menuUrl });
+
+    successEl.textContent = `تم إنشاء الكوفي بنجاح ✓`;
+
+    const qrDiv = document.getElementById('qrResult');
+    qrDiv.innerHTML = `
+      <canvas id="qrCanvas"></canvas>
+      <div style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:8px 0;">${menuUrl}</div>
+      <button class="btn btn-ghost" onclick="downloadQr()">تحميل الباركود</button>
+    `;
+    await QRCode.toCanvas(document.getElementById('qrCanvas'), menuUrl, { width: 200 });
 
     // Reset form
     document.getElementById('newShopName').value = '';
