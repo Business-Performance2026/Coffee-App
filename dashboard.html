@@ -48,6 +48,11 @@
       <input type="color" id="shopColorInput" style="width:80px; padding:4px;">
     </div>
 
+    <div class="field">
+      <label for="shopPrepTimeInput">الوقت التقريبي للتحضير (دقائق)</label>
+      <input type="number" id="shopPrepTimeInput" min="1" placeholder="مثال: 10">
+    </div>
+
     <button class="btn" onclick="saveShopInfo()">حفظ التغييرات</button>
     <div id="shopInfoError" class="error-msg"></div>
     <div id="shopInfoSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
@@ -252,6 +257,7 @@ function listenToOrders() {
               <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
             </div>
             <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ر.ع</div>
+            ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
             <div class="order-actions">
               ${nextStatus[status] ? `<button class="btn" style="padding:6px 14px; font-size:0.85rem;" onclick='advanceOrder("${doc.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
             </div>
@@ -283,6 +289,7 @@ async function loadShopInfo() {
     document.getElementById('shopNameInput').value = info.name || '';
     document.getElementById('shopLocationInput').value = info.location || '';
     document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
+    document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
     if (info.logo) {
       const preview = document.getElementById('logoPreview');
       preview.src = info.logo;
@@ -337,6 +344,7 @@ async function saveShopInfo() {
   const name = document.getElementById('shopNameInput').value.trim();
   const location = document.getElementById('shopLocationInput').value.trim();
   const color = document.getElementById('shopColorInput').value;
+  const prepTime = parseInt(document.getElementById('shopPrepTimeInput').value) || 10;
 
   if (!name) {
     errorEl.textContent = 'اسم الكوفي مطلوب.';
@@ -347,7 +355,8 @@ async function saveShopInfo() {
     const updateData = {
       'info.name': name,
       'info.location': location,
-      'info.primaryColor': color
+      'info.primaryColor': color,
+      'info.estimatedMinutes': prepTime
     };
     if (uploadedLogoUrl) updateData['info.logo'] = uploadedLogoUrl;
 

@@ -203,11 +203,15 @@ function openCartModal() {
 
       <div class="field" style="margin-top:16px;">
         <label for="custName">اسمك</label>
-        <input type="text" id="custName" placeholder="مثال: أحمد">
+        <input type="text" id="custName" placeholder="مثال: أحمد" value="${localStorage.getItem('customerName') || ''}">
       </div>
       <div class="field">
         <label for="tableNum">رقم الطاولة (اختياري)</label>
         <input type="text" id="tableNum" placeholder="مثال: 5">
+      </div>
+      <div class="field">
+        <label for="orderNotes">ملاحظات (اختياري)</label>
+        <input type="text" id="orderNotes" placeholder="مثال: بدون سكر">
       </div>
 
       <button class="btn" style="width:100%;" onclick="submitOrder()">إرسال الطلب</button>
@@ -226,11 +230,14 @@ async function submitOrder() {
   const errorEl = document.getElementById('orderError');
   const name = document.getElementById('custName').value.trim();
   const table = document.getElementById('tableNum').value.trim();
+  const notes = document.getElementById('orderNotes').value.trim();
 
   if (!name) {
     errorEl.textContent = 'الرجاء إدخال اسمك.';
     return;
   }
+
+  localStorage.setItem('customerName', name);
 
   const items = Object.values(cart).map(i => ({ name: i.name, price: i.price, qty: i.qty }));
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
@@ -239,6 +246,7 @@ async function submitOrder() {
     const docRef = await db.collection('shops').doc(shopId).collection('orders').add({
       customerName: name,
       tableNumber: table || null,
+      notes: notes || null,
       items,
       total,
       status: 'pending',
@@ -312,7 +320,12 @@ function renderTracker(status) {
   });
   labelsHtml += '</div>';
 
-  return `<div class="order-track">${barHtml}${labelsHtml}</div>`;
+  let etaHtml = '';
+  if (status !== 'ready' && shopInfo.estimatedMinutes) {
+    etaHtml = `<div style="text-align:center; color:var(--stone); font-size:0.85rem; margin-top:14px;">⏱ الوقت المتوقع: ~${shopInfo.estimatedMinutes} دقيقة</div>`;
+  }
+
+  return `<div class="order-track">${barHtml}${labelsHtml}${etaHtml}</div>`;
 }
 
 function openStatusModal() {
