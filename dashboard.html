@@ -129,6 +129,16 @@ function logout() {
 let soundEnabled = false;
 const alertAudio = document.getElementById('alertSound');
 
+alertAudio.addEventListener('error', () => {
+  console.error('Audio file failed to load:', alertAudio.error);
+  document.getElementById('soundBanner').innerHTML = `
+    <div class="card" style="padding:12px 16px; color:#B3441E;">
+      ⚠️ ملف الصوت (beep.wav) ما تحمّل. تأكد إنك رفعته بنفس المجلد وبنفس الاسم بالضبط.
+    </div>
+  `;
+  document.getElementById('soundBanner').style.display = 'block';
+});
+
 function enableSound() {
   alertAudio.play()
     .then(() => {
