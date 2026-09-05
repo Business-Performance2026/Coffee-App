@@ -77,10 +77,13 @@ async function loadMenu() {
       categories[cat].push({ id: doc.id, ...item });
     });
 
+    const coverStyle = shopInfo.coverImage ? `style="background-image:url('${shopInfo.coverImage}')"` : '';
+
     let html = `
-      <div class="menu-hero">
+      <div class="menu-hero" ${coverStyle}>
         ${shopInfo.logo ? `<img src="${shopInfo.logo}" class="menu-hero-logo" alt="${shopInfo.name || ''}">` : ''}
         <div class="menu-hero-name display">${shopInfo.name || 'القائمة'}</div>
+        ${shopInfo.tagline ? `<div class="menu-hero-tagline">${shopInfo.tagline}</div>` : ''}
         ${shopInfo.location ? `<div class="menu-hero-location">${shopInfo.location}</div>` : ''}
       </div>
     `;
@@ -100,26 +103,26 @@ async function loadMenu() {
     categoryNames.forEach((category, i) => {
       const items = categories[category];
       html += `<div class="category-title" id="cat-${i}">${category}</div>`;
+      html += '<div class="menu-grid">';
       items.forEach(item => {
         const unavailable = item.available === false;
         html += `
-          <div class="item-row ${unavailable ? 'unavailable' : ''}">
-            ${item.image ? `<img src="${item.image}" class="item-photo" alt="">` : ''}
-            <div class="item-info">
-              <div class="item-name">${item.name}</div>
-              ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
-              <div class="item-price">${Number(item.price).toFixed(2)} ر.ع</div>
+          <div class="grid-card ${unavailable ? 'unavailable' : ''}">
+            <div class="grid-card-img-wrap">
+              ${item.image ? `<img src="${item.image}" class="grid-card-img" alt="">` : ''}
+              ${unavailable ? `<div class="grid-unavailable-tag">غير متاح</div>` : `
+                <span class="grid-qty-badge" id="count-${item.id}" style="display:none;">0</span>
+                <button class="grid-add-btn" onclick='changeQty("${item.id}", "${escapeStr(item.name)}", ${item.price}, 1)'>+</button>
+              `}
             </div>
-            ${unavailable ? '' : `
-              <div class="qty-control" id="qty-${item.id}">
-                <button class="qty-btn" onclick='changeQty("${item.id}", "${escapeStr(item.name)}", ${item.price}, -1)'>−</button>
-                <span class="qty-count" id="count-${item.id}">0</span>
-                <button class="qty-btn" onclick='changeQty("${item.id}", "${escapeStr(item.name)}", ${item.price}, 1)'>+</button>
-              </div>
-            `}
+            <div class="grid-card-body">
+              <div class="grid-card-name">${item.name}</div>
+              <div class="grid-card-price">${Number(item.price).toFixed(2)} ر.ع</div>
+            </div>
           </div>
         `;
       });
+      html += '</div>';
     });
 
     app.innerHTML = html;
@@ -158,7 +161,11 @@ function changeQty(itemId, name, price, delta) {
   if (cart[itemId].qty <= 0) delete cart[itemId];
 
   const countEl = document.getElementById(`count-${itemId}`);
-  if (countEl) countEl.textContent = cart[itemId] ? cart[itemId].qty : 0;
+  if (countEl) {
+    const qty = cart[itemId] ? cart[itemId].qty : 0;
+    countEl.textContent = qty;
+    countEl.style.display = qty > 0 ? 'flex' : 'none';
+  }
 
   updateCartBar();
 }
@@ -263,7 +270,7 @@ async function submitOrder() {
     // Reset cart
     cart = {};
     updateCartBar();
-    document.querySelectorAll('.qty-count').forEach(el => el.textContent = '0');
+    document.querySelectorAll('.grid-qty-badge').forEach(el => { el.textContent = '0'; el.style.display = 'none'; });
 
     // Start live tracking of this order and show the step tracker
     trackOrder(docRef.id);

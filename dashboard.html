@@ -34,8 +34,20 @@
     </div>
 
     <div class="field">
+      <label for="shopCoverInput">صورة الغلاف (تظهر خلف الشعار بأعلى القائمة)</label>
+      <input type="file" id="shopCoverInput" accept="image/*">
+      <img id="coverPreview" src="" alt="" style="width:100%; max-height:100px; object-fit:cover; border-radius:8px; margin-top:8px; display:none;">
+      <div id="coverUploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
+    </div>
+
+    <div class="field">
       <label for="shopNameInput">اسم الكوفي</label>
       <input type="text" id="shopNameInput">
+    </div>
+
+    <div class="field">
+      <label for="shopTaglineInput">شعار نصي قصير (اختياري)</label>
+      <input type="text" id="shopTaglineInput" placeholder="مثال: The pleasure of the moment">
     </div>
 
     <div class="field">
@@ -278,6 +290,7 @@ async function advanceOrder(orderId, newStatus) {
 
 // ---- Load shop name for header ----
 let uploadedLogoUrl = null;
+let uploadedCoverUrl = null;
 
 async function loadShopInfo() {
   const doc = await db.collection('shops').doc(currentShopId).get();
@@ -287,6 +300,7 @@ async function loadShopInfo() {
 
     // Populate the editable shop info form
     document.getElementById('shopNameInput').value = info.name || '';
+    document.getElementById('shopTaglineInput').value = info.tagline || '';
     document.getElementById('shopLocationInput').value = info.location || '';
     document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
     document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
@@ -295,6 +309,12 @@ async function loadShopInfo() {
       preview.src = info.logo;
       preview.style.display = 'block';
       uploadedLogoUrl = info.logo;
+    }
+    if (info.coverImage) {
+      const coverPrev = document.getElementById('coverPreview');
+      coverPrev.src = info.coverImage;
+      coverPrev.style.display = 'block';
+      uploadedCoverUrl = info.coverImage;
     }
 
     // Build (or reuse) the menu URL and render its QR code
@@ -334,6 +354,30 @@ document.getElementById('shopLogoInput').addEventListener('change', async (e) =>
   }
 });
 
+// ---- Handle cover image upload ----
+document.getElementById('shopCoverInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('coverUploadStatus');
+  statusEl.textContent = 'جاري رفع صورة الغلاف...';
+
+  try {
+    const path = `shops/${currentShopId}/cover_${Date.now()}_${file.name}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    uploadedCoverUrl = await ref.getDownloadURL();
+
+    const preview = document.getElementById('coverPreview');
+    preview.src = uploadedCoverUrl;
+    preview.style.display = 'block';
+    statusEl.textContent = 'تم رفع الغلاف ✓ — لا تنسى تضغط "حفظ التغييرات"';
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'فشل رفع الغلاف، حاول مرة أخرى.';
+  }
+});
+
 // ---- Save shop info (name, location, color, logo) ----
 async function saveShopInfo() {
   const errorEl = document.getElementById('shopInfoError');
@@ -342,6 +386,7 @@ async function saveShopInfo() {
   successEl.textContent = '';
 
   const name = document.getElementById('shopNameInput').value.trim();
+  const tagline = document.getElementById('shopTaglineInput').value.trim();
   const location = document.getElementById('shopLocationInput').value.trim();
   const color = document.getElementById('shopColorInput').value;
   const prepTime = parseInt(document.getElementById('shopPrepTimeInput').value) || 10;
@@ -354,11 +399,13 @@ async function saveShopInfo() {
   try {
     const updateData = {
       'info.name': name,
+      'info.tagline': tagline,
       'info.location': location,
       'info.primaryColor': color,
       'info.estimatedMinutes': prepTime
     };
     if (uploadedLogoUrl) updateData['info.logo'] = uploadedLogoUrl;
+    if (uploadedCoverUrl) updateData['info.coverImage'] = uploadedCoverUrl;
 
     await db.collection('shops').doc(currentShopId).update(updateData);
     document.getElementById('shopNameHeader').textContent = name;
