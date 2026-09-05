@@ -419,3 +419,87 @@ button, input, select {
 }
 
 .bell-shake { animation: bellShake 0.6s ease; }
+
+/* ---- Customer menu: hero header ---- */
+.menu-hero {
+  text-align: center;
+  padding: 36px 20px 26px;
+  margin: 0 -20px 4px;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 18%, var(--paper)) 0%, var(--paper) 70%);
+  border-bottom: 1px solid var(--line);
+}
+
+.menu-hero-logo {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: white;
+  border: 3px solid white;
+  box-shadow: 0 6px 18px rgba(36,27,21,0.18);
+  margin-bottom: 14px;
+}
+
+.menu-hero-name {
+  font-size: 1.65rem;
+}
+
+.menu-hero-location {
+  color: var(--stone);
+  font-size: 0.88rem;
+  margin-top: 6px;
+}
+
+/* ---- Sticky category pill nav ---- */
+.category-pills {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 20px;
+  margin: 0 -20px 8px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+
+.category-pills::-webkit-scrollbar { display: none; }
+
+.pill {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.pill.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+/* Larger, friendlier item photos for the customer menu */
+.item-photo {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+}
+
+.qty-btn {
+  width: 34px;
+  height: 34px;
+}
+
+.cart-bar {
+  bottom: calc(16px + env(safe-area-inset-bottom));
+}

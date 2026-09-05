@@ -27,6 +27,39 @@
     </div>
   </div>
 
+  <!-- Shop info & logo -->
+  <div class="card">
+    <h3 style="margin-bottom:16px;">معلومات الكوفي</h3>
+
+    <div class="field" style="display:flex; align-items:center; gap:14px;">
+      <img id="logoPreview" src="" alt="" style="width:56px; height:56px; border-radius:50%; object-fit:cover; background:var(--paper-dim); display:none;">
+      <div style="flex:1;">
+        <label for="shopLogoInput">شعار الكوفي</label>
+        <input type="file" id="shopLogoInput" accept="image/*">
+        <div id="logoUploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="shopNameInput">اسم الكوفي</label>
+      <input type="text" id="shopNameInput">
+    </div>
+
+    <div class="field">
+      <label for="shopLocationInput">الموقع</label>
+      <input type="text" id="shopLocationInput">
+    </div>
+
+    <div class="field">
+      <label for="shopColorInput">اللون المميز</label>
+      <input type="color" id="shopColorInput" style="width:80px; padding:4px;">
+    </div>
+
+    <button class="btn" onclick="saveShopInfo()">حفظ التغييرات</button>
+    <div id="shopInfoError" class="error-msg"></div>
+    <div id="shopInfoSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
+  </div>
+
   <!-- QR code for this shop's menu -->
   <div class="card" style="text-align:center;">
     <h3 style="margin-bottom:12px;">باركود قائمتك</h3>
@@ -233,11 +266,24 @@ async function advanceOrder(orderId, newStatus) {
 }
 
 // ---- Load shop name for header ----
+let uploadedLogoUrl = null;
+
 async function loadShopInfo() {
   const doc = await db.collection('shops').doc(currentShopId).get();
   if (doc.exists) {
     const info = doc.data().info || {};
     document.getElementById('shopNameHeader').textContent = info.name || 'لوحة التحكم';
+
+    // Populate the editable shop info form
+    document.getElementById('shopNameInput').value = info.name || '';
+    document.getElementById('shopLocationInput').value = info.location || '';
+    document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
+    if (info.logo) {
+      const preview = document.getElementById('logoPreview');
+      preview.src = info.logo;
+      preview.style.display = 'block';
+      uploadedLogoUrl = info.logo;
+    }
 
     // Build (or reuse) the menu URL and render its QR code
     const menuUrl = info.menuUrl || (window.location.href.replace('dashboard.html', '') + 'menu.html?shop=' + currentShopId);
@@ -249,6 +295,63 @@ async function loadShopInfo() {
       console.error('QR generation failed:', qrErr);
       document.getElementById('myMenuUrl').insertAdjacentHTML('afterend', `<div class="error-msg">تعذر توليد الباركود: ${qrErr.message}</div>`);
     }
+  }
+}
+
+// ---- Handle logo upload ----
+document.getElementById('shopLogoInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('logoUploadStatus');
+  statusEl.textContent = 'جاري رفع الشعار...';
+
+  try {
+    const path = `shops/${currentShopId}/logo_${Date.now()}_${file.name}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    uploadedLogoUrl = await ref.getDownloadURL();
+
+    const preview = document.getElementById('logoPreview');
+    preview.src = uploadedLogoUrl;
+    preview.style.display = 'block';
+    statusEl.textContent = 'تم رفع الشعار ✓ — لا تنسى تضغط "حفظ التغييرات"';
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'فشل رفع الشعار، حاول مرة أخرى.';
+  }
+});
+
+// ---- Save shop info (name, location, color, logo) ----
+async function saveShopInfo() {
+  const errorEl = document.getElementById('shopInfoError');
+  const successEl = document.getElementById('shopInfoSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const name = document.getElementById('shopNameInput').value.trim();
+  const location = document.getElementById('shopLocationInput').value.trim();
+  const color = document.getElementById('shopColorInput').value;
+
+  if (!name) {
+    errorEl.textContent = 'اسم الكوفي مطلوب.';
+    return;
+  }
+
+  try {
+    const updateData = {
+      'info.name': name,
+      'info.location': location,
+      'info.primaryColor': color
+    };
+    if (uploadedLogoUrl) updateData['info.logo'] = uploadedLogoUrl;
+
+    await db.collection('shops').doc(currentShopId).update(updateData);
+    document.getElementById('shopNameHeader').textContent = name;
+    successEl.textContent = 'تم الحفظ ✓';
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.';
   }
 }
 

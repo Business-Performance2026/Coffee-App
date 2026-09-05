@@ -73,21 +73,28 @@ async function loadMenu() {
     });
 
     let html = `
-      <div class="shop-header">
-        ${shopInfo.logo ? `<img src="${shopInfo.logo}" class="shop-logo" alt="${shopInfo.name || ''}">` : ''}
-        <div>
-          <div class="shop-name display">${shopInfo.name || 'القائمة'}</div>
-          ${shopInfo.location ? `<div class="shop-meta">${shopInfo.location}</div>` : ''}
-        </div>
+      <div class="menu-hero">
+        ${shopInfo.logo ? `<img src="${shopInfo.logo}" class="menu-hero-logo" alt="${shopInfo.name || ''}">` : ''}
+        <div class="menu-hero-name display">${shopInfo.name || 'القائمة'}</div>
+        ${shopInfo.location ? `<div class="menu-hero-location">${shopInfo.location}</div>` : ''}
       </div>
     `;
 
-    if (Object.keys(categories).length === 0) {
+    const categoryNames = Object.keys(categories);
+
+    if (categoryNames.length === 0) {
       html += '<div class="state-msg">لا توجد أصناف بالقائمة حالياً.</div>';
+    } else if (categoryNames.length > 1) {
+      html += '<div class="category-pills" id="categoryPills">';
+      categoryNames.forEach((cat, i) => {
+        html += `<button class="pill ${i === 0 ? 'active' : ''}" data-cat="cat-${i}" onclick="scrollToCategory('cat-${i}', this)">${cat}</button>`;
+      });
+      html += '</div>';
     }
 
-    for (const [category, items] of Object.entries(categories)) {
-      html += `<div class="category-title">${category}</div>`;
+    categoryNames.forEach((category, i) => {
+      const items = categories[category];
+      html += `<div class="category-title" id="cat-${i}">${category}</div>`;
       items.forEach(item => {
         const unavailable = item.available === false;
         html += `
@@ -108,7 +115,7 @@ async function loadMenu() {
           </div>
         `;
       });
-    }
+    });
 
     app.innerHTML = html;
 
@@ -120,6 +127,16 @@ async function loadMenu() {
 
 function escapeStr(str) {
   return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function scrollToCategory(catId, pillEl) {
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  pillEl.classList.add('active');
+  const target = document.getElementById(catId);
+  const pillsBar = document.getElementById('categoryPills');
+  const offset = pillsBar ? pillsBar.offsetHeight + 12 : 12;
+  const top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+  window.scrollTo({ top, behavior: 'smooth' });
 }
 
 // ---- Cart logic ----
