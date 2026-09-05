@@ -73,6 +73,7 @@
         <div class="field">
           <label for="itemImage">صورة المنتج</label>
           <input type="file" id="itemImage" accept="image/*">
+          <img id="itemImagePreview" src="" alt="" style="width:100%; max-height:140px; object-fit:cover; border-radius:8px; margin-top:8px; display:none;">
           <div id="uploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
         </div>
 
@@ -281,6 +282,46 @@ function logout() {
   auth.signOut().then(() => window.location.href = 'login.html');
 }
 
+// ===================== Image resize helper =====================
+// Standardizes any uploaded photo (whatever its original size/shape) into a
+// consistent, web-friendly size before upload — keeps things fast and uniform
+// regardless of what the owner's phone camera produces.
+function resizeImage(file, maxDimension = 900, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (e) => { img.src = e.target.result; };
+    reader.onerror = reject;
+
+    img.onload = () => {
+      let { width, height } = img;
+
+      if (width > height && width > maxDimension) {
+        height = Math.round(height * (maxDimension / width));
+        width = maxDimension;
+      } else if (height > maxDimension) {
+        width = Math.round(width * (maxDimension / height));
+        height = maxDimension;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => blob ? resolve(blob) : reject(new Error('فشل تجهيز الصورة')),
+        'image/jpeg',
+        quality
+      );
+    };
+    img.onerror = reject;
+
+    reader.readAsDataURL(file);
+  });
+}
+
 // ===================== Tab switching =====================
 function switchTab(name) {
   document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
@@ -392,11 +433,12 @@ document.getElementById('shopLogoInput').addEventListener('change', async (e) =>
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = document.getElementById('logoUploadStatus');
-  statusEl.textContent = 'جاري رفع الشعار...';
+  statusEl.textContent = 'جاري تجهيز ورفع الشعار...';
   try {
+    const resizedBlob = await resizeImage(file, 500, 0.85);
     const path = `shops/${currentShopId}/logo_${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
-    await ref.put(file);
+    await ref.put(resizedBlob);
     uploadedLogoUrl = await ref.getDownloadURL();
     const preview = document.getElementById('logoPreview');
     preview.src = uploadedLogoUrl;
@@ -412,11 +454,12 @@ document.getElementById('shopCoverInput').addEventListener('change', async (e) =
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = document.getElementById('coverUploadStatus');
-  statusEl.textContent = 'جاري رفع صورة الغلاف...';
+  statusEl.textContent = 'جاري تجهيز ورفع صورة الغلاف...';
   try {
+    const resizedBlob = await resizeImage(file, 1200, 0.82);
     const path = `shops/${currentShopId}/cover_${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
-    await ref.put(file);
+    await ref.put(resizedBlob);
     uploadedCoverUrl = await ref.getDownloadURL();
     const preview = document.getElementById('coverPreview');
     preview.src = uploadedCoverUrl;
@@ -511,12 +554,17 @@ document.getElementById('itemImage').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = document.getElementById('uploadStatus');
-  statusEl.textContent = 'جاري رفع الصورة...';
+  statusEl.textContent = 'جاري تجهيز ورفع الصورة...';
   try {
+    const resizedBlob = await resizeImage(file, 900, 0.82);
     const path = `shops/${currentShopId}/${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
-    await ref.put(file);
+    await ref.put(resizedBlob);
     uploadedImageUrl = await ref.getDownloadURL();
+
+    const preview = document.getElementById('itemImagePreview');
+    preview.src = uploadedImageUrl;
+    preview.style.display = 'block';
     statusEl.textContent = 'تم رفع الصورة ✓';
   } catch (err) {
     console.error(err);
@@ -573,6 +621,14 @@ async function editItem(id) {
   document.getElementById('formTitle').textContent = 'تعديل الصنف';
   uploadedImageUrl = item.image || null;
 
+  const preview = document.getElementById('itemImagePreview');
+  if (item.image) {
+    preview.src = item.image;
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+
   switchSubView('add');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -591,6 +647,7 @@ function resetForm() {
   document.getElementById('itemPrice').value = '';
   document.getElementById('itemAvailable').checked = true;
   document.getElementById('itemImage').value = '';
+  document.getElementById('itemImagePreview').style.display = 'none';
   document.getElementById('uploadStatus').textContent = '';
   document.getElementById('formTitle').textContent = 'إضافة صنف جديد';
   document.getElementById('formError').textContent = '';
