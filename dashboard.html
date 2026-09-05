@@ -217,7 +217,13 @@ async function loadShopInfo() {
     // Build (or reuse) the menu URL and render its QR code
     const menuUrl = info.menuUrl || (window.location.href.replace('dashboard.html', '') + 'menu.html?shop=' + currentShopId);
     document.getElementById('myMenuUrl').textContent = menuUrl;
-    await QRCode.toCanvas(document.getElementById('myQrCanvas'), menuUrl, { width: 180 });
+    try {
+      if (typeof QRCode === 'undefined') throw new Error('مكتبة QR ما تحمّلت من الإنترنت');
+      await QRCode.toCanvas(document.getElementById('myQrCanvas'), menuUrl, { width: 180 });
+    } catch (qrErr) {
+      console.error('QR generation failed:', qrErr);
+      document.getElementById('myMenuUrl').insertAdjacentHTML('afterend', `<div class="error-msg">تعذر توليد الباركود: ${qrErr.message}</div>`);
+    }
   }
 }
 

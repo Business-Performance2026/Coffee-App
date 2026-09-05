@@ -114,7 +114,7 @@ async function loadMenu() {
 
   } catch (err) {
     console.error(err);
-    app.innerHTML = '<div class="state-msg">حدث خطأ أثناء تحميل القائمة. حاول مرة أخرى.</div>';
+    app.innerHTML = `<div class="state-msg">حدث خطأ أثناء تحميل القائمة.<br><small style="color:#B3441E;">${err.code || ''} ${err.message || err}</small></div>`;
   }
 }
 

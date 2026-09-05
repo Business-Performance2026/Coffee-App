@@ -225,7 +225,13 @@ async function createShop() {
       <div style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:8px 0;">${menuUrl}</div>
       <button class="btn btn-ghost" onclick="downloadQr()">تحميل الباركود</button>
     `;
-    await QRCode.toCanvas(document.getElementById('qrCanvas'), menuUrl, { width: 200 });
+    try {
+      if (typeof QRCode === 'undefined') throw new Error('مكتبة QR ما تحمّلت من الإنترنت');
+      await QRCode.toCanvas(document.getElementById('qrCanvas'), menuUrl, { width: 200 });
+    } catch (qrErr) {
+      console.error('QR generation failed:', qrErr);
+      qrDiv.innerHTML += `<div class="error-msg">تعذر توليد الباركود: ${qrErr.message}</div>`;
+    }
 
     // Reset form
     document.getElementById('newShopName').value = '';
