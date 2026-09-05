@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة الأدمن</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Login screen -->
+<div class="wrap" id="loginScreen" style="max-width:400px; padding-top:60px; display:none;">
+  <div class="shop-name display" style="text-align:center; margin-bottom:30px;">دخول الأدمن</div>
+  <div class="card">
+    <div class="field">
+      <label for="adminEmail">البريد الإلكتروني</label>
+      <input type="email" id="adminEmail">
+    </div>
+    <div class="field">
+      <label for="adminPassword">كلمة المرور</label>
+      <input type="password" id="adminPassword">
+    </div>
+    <button class="btn" style="width:100%;" onclick="adminLogin()">دخول</button>
+    <div id="loginError" class="error-msg"></div>
+  </div>
+</div>
+
+<!-- Admin dashboard -->
+<div class="wrap" id="adminScreen" style="display:none;">
+  <div class="top-bar">
+    <div class="shop-name display">لوحة الأدمن</div>
+    <button class="btn btn-ghost" onclick="adminLogout()">تسجيل خروج</button>
+  </div>
+
+  <!-- Add new shop -->
+  <div class="card">
+    <h3 style="margin-bottom:16px;">إضافة كوفي جديد</h3>
+
+    <div class="field">
+      <label for="newShopName">اسم الكوفي</label>
+      <input type="text" id="newShopName" placeholder="مثال: قهوة الروضة">
+    </div>
+    <div class="field">
+      <label for="newShopLocation">الموقع (اختياري)</label>
+      <input type="text" id="newShopLocation" placeholder="مثال: مسقط">
+    </div>
+    <div class="field">
+      <label for="newShopColor">اللون المميز</label>
+      <input type="color" id="newShopColor" value="#8B5A2B" style="width:80px; padding:4px;">
+    </div>
+    <div class="field">
+      <label for="newOwnerEmail">إيميل صاحب الكوفي (لتسجيل دخوله)</label>
+      <input type="email" id="newOwnerEmail" placeholder="owner@example.com">
+    </div>
+    <div class="field">
+      <label for="newOwnerPassword">كلمة مرور مؤقتة له</label>
+      <input type="text" id="newOwnerPassword" placeholder="8 أحرف على الأقل">
+    </div>
+
+    <button class="btn" onclick="createShop()">إنشاء الكوفي</button>
+    <div id="createError" class="error-msg"></div>
+    <div id="createSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
+  </div>
+
+  <!-- Shops list -->
+  <h3 style="margin:28px 0 12px;">الكوفيات المسجّلة</h3>
+  <div class="card" id="shopsList">
+    <div class="state-msg">جاري التحميل...</div>
+  </div>
+</div>
+
+<div id="loadingMsg" class="state-msg">جاري التحقق...</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+// Secondary Firebase app instance — lets us create new shop-owner accounts
+// WITHOUT logging the admin out of their own session.
+const secondaryApp = firebase.initializeApp(firebase.app().options, "Secondary");
+const secondaryAuth = secondaryApp.auth();
+
+let isAdmin = false;
+
+auth.onAuthStateChanged(async user => {
+  document.getElementById('loadingMsg').style.display = 'none';
+
+  if (!user) {
+    document.getElementById('loginScreen').style.display = 'block';
+    return;
+  }
+
+  // Check this user is actually listed in the admins collection
+  const adminDoc = await db.collection('admins').doc(user.uid).get();
+  if (!adminDoc.exists) {
+    document.getElementById('loginScreen').style.display = 'block';
+    document.getElementById('loginError').textContent = 'هذا الحساب ليس لديه صلاحية أدمن.';
+    await auth.signOut();
+    return;
+  }
+
+  isAdmin = true;
+  document.getElementById('adminScreen').style.display = 'block';
+  await loadShops();
+});
+
+function adminLogin() {
+  const email = document.getElementById('adminEmail').value.trim();
+  const password = document.getElementById('adminPassword').value;
+  const errorEl = document.getElementById('loginError');
+  errorEl.textContent = '';
+
+  auth.signInWithEmailAndPassword(email, password)
+    .catch(err => {
+      errorEl.textContent = 'بيانات الدخول غير صحيحة.';
+      console.error(err);
+    });
+}
+
+function adminLogout() {
+  auth.signOut().then(() => window.location.reload());
+}
+
+// ---- Load all shops ----
+async function loadShops() {
+  const listEl = document.getElementById('shopsList');
+  const snap = await db.collection('shops').get();
+
+  if (snap.empty) {
+    listEl.innerHTML = '<div class="state-msg">لا توجد كوفيات مسجّلة بعد.</div>';
+    return;
+  }
+
+  let html = '';
+  snap.forEach(doc => {
+    const shop = doc.data();
+    const info = shop.info || {};
+    const active = info.subscriptionStatus === 'active';
+    html += `
+      <div class="dashboard-item">
+        <div class="grow">
+          <div class="item-name">${info.name || '(بدون اسم)'}</div>
+          <div class="item-desc">${info.location || ''} · ${active ? 'مفعّل ✓' : 'موقوف'}</div>
+        </div>
+        <button class="btn ${active ? 'btn-danger' : 'btn-ghost'}" onclick='toggleSubscription("${doc.id}", ${active})'>
+          ${active ? 'إيقاف' : 'تفعيل'}
+        </button>
+      </div>
+    `;
+  });
+  listEl.innerHTML = html;
+}
+
+// ---- Toggle a shop's subscription on/off ----
+async function toggleSubscription(shopId, currentlyActive) {
+  await db.collection('shops').doc(shopId).update({
+    'info.subscriptionStatus': currentlyActive ? 'expired' : 'active'
+  });
+  await loadShops();
+}
+
+// ---- Create a brand new shop (auth account + Firestore doc) ----
+async function createShop() {
+  const errorEl = document.getElementById('createError');
+  const successEl = document.getElementById('createSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const name = document.getElementById('newShopName').value.trim();
+  const location = document.getElementById('newShopLocation').value.trim();
+  const color = document.getElementById('newShopColor').value;
+  const email = document.getElementById('newOwnerEmail').value.trim();
+  const password = document.getElementById('newOwnerPassword').value;
+
+  if (!name || !email || !password) {
+    errorEl.textContent = 'الرجاء تعبئة اسم الكوفي وإيميل وكلمة مرور صاحب الكوفي.';
+    return;
+  }
+  if (password.length < 6) {
+    errorEl.textContent = 'كلمة المرور لازم تكون 6 أحرف على الأقل.';
+    return;
+  }
+
+  try {
+    // Create the owner's account using the SECONDARY app instance
+    // so the admin's own session stays logged in.
+    const cred = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+    const newUid = cred.user.uid;
+
+    // Immediately sign out of the secondary instance (cleanup)
+    await secondaryAuth.signOut();
+
+    // Create the shop's Firestore document, ID = new owner's UID
+    await db.collection('shops').doc(newUid).set({
+      info: {
+        name,
+        location,
+        primaryColor: color,
+        logo: '',
+        subscriptionStatus: 'active'
+      }
+    });
+
+    successEl.textContent = `تم إنشاء الكوفي بنجاح ✓ — رابط القائمة: menu.html?shop=${newUid}`;
+
+    // Reset form
+    document.getElementById('newShopName').value = '';
+    document.getElementById('newShopLocation').value = '';
+    document.getElementById('newOwnerEmail').value = '';
+    document.getElementById('newOwnerPassword').value = '';
+
+    await loadShops();
+
+  } catch (err) {
+    console.error(err);
+    if (err.code === 'auth/email-already-in-use') {
+      errorEl.textContent = 'هذا الإيميل مستخدم مسبقاً لكوفي آخر.';
+    } else {
+      errorEl.textContent = 'حدث خطأ أثناء الإنشاء. حاول مرة أخرى.';
+    }
+  }
+}
+</script>
+
+</body>
+</html>
