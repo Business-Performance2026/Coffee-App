@@ -72,6 +72,7 @@ async function loadMenu() {
     const categories = {};
     menuSnap.forEach(doc => {
       const item = doc.data();
+      if (item.hidden === true) return; // fully hidden from customers, skip entirely
       const cat = item.category || 'أخرى';
       if (!categories[cat]) categories[cat] = [];
       categories[cat].push({ id: doc.id, ...item });

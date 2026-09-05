@@ -22,57 +22,78 @@
   <!-- ===================== TAB 1: لوحة التحكم (Menu + QR) ===================== -->
   <div id="view-dashboard" class="tab-view active">
 
-    <div class="card" style="text-align:center;">
-      <h3 style="margin-bottom:12px;">باركود قائمتك</h3>
-      <canvas id="myQrCanvas"></canvas>
-      <div id="myMenuUrl" style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:10px 0;"></div>
-      <button class="btn btn-ghost" onclick="downloadMyQr()">تحميل الباركود</button>
+    <div class="icon-subnav">
+      <button class="icon-subnav-btn" data-sub="qr" onclick="switchSubView('qr')">
+        <span class="icon-subnav-icon">📱</span><span class="icon-subnav-label">الباركود</span>
+      </button>
+      <button class="icon-subnav-btn" data-sub="add" onclick="switchSubView('add')">
+        <span class="icon-subnav-icon">➕</span><span class="icon-subnav-label">إضافة صنف</span>
+      </button>
+      <button class="icon-subnav-btn active" data-sub="list" onclick="switchSubView('list')">
+        <span class="icon-subnav-icon">📃</span><span class="icon-subnav-label">قائمة الأصناف</span>
+      </button>
     </div>
 
-    <div class="card">
-      <h3 style="margin-bottom:16px;" id="formTitle">إضافة صنف جديد</h3>
-      <input type="hidden" id="itemId">
-
-      <div class="field">
-        <label for="itemName">اسم الصنف</label>
-        <input type="text" id="itemName" placeholder="مثال: لاتيه">
+    <!-- Sub-view: QR -->
+    <div id="sub-qr" class="sub-view">
+      <div class="card" style="text-align:center;">
+        <h3 style="margin-bottom:12px;">باركود قائمتك</h3>
+        <canvas id="myQrCanvas"></canvas>
+        <div id="myMenuUrl" style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:10px 0;"></div>
+        <button class="btn btn-ghost" onclick="downloadMyQr()">تحميل الباركود</button>
       </div>
-
-      <div class="field">
-        <label for="itemCategory">التصنيف</label>
-        <input type="text" id="itemCategory" placeholder="مثال: مشروبات ساخنة">
-      </div>
-
-      <div class="field">
-        <label for="itemDesc">الوصف (اختياري)</label>
-        <input type="text" id="itemDesc" placeholder="مثال: إسبريسو مع حليب مبخر">
-      </div>
-
-      <div class="field">
-        <label for="itemPrice">السعر (ر.ع)</label>
-        <input type="number" step="0.01" id="itemPrice" placeholder="1.50">
-      </div>
-
-      <div class="field">
-        <label for="itemImage">صورة المنتج</label>
-        <input type="file" id="itemImage" accept="image/*">
-        <div id="uploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
-      </div>
-
-      <div class="field" style="display:flex; align-items:center; gap:8px;">
-        <input type="checkbox" id="itemAvailable" checked style="width:auto;">
-        <label for="itemAvailable" style="margin:0;">متاح حالياً</label>
-      </div>
-
-      <button class="btn" onclick="saveItem()">حفظ الصنف</button>
-      <button class="btn btn-ghost" onclick="resetForm()" style="margin-right:8px;">إلغاء</button>
-      <div id="formError" class="error-msg"></div>
     </div>
 
-    <h3 style="margin:28px 0 12px;">أصناف القائمة</h3>
-    <div class="card" id="itemsList">
-      <div class="state-msg">جاري التحميل...</div>
+    <!-- Sub-view: Add item -->
+    <div id="sub-add" class="sub-view">
+      <div class="card">
+        <h3 style="margin-bottom:16px;" id="formTitle">إضافة صنف جديد</h3>
+        <input type="hidden" id="itemId">
+
+        <div class="field">
+          <label for="itemName">اسم الصنف</label>
+          <input type="text" id="itemName" placeholder="مثال: لاتيه">
+        </div>
+
+        <div class="field">
+          <label for="itemCategory">التصنيف</label>
+          <input type="text" id="itemCategory" placeholder="مثال: مشروبات ساخنة">
+        </div>
+
+        <div class="field">
+          <label for="itemDesc">الوصف (اختياري)</label>
+          <input type="text" id="itemDesc" placeholder="مثال: إسبريسو مع حليب مبخر">
+        </div>
+
+        <div class="field">
+          <label for="itemPrice">السعر (ر.ع)</label>
+          <input type="number" step="0.01" id="itemPrice" placeholder="1.50">
+        </div>
+
+        <div class="field">
+          <label for="itemImage">صورة المنتج</label>
+          <input type="file" id="itemImage" accept="image/*">
+          <div id="uploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
+        </div>
+
+        <div class="field" style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="itemAvailable" checked style="width:auto;">
+          <label for="itemAvailable" style="margin:0;">متاح حالياً</label>
+        </div>
+
+        <button class="btn" onclick="saveItem()">حفظ الصنف</button>
+        <button class="btn btn-ghost" onclick="resetForm()" style="margin-right:8px;">إلغاء</button>
+        <div id="formError" class="error-msg"></div>
+      </div>
     </div>
+
+    <!-- Sub-view: Items list -->
+    <div id="sub-list" class="sub-view active">
+      <div class="card" id="itemsList">
+        <div class="state-msg">جاري التحميل...</div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ===================== TAB 2: نقطة البيع (POS) ===================== -->
@@ -271,6 +292,14 @@ function switchTab(name) {
   if (name === 'sales') loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
 }
 
+// ===================== Sub-view switching (inside "لوحة التحكم") =====================
+function switchSubView(name) {
+  document.querySelectorAll('.sub-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.icon-subnav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`sub-${name}`).classList.add('active');
+  document.querySelector(`.icon-subnav-btn[data-sub="${name}"]`).classList.add('active');
+}
+
 // ===================== Sound alert system: "ding-ding" x3 =====================
 let audioCtx = null;
 function getAudioCtx() {
@@ -456,19 +485,26 @@ async function loadItems() {
   let html = '';
   snap.forEach(doc => {
     const item = doc.data();
+    const isHidden = item.hidden === true;
     html += `
-      <div class="dashboard-item">
+      <div class="dashboard-item ${isHidden ? 'item-hidden' : ''}">
         ${item.image ? `<img src="${item.image}">` : '<div class="item-photo"></div>'}
         <div class="grow">
           <div class="item-name">${item.name} — ${Number(item.price).toFixed(2)} ر.ع</div>
-          <div class="item-desc">${item.category}${item.available === false ? ' · غير متاح' : ''}</div>
+          <div class="item-desc">${item.category}${item.available === false ? ' · غير متاح' : ''}${isHidden ? ' · مخفي عن الزبائن' : ''}</div>
         </div>
+        <button class="icon-action-btn" title="${isHidden ? 'إظهار للزبائن' : 'إخفاء عن الزبائن'}" onclick='toggleHidden("${doc.id}", ${isHidden})'>${isHidden ? '🙈' : '👁️'}</button>
         <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>تعديل</button>
         <button class="btn btn-danger" onclick='deleteItem("${doc.id}")'>حذف</button>
       </div>
     `;
   });
   listEl.innerHTML = html;
+}
+
+async function toggleHidden(id, currentlyHidden) {
+  await db.collection('shops').doc(currentShopId).collection('menu').doc(id).update({ hidden: !currentlyHidden });
+  await loadItems();
 }
 
 document.getElementById('itemImage').addEventListener('change', async (e) => {
@@ -516,6 +552,7 @@ async function saveItem() {
     }
     resetForm();
     await loadItems();
+    switchSubView('list');
   } catch (err) {
     console.error(err);
     errorEl.textContent = 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.';
@@ -536,7 +573,7 @@ async function editItem(id) {
   document.getElementById('formTitle').textContent = 'تعديل الصنف';
   uploadedImageUrl = item.image || null;
 
-  switchTab('dashboard');
+  switchSubView('add');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

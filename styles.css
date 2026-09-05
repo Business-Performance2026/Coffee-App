@@ -727,6 +727,52 @@ button, input, select {
   border-bottom: 1px solid var(--line);
 }
 
+/* ---- Icon sub-nav inside "لوحة التحكم" tab ---- */
+.icon-subnav {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.icon-subnav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 6px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--stone);
+  font-family: inherit;
+}
+
+.icon-subnav-btn .icon-subnav-icon { font-size: 1.5rem; }
+.icon-subnav-btn .icon-subnav-label { font-size: 0.75rem; }
+
+.icon-subnav-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, white);
+}
+
+.sub-view { display: none; }
+.sub-view.active { display: block; }
+
+.dashboard-item.item-hidden {
+  opacity: 0.5;
+}
+
+.icon-action-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 6px;
+}
+
 .cart-bar {
   bottom: calc(16px + env(safe-area-inset-bottom));
 }
