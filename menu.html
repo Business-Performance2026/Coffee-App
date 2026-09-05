@@ -124,6 +124,13 @@ async function loadMenu() {
 
     app.innerHTML = html;
 
+    // Resume tracking a previously placed order, if one is still active for this shop
+    // (survives page refresh, since it's stored in the browser, not just in memory)
+    const savedOrderId = localStorage.getItem(`activeOrder_${shopId}`);
+    if (savedOrderId) {
+      trackOrder(savedOrderId);
+    }
+
   } catch (err) {
     console.error(err);
     app.innerHTML = `<div class="state-msg">حدث خطأ أثناء تحميل القائمة.<br><small style="color:#B3441E;">${err.code || ''} ${err.message || err}</small></div>`;
@@ -264,7 +271,7 @@ async function submitOrder() {
     document.querySelector('.modal-sheet').innerHTML = `
       <h3 style="margin:8px 0 20px; text-align:center;">تم إرسال طلبك!</h3>
       <div id="trackerContainer">${renderTracker('pending')}</div>
-      <button class="btn" style="width:100%; margin-top:24px;" onclick="closeCartModal()">تمام</button>
+      <button class="btn" style="width:100%; margin-top:24px;" onclick="closeCartModal()">إغلاق</button>
     `;
   } catch (err) {
     console.error(err);
@@ -288,9 +295,15 @@ function trackOrder(orderId) {
   activeOrderId = orderId;
   if (activeOrderUnsub) activeOrderUnsub();
 
+  localStorage.setItem(`activeOrder_${shopId}`, orderId);
+
   activeOrderUnsub = db.collection('shops').doc(shopId).collection('orders').doc(orderId)
     .onSnapshot(doc => {
-      if (!doc.exists) return;
+      if (!doc.exists) {
+        // Order was deleted — stop tracking and clean up
+        clearOrderTracking();
+        return;
+      }
       const status = doc.data().status || 'pending';
 
       const bar = document.getElementById('orderStatusBar');
@@ -301,6 +314,18 @@ function trackOrder(orderId) {
       const trackerEl = document.getElementById('trackerContainer');
       if (trackerEl) trackerEl.innerHTML = renderTracker(status);
     });
+}
+
+// Called when the customer confirms they've received their order,
+// or when the order no longer exists in Firestore.
+function clearOrderTracking() {
+  if (activeOrderUnsub) activeOrderUnsub();
+  activeOrderUnsub = null;
+  activeOrderId = null;
+  localStorage.removeItem(`activeOrder_${shopId}`);
+  document.getElementById('orderStatusBar').style.display = 'none';
+  closeStatusModal();
+  closeCartModal();
 }
 
 function renderTracker(status) {
@@ -325,7 +350,12 @@ function renderTracker(status) {
     etaHtml = `<div style="text-align:center; color:var(--stone); font-size:0.85rem; margin-top:14px;">⏱ الوقت المتوقع: ~${shopInfo.estimatedMinutes} دقيقة</div>`;
   }
 
-  return `<div class="order-track">${barHtml}${labelsHtml}${etaHtml}</div>`;
+  let doneBtnHtml = '';
+  if (status === 'ready') {
+    doneBtnHtml = `<button class="btn" style="width:100%; margin-top:20px;" onclick="clearOrderTracking()">استلمت طلبي ✓</button>`;
+  }
+
+  return `<div class="order-track">${barHtml}${labelsHtml}${etaHtml}${doneBtnHtml}</div>`;
 }
 
 function openStatusModal() {
