@@ -613,6 +613,120 @@ button, input, select {
   font-size: 0.98rem;
 }
 
+/* ---- Dashboard app shell: bottom nav + tabs ---- */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: white;
+  border-top: 1px solid var(--line);
+  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+  z-index: 20;
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--stone);
+  font-family: inherit;
+}
+
+.nav-item .nav-icon { font-size: 1.3rem; }
+.nav-item .nav-label { font-size: 0.68rem; }
+
+.nav-item.active { color: var(--accent); }
+
+.tab-view { display: none; }
+.tab-view.active { display: block; }
+
+/* ---- Inventory tab ---- */
+.inventory-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.inventory-row .grow { flex: 1; }
+
+.inventory-row input[type="number"] {
+  width: 80px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.stock-low { color: #B3441E; font-size: 0.78rem; margin-top:2px; }
+
+/* ---- Sales tab ---- */
+.range-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.range-tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.range-tab.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.sales-summary {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.sales-summary-box {
+  flex: 1;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+
+.sales-summary-box .big-num {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 1.4rem;
+  display: block;
+}
+
+.sales-summary-box .label {
+  color: var(--stone);
+  font-size: 0.8rem;
+}
+
+.top-item-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
 .cart-bar {
   bottom: calc(16px + env(safe-area-inset-bottom));
 }

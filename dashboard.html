@@ -8,132 +8,224 @@
 </head>
 <body>
 
-<div class="wrap" id="app" style="display:none;">
+<div id="loadingMsg" class="state-msg">جاري التحقق من تسجيل الدخول...</div>
+
+<div class="wrap" id="app" style="display:none; padding-bottom:80px;">
 
   <div class="top-bar">
     <div class="shop-name display" id="shopNameHeader">لوحة التحكم</div>
-    <div style="display:flex; align-items:center; gap:14px;">
-      <div class="bell-wrap" onclick="document.getElementById('ordersList').scrollIntoView({behavior:'smooth'})">
-        🔔<span class="bell-badge" id="bellBadge" style="display:none;">0</span>
+    <div class="bell-wrap" onclick="switchTab('pos')">
+      🔔<span class="bell-badge" id="bellBadge" style="display:none;">0</span>
+    </div>
+  </div>
+
+  <!-- ===================== TAB 1: لوحة التحكم (Menu + QR) ===================== -->
+  <div id="view-dashboard" class="tab-view active">
+
+    <div class="card" style="text-align:center;">
+      <h3 style="margin-bottom:12px;">باركود قائمتك</h3>
+      <canvas id="myQrCanvas"></canvas>
+      <div id="myMenuUrl" style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:10px 0;"></div>
+      <button class="btn btn-ghost" onclick="downloadMyQr()">تحميل الباركود</button>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:16px;" id="formTitle">إضافة صنف جديد</h3>
+      <input type="hidden" id="itemId">
+
+      <div class="field">
+        <label for="itemName">اسم الصنف</label>
+        <input type="text" id="itemName" placeholder="مثال: لاتيه">
       </div>
-      <button class="btn btn-ghost" onclick="logout()">تسجيل خروج</button>
+
+      <div class="field">
+        <label for="itemCategory">التصنيف</label>
+        <input type="text" id="itemCategory" placeholder="مثال: مشروبات ساخنة">
+      </div>
+
+      <div class="field">
+        <label for="itemDesc">الوصف (اختياري)</label>
+        <input type="text" id="itemDesc" placeholder="مثال: إسبريسو مع حليب مبخر">
+      </div>
+
+      <div class="field">
+        <label for="itemPrice">السعر (ر.ع)</label>
+        <input type="number" step="0.01" id="itemPrice" placeholder="1.50">
+      </div>
+
+      <div class="field">
+        <label for="itemImage">صورة المنتج</label>
+        <input type="file" id="itemImage" accept="image/*">
+        <div id="uploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
+      </div>
+
+      <div class="field" style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="itemAvailable" checked style="width:auto;">
+        <label for="itemAvailable" style="margin:0;">متاح حالياً</label>
+      </div>
+
+      <button class="btn" onclick="saveItem()">حفظ الصنف</button>
+      <button class="btn btn-ghost" onclick="resetForm()" style="margin-right:8px;">إلغاء</button>
+      <div id="formError" class="error-msg"></div>
+    </div>
+
+    <h3 style="margin:28px 0 12px;">أصناف القائمة</h3>
+    <div class="card" id="itemsList">
+      <div class="state-msg">جاري التحميل...</div>
     </div>
   </div>
 
-  <!-- Shop info & logo -->
-  <div class="card">
-    <h3 style="margin-bottom:16px;">معلومات الكوفي</h3>
+  <!-- ===================== TAB 2: نقطة البيع (POS) ===================== -->
+  <div id="view-pos" class="tab-view">
+    <button class="btn" style="width:100%; margin-bottom:20px;" onclick="openNewOrderModal()">+ طلب جديد (كاونتر)</button>
 
-    <div class="field" style="display:flex; align-items:center; gap:14px;">
-      <img id="logoPreview" src="" alt="" style="width:56px; height:56px; border-radius:50%; object-fit:cover; background:var(--paper-dim); display:none;">
-      <div style="flex:1;">
-        <label for="shopLogoInput">شعار الكوفي</label>
-        <input type="file" id="shopLogoInput" accept="image/*">
-        <div id="logoUploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
+    <h3 style="margin:0 0 12px;">الطلبات الواردة</h3>
+    <div id="ordersList">
+      <div class="state-msg">جاري التحميل...</div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB 3: المخزون (Inventory) ===================== -->
+  <div id="view-inventory" class="tab-view">
+    <p style="color:var(--stone); font-size:0.85rem; margin-bottom:16px;">
+      حدد كمية المخزون لأي صنف تبي تتابعه. اتركه فاضي لو الكمية غير محدودة.
+    </p>
+    <div class="card" id="inventoryList">
+      <div class="state-msg">جاري التحميل...</div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB 4: المبيعات (Sales) ===================== -->
+  <div id="view-sales" class="tab-view">
+    <div class="range-tabs">
+      <button class="range-tab active" data-range="day" onclick="loadSales('day', this)">اليوم</button>
+      <button class="range-tab" data-range="week" onclick="loadSales('week', this)">هذا الأسبوع</button>
+      <button class="range-tab" data-range="month" onclick="loadSales('month', this)">هذا الشهر</button>
+    </div>
+
+    <div class="sales-summary">
+      <div class="sales-summary-box">
+        <span class="big-num" id="salesTotal">0.00</span>
+        <span class="label">إجمالي المبيعات (ر.ع)</span>
+      </div>
+      <div class="sales-summary-box">
+        <span class="big-num" id="salesCount">0</span>
+        <span class="label">عدد الطلبات</span>
       </div>
     </div>
 
-    <div class="field">
-      <label for="shopCoverInput">صورة الغلاف (تظهر خلف الشعار بأعلى القائمة)</label>
-      <input type="file" id="shopCoverInput" accept="image/*">
-      <img id="coverPreview" src="" alt="" style="width:100%; max-height:100px; object-fit:cover; border-radius:8px; margin-top:8px; display:none;">
-      <div id="coverUploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
+    <h3 style="margin:0 0 12px;">الأكثر مبيعاً</h3>
+    <div class="card" id="topItemsList">
+      <div class="state-msg">جاري التحميل...</div>
     </div>
-
-    <div class="field">
-      <label for="shopNameInput">اسم الكوفي</label>
-      <input type="text" id="shopNameInput">
-    </div>
-
-    <div class="field">
-      <label for="shopTaglineInput">شعار نصي قصير (اختياري)</label>
-      <input type="text" id="shopTaglineInput" placeholder="مثال: The pleasure of the moment">
-    </div>
-
-    <div class="field">
-      <label for="shopLocationInput">الموقع</label>
-      <input type="text" id="shopLocationInput">
-    </div>
-
-    <div class="field">
-      <label for="shopColorInput">اللون المميز</label>
-      <input type="color" id="shopColorInput" style="width:80px; padding:4px;">
-    </div>
-
-    <div class="field">
-      <label for="shopPrepTimeInput">الوقت التقريبي للتحضير (دقائق)</label>
-      <input type="number" id="shopPrepTimeInput" min="1" placeholder="مثال: 10">
-    </div>
-
-    <button class="btn" onclick="saveShopInfo()">حفظ التغييرات</button>
-    <div id="shopInfoError" class="error-msg"></div>
-    <div id="shopInfoSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
   </div>
 
-  <!-- QR code for this shop's menu -->
-  <div class="card" style="text-align:center;">
-    <h3 style="margin-bottom:12px;">باركود قائمتك</h3>
-    <canvas id="myQrCanvas"></canvas>
-    <div id="myMenuUrl" style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:10px 0;"></div>
-    <button class="btn btn-ghost" onclick="downloadMyQr()">تحميل الباركود</button>
-  </div>
+  <!-- ===================== TAB 5: الحساب (Account) ===================== -->
+  <div id="view-account" class="tab-view">
 
-  <!-- Incoming orders -->
-  <h3 style="margin:0 0 12px;">الطلبات الواردة</h3>
-  <div id="ordersList" style="margin-bottom:28px;">
-    <div class="state-msg">جاري التحميل...</div>
-  </div>
+    <div class="card">
+      <h3 style="margin-bottom:16px;">معلومات الكوفي</h3>
 
-  <!-- Add / edit item form -->
-  <div class="card">
-    <h3 style="margin-bottom:16px;" id="formTitle">إضافة صنف جديد</h3>
-    <input type="hidden" id="itemId">
+      <div class="field" style="display:flex; align-items:center; gap:14px;">
+        <img id="logoPreview" src="" alt="" style="width:56px; height:56px; border-radius:50%; object-fit:cover; background:var(--paper-dim); display:none;">
+        <div style="flex:1;">
+          <label for="shopLogoInput">شعار الكوفي</label>
+          <input type="file" id="shopLogoInput" accept="image/*">
+          <div id="logoUploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
+        </div>
+      </div>
 
-    <div class="field">
-      <label for="itemName">اسم الصنف</label>
-      <input type="text" id="itemName" placeholder="مثال: لاتيه">
+      <div class="field">
+        <label for="shopCoverInput">صورة الغلاف</label>
+        <input type="file" id="shopCoverInput" accept="image/*">
+        <img id="coverPreview" src="" alt="" style="width:100%; max-height:100px; object-fit:cover; border-radius:8px; margin-top:8px; display:none;">
+        <div id="coverUploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
+      </div>
+
+      <div class="field">
+        <label for="shopNameInput">اسم المحل (عربي)</label>
+        <input type="text" id="shopNameInput">
+      </div>
+
+      <div class="field">
+        <label for="shopNameEnInput">اسم المحل (إنجليزي)</label>
+        <input type="text" id="shopNameEnInput" placeholder="e.g. Sarj Coffee">
+      </div>
+
+      <div class="field">
+        <label for="shopTaglineInput">شعار نصي قصير (اختياري)</label>
+        <input type="text" id="shopTaglineInput">
+      </div>
+
+      <div class="field">
+        <label for="shopLocationInput">الموقع</label>
+        <input type="text" id="shopLocationInput">
+      </div>
+
+      <div class="field">
+        <label for="shopPhoneInput">رقم الهاتف</label>
+        <input type="tel" id="shopPhoneInput" placeholder="+968 9xxxxxxx">
+      </div>
+
+      <div class="field">
+        <label for="shopWhatsappInput">رقم الواتساب</label>
+        <input type="tel" id="shopWhatsappInput" placeholder="+968 9xxxxxxx">
+      </div>
+
+      <div class="field">
+        <label for="shopEmailInput">البريد الإلكتروني</label>
+        <input type="email" id="shopEmailInput">
+      </div>
+
+      <div class="field">
+        <label for="shopColorInput">اللون المميز</label>
+        <input type="color" id="shopColorInput" style="width:80px; padding:4px;">
+      </div>
+
+      <div class="field">
+        <label for="shopPrepTimeInput">الوقت التقريبي للتحضير (دقائق)</label>
+        <input type="number" id="shopPrepTimeInput" min="1">
+      </div>
+
+      <button class="btn" onclick="saveShopInfo()">حفظ التغييرات</button>
+      <div id="shopInfoError" class="error-msg"></div>
+      <div id="shopInfoSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
     </div>
 
-    <div class="field">
-      <label for="itemCategory">التصنيف</label>
-      <input type="text" id="itemCategory" placeholder="مثال: مشروبات ساخنة">
+    <div class="card">
+      <button class="btn btn-ghost" style="width:100%;" onclick="logout()">تسجيل خروج</button>
     </div>
 
-    <div class="field">
-      <label for="itemDesc">الوصف (اختياري)</label>
-      <input type="text" id="itemDesc" placeholder="مثال: إسبريسو مع حليب مبخر">
+    <div class="card" style="border-color:#E4B8AC;">
+      <h3 style="margin-bottom:10px; color:#B3441E;">منطقة الخطر</h3>
+      <p style="color:var(--stone); font-size:0.85rem; margin-bottom:14px;">
+        حذف حسابك يمسح قائمتك وطلباتك وكل بياناتك نهائياً. هذا الإجراء لا يمكن التراجع عنه.
+      </p>
+      <button class="btn btn-danger" style="width:100%; padding:11px;" onclick="deleteMyAccount()">حذف حسابي</button>
     </div>
 
-    <div class="field">
-      <label for="itemPrice">السعر (ر.ع)</label>
-      <input type="number" step="0.01" id="itemPrice" placeholder="1.50">
-    </div>
-
-    <div class="field">
-      <label for="itemImage">صورة المنتج</label>
-      <input type="file" id="itemImage" accept="image/*">
-      <div id="uploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
-    </div>
-
-    <div class="field" style="display:flex; align-items:center; gap:8px;">
-      <input type="checkbox" id="itemAvailable" checked style="width:auto;">
-      <label for="itemAvailable" style="margin:0;">متاح حالياً</label>
-    </div>
-
-    <button class="btn" onclick="saveItem()">حفظ الصنف</button>
-    <button class="btn btn-ghost" onclick="resetForm()" style="margin-right:8px;">إلغاء</button>
-    <div id="formError" class="error-msg"></div>
-  </div>
-
-  <!-- Existing items list -->
-  <h3 style="margin:28px 0 12px;">أصناف القائمة</h3>
-  <div class="card" id="itemsList">
-    <div class="state-msg">جاري التحميل...</div>
   </div>
 
 </div>
 
-<div id="loadingMsg" class="state-msg">جاري التحقق من تسجيل الدخول...</div>
+<!-- ===================== Bottom navigation ===================== -->
+<div class="bottom-nav" id="bottomNav" style="display:none;">
+  <button class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
+    <span class="nav-icon">📋</span><span class="nav-label">لوحة التحكم</span>
+  </button>
+  <button class="nav-item" data-tab="pos" onclick="switchTab('pos')">
+    <span class="nav-icon">🧾</span><span class="nav-label">نقطة البيع</span>
+  </button>
+  <button class="nav-item" data-tab="inventory" onclick="switchTab('inventory')">
+    <span class="nav-icon">📦</span><span class="nav-label">المخزون</span>
+  </button>
+  <button class="nav-item" data-tab="sales" onclick="switchTab('sales')">
+    <span class="nav-icon">📊</span><span class="nav-label">المبيعات</span>
+  </button>
+  <button class="nav-item" data-tab="account" onclick="switchTab('account')">
+    <span class="nav-icon">👤</span><span class="nav-label">الحساب</span>
+  </button>
+</div>
 
 <script src="qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -145,16 +237,19 @@
 <script>
 let currentShopId = null;
 let uploadedImageUrl = null;
+let uploadedLogoUrl = null;
+let uploadedCoverUrl = null;
 
-// ---- Auth guard: redirect to login if not signed in ----
+// ===================== Auth guard =====================
 auth.onAuthStateChanged(async user => {
   if (!user) {
     window.location.href = 'login.html';
     return;
   }
-  currentShopId = user.uid; // this owner's UID = their shop's document ID
+  currentShopId = user.uid;
   document.getElementById('loadingMsg').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  document.getElementById('bottomNav').style.display = 'flex';
 
   await loadShopInfo();
   await loadItems();
@@ -165,16 +260,23 @@ function logout() {
   auth.signOut().then(() => window.location.href = 'login.html');
 }
 
-// ---- Sound alert system: a "ding-ding" chime repeated 3 times ----
-let audioCtx = null;
+// ===================== Tab switching =====================
+function switchTab(name) {
+  document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`view-${name}`).classList.add('active');
+  document.querySelector(`.nav-item[data-tab="${name}"]`).classList.add('active');
 
-function getAudioCtx() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  return audioCtx;
+  if (name === 'inventory') loadInventory();
+  if (name === 'sales') loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
 }
 
+// ===================== Sound alert system: "ding-ding" x3 =====================
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
 function playTone(ctx, freq, startTime, duration) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -188,32 +290,277 @@ function playTone(ctx, freq, startTime, duration) {
   osc.start(startTime);
   osc.stop(startTime + duration + 0.02);
 }
-
 function playAlertSound() {
   const ctx = getAudioCtx();
   if (ctx.state === 'suspended') ctx.resume();
-
   const now = ctx.currentTime;
   const toneDur = 0.14;
   let t = now;
-
   for (let rep = 0; rep < 3; rep++) {
-    playTone(ctx, 1046, t, toneDur);       // "تن" الأولى (حادة)
+    playTone(ctx, 1046, t, toneDur);
     t += toneDur + 0.06;
-    playTone(ctx, 1046, t, toneDur);       // "تن" الثانية (نفس النغمة)
-    t += toneDur + 0.4;                    // فاصل قبل التكرار التالي
+    playTone(ctx, 1046, t, toneDur);
+    t += toneDur + 0.4;
   }
 }
-
-// Silently unlock the audio engine on the very first tap/click anywhere on the page
-// (required by browsers before any sound can play — happens invisibly, no banner needed)
 document.addEventListener('click', function unlockAudioOnce() {
   const ctx = getAudioCtx();
   if (ctx.state === 'suspended') ctx.resume();
   document.removeEventListener('click', unlockAudioOnce);
 }, { once: true });
 
-// ---- Live orders listener ----
+// ===================== TAB 1: Shop info + QR + Menu items =====================
+async function loadShopInfo() {
+  const doc = await db.collection('shops').doc(currentShopId).get();
+  if (doc.exists) {
+    const info = doc.data().info || {};
+    document.getElementById('shopNameHeader').textContent = info.name || 'لوحة التحكم';
+
+    document.getElementById('shopNameInput').value = info.name || '';
+    document.getElementById('shopNameEnInput').value = info.nameEn || '';
+    document.getElementById('shopTaglineInput').value = info.tagline || '';
+    document.getElementById('shopLocationInput').value = info.location || '';
+    document.getElementById('shopPhoneInput').value = info.phone || '';
+    document.getElementById('shopWhatsappInput').value = info.whatsapp || '';
+    document.getElementById('shopEmailInput').value = info.email || '';
+    document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
+    document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
+
+    if (info.logo) {
+      const preview = document.getElementById('logoPreview');
+      preview.src = info.logo;
+      preview.style.display = 'block';
+      uploadedLogoUrl = info.logo;
+    }
+    if (info.coverImage) {
+      const coverPrev = document.getElementById('coverPreview');
+      coverPrev.src = info.coverImage;
+      coverPrev.style.display = 'block';
+      uploadedCoverUrl = info.coverImage;
+    }
+
+    const menuUrl = info.menuUrl || (window.location.href.replace('dashboard.html', '') + 'menu.html?shop=' + currentShopId);
+    document.getElementById('myMenuUrl').textContent = menuUrl;
+    try {
+      if (typeof QRCode === 'undefined') throw new Error('مكتبة QR ما تحمّلت من الإنترنت');
+      await QRCode.toCanvas(document.getElementById('myQrCanvas'), menuUrl, { width: 180 });
+    } catch (qrErr) {
+      console.error('QR generation failed:', qrErr);
+      document.getElementById('myMenuUrl').insertAdjacentHTML('afterend', `<div class="error-msg">تعذر توليد الباركود: ${qrErr.message}</div>`);
+    }
+  }
+}
+
+function downloadMyQr() {
+  const canvas = document.getElementById('myQrCanvas');
+  const link = document.createElement('a');
+  link.download = 'qr-code.png';
+  link.href = canvas.toDataURL();
+  link.click();
+}
+
+document.getElementById('shopLogoInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('logoUploadStatus');
+  statusEl.textContent = 'جاري رفع الشعار...';
+  try {
+    const path = `shops/${currentShopId}/logo_${Date.now()}_${file.name}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    uploadedLogoUrl = await ref.getDownloadURL();
+    const preview = document.getElementById('logoPreview');
+    preview.src = uploadedLogoUrl;
+    preview.style.display = 'block';
+    statusEl.textContent = 'تم رفع الشعار ✓ — لا تنسى تضغط "حفظ التغييرات"';
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'فشل رفع الشعار، حاول مرة أخرى.';
+  }
+});
+
+document.getElementById('shopCoverInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('coverUploadStatus');
+  statusEl.textContent = 'جاري رفع صورة الغلاف...';
+  try {
+    const path = `shops/${currentShopId}/cover_${Date.now()}_${file.name}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    uploadedCoverUrl = await ref.getDownloadURL();
+    const preview = document.getElementById('coverPreview');
+    preview.src = uploadedCoverUrl;
+    preview.style.display = 'block';
+    statusEl.textContent = 'تم رفع الغلاف ✓ — لا تنسى تضغط "حفظ التغييرات"';
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'فشل رفع الغلاف، حاول مرة أخرى.';
+  }
+});
+
+async function saveShopInfo() {
+  const errorEl = document.getElementById('shopInfoError');
+  const successEl = document.getElementById('shopInfoSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const name = document.getElementById('shopNameInput').value.trim();
+  const nameEn = document.getElementById('shopNameEnInput').value.trim();
+  const tagline = document.getElementById('shopTaglineInput').value.trim();
+  const location = document.getElementById('shopLocationInput').value.trim();
+  const phone = document.getElementById('shopPhoneInput').value.trim();
+  const whatsapp = document.getElementById('shopWhatsappInput').value.trim();
+  const email = document.getElementById('shopEmailInput').value.trim();
+  const color = document.getElementById('shopColorInput').value;
+  const prepTime = parseInt(document.getElementById('shopPrepTimeInput').value) || 10;
+
+  if (!name) {
+    errorEl.textContent = 'اسم الكوفي مطلوب.';
+    return;
+  }
+
+  try {
+    const updateData = {
+      'info.name': name,
+      'info.nameEn': nameEn,
+      'info.tagline': tagline,
+      'info.location': location,
+      'info.phone': phone,
+      'info.whatsapp': whatsapp,
+      'info.email': email,
+      'info.primaryColor': color,
+      'info.estimatedMinutes': prepTime
+    };
+    if (uploadedLogoUrl) updateData['info.logo'] = uploadedLogoUrl;
+    if (uploadedCoverUrl) updateData['info.coverImage'] = uploadedCoverUrl;
+
+    await db.collection('shops').doc(currentShopId).update(updateData);
+    document.getElementById('shopNameHeader').textContent = name;
+    successEl.textContent = 'تم الحفظ ✓';
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.';
+  }
+}
+
+async function loadItems() {
+  const listEl = document.getElementById('itemsList');
+  const snap = await db.collection('shops').doc(currentShopId).collection('menu').orderBy('category').get();
+
+  if (snap.empty) {
+    listEl.innerHTML = '<div class="state-msg">لا توجد أصناف بعد. أضف أول صنف بالأعلى.</div>';
+    return;
+  }
+
+  let html = '';
+  snap.forEach(doc => {
+    const item = doc.data();
+    html += `
+      <div class="dashboard-item">
+        ${item.image ? `<img src="${item.image}">` : '<div class="item-photo"></div>'}
+        <div class="grow">
+          <div class="item-name">${item.name} — ${Number(item.price).toFixed(2)} ر.ع</div>
+          <div class="item-desc">${item.category}${item.available === false ? ' · غير متاح' : ''}</div>
+        </div>
+        <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>تعديل</button>
+        <button class="btn btn-danger" onclick='deleteItem("${doc.id}")'>حذف</button>
+      </div>
+    `;
+  });
+  listEl.innerHTML = html;
+}
+
+document.getElementById('itemImage').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.textContent = 'جاري رفع الصورة...';
+  try {
+    const path = `shops/${currentShopId}/${Date.now()}_${file.name}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    uploadedImageUrl = await ref.getDownloadURL();
+    statusEl.textContent = 'تم رفع الصورة ✓';
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'فشل رفع الصورة، حاول مرة أخرى.';
+  }
+});
+
+async function saveItem() {
+  const errorEl = document.getElementById('formError');
+  errorEl.textContent = '';
+
+  const id = document.getElementById('itemId').value;
+  const name = document.getElementById('itemName').value.trim();
+  const category = document.getElementById('itemCategory').value.trim();
+  const description = document.getElementById('itemDesc').value.trim();
+  const price = parseFloat(document.getElementById('itemPrice').value);
+  const available = document.getElementById('itemAvailable').checked;
+
+  if (!name || !category || isNaN(price)) {
+    errorEl.textContent = 'الرجاء تعبئة الاسم والتصنيف والسعر على الأقل.';
+    return;
+  }
+
+  const itemData = { name, category, description, price, available };
+  if (uploadedImageUrl) itemData.image = uploadedImageUrl;
+
+  try {
+    const menuRef = db.collection('shops').doc(currentShopId).collection('menu');
+    if (id) {
+      await menuRef.doc(id).update(itemData);
+    } else {
+      await menuRef.add(itemData);
+    }
+    resetForm();
+    await loadItems();
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.';
+  }
+}
+
+async function editItem(id) {
+  const doc = await db.collection('shops').doc(currentShopId).collection('menu').doc(id).get();
+  if (!doc.exists) return;
+  const item = doc.data();
+
+  document.getElementById('itemId').value = id;
+  document.getElementById('itemName').value = item.name || '';
+  document.getElementById('itemCategory').value = item.category || '';
+  document.getElementById('itemDesc').value = item.description || '';
+  document.getElementById('itemPrice').value = item.price || '';
+  document.getElementById('itemAvailable').checked = item.available !== false;
+  document.getElementById('formTitle').textContent = 'تعديل الصنف';
+  uploadedImageUrl = item.image || null;
+
+  switchTab('dashboard');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteItem(id) {
+  if (!confirm('متأكد تبي تحذف هذا الصنف؟')) return;
+  await db.collection('shops').doc(currentShopId).collection('menu').doc(id).delete();
+  await loadItems();
+}
+
+function resetForm() {
+  document.getElementById('itemId').value = '';
+  document.getElementById('itemName').value = '';
+  document.getElementById('itemCategory').value = '';
+  document.getElementById('itemDesc').value = '';
+  document.getElementById('itemPrice').value = '';
+  document.getElementById('itemAvailable').checked = true;
+  document.getElementById('itemImage').value = '';
+  document.getElementById('uploadStatus').textContent = '';
+  document.getElementById('formTitle').textContent = 'إضافة صنف جديد';
+  document.getElementById('formError').textContent = '';
+  uploadedImageUrl = null;
+}
+
+// ===================== TAB 2: POS (orders + manual order) =====================
 const statusLabels = { pending: 'جديد', preparing: 'قيد التحضير', ready: 'جاهز' };
 const statusClasses = { pending: 'status-pending', preparing: 'status-preparing', ready: 'status-ready' };
 const nextStatus = { pending: 'preparing', preparing: 'ready' };
@@ -227,21 +574,18 @@ function listenToOrders() {
     .onSnapshot(snap => {
       const listEl = document.getElementById('ordersList');
 
-      // Detect brand-new orders (skip the very first load so it doesn't
-      // beep for orders that were already sitting there before you opened the page)
       if (!isFirstOrdersLoad) {
         const newOnes = snap.docChanges().filter(c => c.type === 'added');
         if (newOnes.length > 0) {
           playAlertSound();
           const bell = document.querySelector('.bell-wrap');
           bell.classList.remove('bell-shake');
-          void bell.offsetWidth; // restart animation
+          void bell.offsetWidth;
           bell.classList.add('bell-shake');
         }
       }
       isFirstOrdersLoad = false;
 
-      // Update the red badge count (pending orders needing attention)
       const pendingCount = snap.docs.filter(d => d.data().status === 'pending').length;
       const badge = document.getElementById('bellBadge');
       if (pendingCount > 0) {
@@ -284,268 +628,211 @@ function listenToOrders() {
 }
 
 async function advanceOrder(orderId, newStatus) {
-  await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId)
-    .update({ status: newStatus });
+  await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({ status: newStatus });
 }
 
-// ---- Load shop name for header ----
-let uploadedLogoUrl = null;
-let uploadedCoverUrl = null;
+// Manual "counter" order (staff-entered, no QR needed)
+let posCart = {};
+let posMenuItems = [];
 
-async function loadShopInfo() {
-  const doc = await db.collection('shops').doc(currentShopId).get();
-  if (doc.exists) {
-    const info = doc.data().info || {};
-    document.getElementById('shopNameHeader').textContent = info.name || 'لوحة التحكم';
-
-    // Populate the editable shop info form
-    document.getElementById('shopNameInput').value = info.name || '';
-    document.getElementById('shopTaglineInput').value = info.tagline || '';
-    document.getElementById('shopLocationInput').value = info.location || '';
-    document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
-    document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
-    if (info.logo) {
-      const preview = document.getElementById('logoPreview');
-      preview.src = info.logo;
-      preview.style.display = 'block';
-      uploadedLogoUrl = info.logo;
-    }
-    if (info.coverImage) {
-      const coverPrev = document.getElementById('coverPreview');
-      coverPrev.src = info.coverImage;
-      coverPrev.style.display = 'block';
-      uploadedCoverUrl = info.coverImage;
-    }
-
-    // Build (or reuse) the menu URL and render its QR code
-    const menuUrl = info.menuUrl || (window.location.href.replace('dashboard.html', '') + 'menu.html?shop=' + currentShopId);
-    document.getElementById('myMenuUrl').textContent = menuUrl;
-    try {
-      if (typeof QRCode === 'undefined') throw new Error('مكتبة QR ما تحمّلت من الإنترنت');
-      await QRCode.toCanvas(document.getElementById('myQrCanvas'), menuUrl, { width: 180 });
-    } catch (qrErr) {
-      console.error('QR generation failed:', qrErr);
-      document.getElementById('myMenuUrl').insertAdjacentHTML('afterend', `<div class="error-msg">تعذر توليد الباركود: ${qrErr.message}</div>`);
-    }
+async function openNewOrderModal() {
+  if (posMenuItems.length === 0) {
+    const snap = await db.collection('shops').doc(currentShopId).collection('menu').where('available', '!=', false).get();
+    posMenuItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }
+  posCart = {};
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'posOverlay';
+  let itemsHtml = posMenuItems.map(item => `
+    <div class="item-row">
+      <div class="item-info">
+        <div class="item-name">${item.name}</div>
+        <div class="item-price">${Number(item.price).toFixed(2)} ر.ع</div>
+      </div>
+      <div class="qty-control">
+        <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", ${item.price}, -1)'>−</button>
+        <span class="qty-count" id="pos-count-${item.id}">0</span>
+        <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", ${item.price}, 1)'>+</button>
+      </div>
+    </div>
+  `).join('');
+
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="document.getElementById('posOverlay').remove()">×</button>
+      <h3 style="margin:8px 0 16px;">طلب جديد من الكاونتر</h3>
+      ${itemsHtml}
+      <div class="field" style="margin-top:16px;">
+        <label for="posCustomerName">اسم العميل (اختياري)</label>
+        <input type="text" id="posCustomerName" placeholder="عميل الكاونتر">
+      </div>
+      <button class="btn" style="width:100%; margin-top:10px;" onclick="submitPosOrder()">إرسال الطلب</button>
+      <div id="posError" class="error-msg"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
 }
 
-// ---- Handle logo upload ----
-document.getElementById('shopLogoInput').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+function posChangeQty(id, name, price, delta) {
+  if (!posCart[id]) posCart[id] = { name, price, qty: 0 };
+  posCart[id].qty += delta;
+  if (posCart[id].qty <= 0) delete posCart[id];
+  const el = document.getElementById(`pos-count-${id}`);
+  if (el) el.textContent = posCart[id] ? posCart[id].qty : 0;
+}
 
-  const statusEl = document.getElementById('logoUploadStatus');
-  statusEl.textContent = 'جاري رفع الشعار...';
-
-  try {
-    const path = `shops/${currentShopId}/logo_${Date.now()}_${file.name}`;
-    const ref = storage.ref().child(path);
-    await ref.put(file);
-    uploadedLogoUrl = await ref.getDownloadURL();
-
-    const preview = document.getElementById('logoPreview');
-    preview.src = uploadedLogoUrl;
-    preview.style.display = 'block';
-    statusEl.textContent = 'تم رفع الشعار ✓ — لا تنسى تضغط "حفظ التغييرات"';
-  } catch (err) {
-    console.error(err);
-    statusEl.textContent = 'فشل رفع الشعار، حاول مرة أخرى.';
-  }
-});
-
-// ---- Handle cover image upload ----
-document.getElementById('shopCoverInput').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const statusEl = document.getElementById('coverUploadStatus');
-  statusEl.textContent = 'جاري رفع صورة الغلاف...';
-
-  try {
-    const path = `shops/${currentShopId}/cover_${Date.now()}_${file.name}`;
-    const ref = storage.ref().child(path);
-    await ref.put(file);
-    uploadedCoverUrl = await ref.getDownloadURL();
-
-    const preview = document.getElementById('coverPreview');
-    preview.src = uploadedCoverUrl;
-    preview.style.display = 'block';
-    statusEl.textContent = 'تم رفع الغلاف ✓ — لا تنسى تضغط "حفظ التغييرات"';
-  } catch (err) {
-    console.error(err);
-    statusEl.textContent = 'فشل رفع الغلاف، حاول مرة أخرى.';
-  }
-});
-
-// ---- Save shop info (name, location, color, logo) ----
-async function saveShopInfo() {
-  const errorEl = document.getElementById('shopInfoError');
-  const successEl = document.getElementById('shopInfoSuccess');
-  errorEl.textContent = '';
-  successEl.textContent = '';
-
-  const name = document.getElementById('shopNameInput').value.trim();
-  const tagline = document.getElementById('shopTaglineInput').value.trim();
-  const location = document.getElementById('shopLocationInput').value.trim();
-  const color = document.getElementById('shopColorInput').value;
-  const prepTime = parseInt(document.getElementById('shopPrepTimeInput').value) || 10;
-
-  if (!name) {
-    errorEl.textContent = 'اسم الكوفي مطلوب.';
+async function submitPosOrder() {
+  const errorEl = document.getElementById('posError');
+  const items = Object.values(posCart).map(i => ({ name: i.name, price: i.price, qty: i.qty }));
+  if (items.length === 0) {
+    errorEl.textContent = 'أضف صنف واحد على الأقل.';
     return;
   }
+  const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
+  const name = document.getElementById('posCustomerName').value.trim() || 'عميل الكاونتر';
 
   try {
-    const updateData = {
-      'info.name': name,
-      'info.tagline': tagline,
-      'info.location': location,
-      'info.primaryColor': color,
-      'info.estimatedMinutes': prepTime
-    };
-    if (uploadedLogoUrl) updateData['info.logo'] = uploadedLogoUrl;
-    if (uploadedCoverUrl) updateData['info.coverImage'] = uploadedCoverUrl;
-
-    await db.collection('shops').doc(currentShopId).update(updateData);
-    document.getElementById('shopNameHeader').textContent = name;
-    successEl.textContent = 'تم الحفظ ✓';
+    await db.collection('shops').doc(currentShopId).collection('orders').add({
+      customerName: name,
+      tableNumber: null,
+      notes: null,
+      items,
+      total,
+      status: 'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('posOverlay').remove();
   } catch (err) {
     console.error(err);
-    errorEl.textContent = 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.';
+    errorEl.textContent = 'حدث خطأ أثناء إرسال الطلب.';
   }
 }
 
-function downloadMyQr() {
-  const canvas = document.getElementById('myQrCanvas');
-  const link = document.createElement('a');
-  link.download = 'qr-code.png';
-  link.href = canvas.toDataURL();
-  link.click();
-}
-
-// ---- Load & render menu items ----
-async function loadItems() {
-  const listEl = document.getElementById('itemsList');
-  const snap = await db.collection('shops').doc(currentShopId)
-                        .collection('menu').orderBy('category').get();
+// ===================== TAB 3: Inventory =====================
+async function loadInventory() {
+  const listEl = document.getElementById('inventoryList');
+  const snap = await db.collection('shops').doc(currentShopId).collection('menu').orderBy('category').get();
 
   if (snap.empty) {
-    listEl.innerHTML = '<div class="state-msg">لا توجد أصناف بعد. أضف أول صنف بالأعلى.</div>';
+    listEl.innerHTML = '<div class="state-msg">أضف أصناف بالقائمة أولاً من تبويب "لوحة التحكم".</div>';
     return;
   }
 
   let html = '';
   snap.forEach(doc => {
     const item = doc.data();
+    const stock = item.stock;
+    const isLow = typeof stock === 'number' && stock <= 3;
     html += `
-      <div class="dashboard-item">
-        ${item.image ? `<img src="${item.image}">` : '<div class="item-photo"></div>'}
+      <div class="inventory-row">
         <div class="grow">
-          <div class="item-name">${item.name} — ${Number(item.price).toFixed(2)} ر.ع</div>
-          <div class="item-desc">${item.category}${item.available === false ? ' · غير متاح' : ''}</div>
+          <div class="item-name">${item.name}</div>
+          ${isLow ? `<div class="stock-low">⚠️ كمية منخفضة</div>` : ''}
         </div>
-        <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>تعديل</button>
-        <button class="btn btn-danger" onclick='deleteItem("${doc.id}")'>حذف</button>
+        <input type="number" min="0" placeholder="غير محدود" value="${stock !== undefined && stock !== null ? stock : ''}"
+               onchange="updateStock('${doc.id}', this.value)">
       </div>
     `;
   });
   listEl.innerHTML = html;
 }
 
-// ---- Handle image upload ----
-document.getElementById('itemImage').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const statusEl = document.getElementById('uploadStatus');
-  statusEl.textContent = 'جاري رفع الصورة...';
-
-  try {
-    const path = `shops/${currentShopId}/${Date.now()}_${file.name}`;
-    const ref = storage.ref().child(path);
-    await ref.put(file);
-    uploadedImageUrl = await ref.getDownloadURL();
-    statusEl.textContent = 'تم رفع الصورة ✓';
-  } catch (err) {
-    console.error(err);
-    statusEl.textContent = 'فشل رفع الصورة، حاول مرة أخرى.';
+async function updateStock(itemId, value) {
+  const ref = db.collection('shops').doc(currentShopId).collection('menu').doc(itemId);
+  if (value === '' || value === null) {
+    await ref.update({ stock: firebase.firestore.FieldValue.delete() });
+  } else {
+    await ref.update({ stock: parseInt(value) || 0 });
   }
-});
+  loadInventory();
+}
 
-// ---- Save (add or update) item ----
-async function saveItem() {
-  const errorEl = document.getElementById('formError');
-  errorEl.textContent = '';
+// ===================== TAB 4: Sales analytics =====================
+async function loadSales(range, btnEl) {
+  document.querySelectorAll('.range-tab').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
 
-  const id = document.getElementById('itemId').value;
-  const name = document.getElementById('itemName').value.trim();
-  const category = document.getElementById('itemCategory').value.trim();
-  const description = document.getElementById('itemDesc').value.trim();
-  const price = parseFloat(document.getElementById('itemPrice').value);
-  const available = document.getElementById('itemAvailable').checked;
-
-  if (!name || !category || isNaN(price)) {
-    errorEl.textContent = 'الرجاء تعبئة الاسم والتصنيف والسعر على الأقل.';
-    return;
+  const now = new Date();
+  let startDate;
+  if (range === 'day') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else if (range === 'week') {
+    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  } else {
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   }
 
-  const itemData = { name, category, description, price, available };
-  if (uploadedImageUrl) itemData.image = uploadedImageUrl;
+  const snap = await db.collection('shops').doc(currentShopId).collection('orders')
+    .where('createdAt', '>=', startDate)
+    .get();
+
+  let total = 0;
+  const itemCounts = {};
+
+  snap.forEach(doc => {
+    const order = doc.data();
+    total += Number(order.total) || 0;
+    (order.items || []).forEach(i => {
+      itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty;
+    });
+  });
+
+  document.getElementById('salesTotal').textContent = total.toFixed(2);
+  document.getElementById('salesCount').textContent = snap.size;
+
+  const sorted = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topEl = document.getElementById('topItemsList');
+  if (sorted.length === 0) {
+    topEl.innerHTML = '<div class="state-msg">لا توجد مبيعات بهذي الفترة.</div>';
+  } else {
+    topEl.innerHTML = sorted.map(([name, qty]) => `
+      <div class="top-item-row"><span>${name}</span><span>${qty} مبيعات</span></div>
+    `).join('');
+  }
+}
+
+// ===================== Account: delete account =====================
+async function deleteMyAccount() {
+  if (!confirm('تحذير: سيتم حذف قائمتك وطلباتك وكل بياناتك نهائياً. متابعة؟')) return;
+  if (!confirm('تأكيد أخير: هل أنت متأكد فعلاً من حذف حسابك؟')) return;
 
   try {
-    const menuRef = db.collection('shops').doc(currentShopId).collection('menu');
-    if (id) {
-      await menuRef.doc(id).update(itemData);
-    } else {
-      await menuRef.add(itemData);
+    const menuSnap = await db.collection('shops').doc(currentShopId).collection('menu').get();
+    for (const d of menuSnap.docs) await d.ref.delete();
+
+    const ordersSnap = await db.collection('shops').doc(currentShopId).collection('orders').get();
+    for (const d of ordersSnap.docs) await d.ref.delete();
+
+    try {
+      const listRes = await storage.ref().child(`shops/${currentShopId}`).listAll();
+      for (const item of listRes.items) await item.delete();
+    } catch (e) {
+      console.error('Storage cleanup error:', e);
     }
-    resetForm();
-    await loadItems();
+
+    await db.collection('shops').doc(currentShopId).delete();
+    await auth.currentUser.delete();
+
+    alert('تم حذف حسابك بنجاح.');
+    window.location.href = 'login.html';
   } catch (err) {
-    console.error(err);
-    errorEl.textContent = 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.';
+    if (err.code === 'auth/requires-recent-login') {
+      const pwd = prompt('لأسباب أمنية، أدخل كلمة المرور مرة أخرى لتأكيد الحذف:');
+      if (!pwd) return;
+      try {
+        const cred = firebase.auth.EmailAuthProvider.credential(auth.currentUser.email, pwd);
+        await auth.currentUser.reauthenticateWithCredential(cred);
+        await deleteMyAccount();
+      } catch (reErr) {
+        alert('فشلت إعادة التحقق: ' + reErr.message);
+      }
+    } else {
+      console.error(err);
+      alert('حدث خطأ أثناء الحذف: ' + err.message);
+    }
   }
-}
-
-// ---- Edit existing item (populate form) ----
-async function editItem(id) {
-  const doc = await db.collection('shops').doc(currentShopId).collection('menu').doc(id).get();
-  if (!doc.exists) return;
-  const item = doc.data();
-
-  document.getElementById('itemId').value = id;
-  document.getElementById('itemName').value = item.name || '';
-  document.getElementById('itemCategory').value = item.category || '';
-  document.getElementById('itemDesc').value = item.description || '';
-  document.getElementById('itemPrice').value = item.price || '';
-  document.getElementById('itemAvailable').checked = item.available !== false;
-  document.getElementById('formTitle').textContent = 'تعديل الصنف';
-  uploadedImageUrl = item.image || null;
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// ---- Delete item ----
-async function deleteItem(id) {
-  if (!confirm('متأكد تبي تحذف هذا الصنف؟')) return;
-  await db.collection('shops').doc(currentShopId).collection('menu').doc(id).delete();
-  await loadItems();
-}
-
-// ---- Reset form to "add new" state ----
-function resetForm() {
-  document.getElementById('itemId').value = '';
-  document.getElementById('itemName').value = '';
-  document.getElementById('itemCategory').value = '';
-  document.getElementById('itemDesc').value = '';
-  document.getElementById('itemPrice').value = '';
-  document.getElementById('itemAvailable').checked = true;
-  document.getElementById('itemImage').value = '';
-  document.getElementById('uploadStatus').textContent = '';
-  document.getElementById('formTitle').textContent = 'إضافة صنف جديد';
-  document.getElementById('formError').textContent = '';
-  uploadedImageUrl = null;
 }
 </script>
 
