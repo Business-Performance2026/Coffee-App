@@ -12,16 +12,26 @@
   <div class="state-msg">جاري تحميل القائمة...</div>
 </div>
 
-<!-- Firebase SDKs (compat, no build step needed) -->
+<!-- Floating cart bar -->
+<div class="cart-bar" id="cartBar" style="display:none;" onclick="openCartModal()">
+  <span id="cartCount">0 أصناف</span>
+  <span id="cartTotal">0.00 ر.ع</span>
+</div>
+
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 
 <script>
+let shopId = null;
+let shopInfo = {};
+let cart = {}; // { itemId: { name, price, qty } }
+
 async function loadMenu() {
   const app = document.getElementById('app');
   const params = new URLSearchParams(window.location.search);
-  const shopId = params.get('shop');
+  shopId = params.get('shop');
 
   if (!shopId) {
     app.innerHTML = '<div class="state-msg">رابط غير صحيح — لا يوجد معرّف كوفي.</div>';
@@ -29,7 +39,6 @@ async function loadMenu() {
   }
 
   try {
-    // 1. Fetch shop info (this shop only — scoped by shopId, never touches other shops)
     const shopDoc = await db.collection('shops').doc(shopId).get();
 
     if (!shopDoc.exists) {
@@ -38,43 +47,37 @@ async function loadMenu() {
     }
 
     const shop = shopDoc.data();
-    const info = shop.info || {};
+    shopInfo = shop.info || {};
 
-    // Check subscription status
-    const isActive = info.subscriptionStatus === 'active';
-    if (!isActive) {
+    if (shopInfo.subscriptionStatus !== 'active') {
       app.innerHTML = '<div class="state-msg">القائمة غير متاحة حالياً.</div>';
       return;
     }
 
-    // Apply shop's accent color dynamically
-    if (info.primaryColor) {
-      document.documentElement.style.setProperty('--accent', info.primaryColor);
+    if (shopInfo.primaryColor) {
+      document.documentElement.style.setProperty('--accent', shopInfo.primaryColor);
     }
-    document.title = info.name || 'القائمة';
+    document.title = shopInfo.name || 'القائمة';
 
-    // 2. Fetch menu items (sub-collection scoped to this shop only)
     const menuSnap = await db.collection('shops').doc(shopId)
                               .collection('menu')
                               .orderBy('category')
                               .get();
 
-    // Group items by category
     const categories = {};
     menuSnap.forEach(doc => {
       const item = doc.data();
       const cat = item.category || 'أخرى';
       if (!categories[cat]) categories[cat] = [];
-      categories[cat].push(item);
+      categories[cat].push({ id: doc.id, ...item });
     });
 
-    // 3. Render
     let html = `
       <div class="shop-header">
-        ${info.logo ? `<img src="${info.logo}" class="shop-logo" alt="${info.name || ''}">` : ''}
+        ${shopInfo.logo ? `<img src="${shopInfo.logo}" class="shop-logo" alt="${shopInfo.name || ''}">` : ''}
         <div>
-          <div class="shop-name display">${info.name || 'القائمة'}</div>
-          ${info.location ? `<div class="shop-meta">${info.location}</div>` : ''}
+          <div class="shop-name display">${shopInfo.name || 'القائمة'}</div>
+          ${shopInfo.location ? `<div class="shop-meta">${shopInfo.location}</div>` : ''}
         </div>
       </div>
     `;
@@ -93,8 +96,15 @@ async function loadMenu() {
             <div class="item-info">
               <div class="item-name">${item.name}</div>
               ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
+              <div class="item-price">${Number(item.price).toFixed(2)} ر.ع</div>
             </div>
-            <div class="item-price">${Number(item.price).toFixed(2)} ر.ع</div>
+            ${unavailable ? '' : `
+              <div class="qty-control" id="qty-${item.id}">
+                <button class="qty-btn" onclick='changeQty("${item.id}", "${escapeStr(item.name)}", ${item.price}, -1)'>−</button>
+                <span class="qty-count" id="count-${item.id}">0</span>
+                <button class="qty-btn" onclick='changeQty("${item.id}", "${escapeStr(item.name)}", ${item.price}, 1)'>+</button>
+              </div>
+            `}
           </div>
         `;
       });
@@ -105,6 +115,130 @@ async function loadMenu() {
   } catch (err) {
     console.error(err);
     app.innerHTML = '<div class="state-msg">حدث خطأ أثناء تحميل القائمة. حاول مرة أخرى.</div>';
+  }
+}
+
+function escapeStr(str) {
+  return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ---- Cart logic ----
+function changeQty(itemId, name, price, delta) {
+  if (!cart[itemId]) cart[itemId] = { name, price, qty: 0 };
+  cart[itemId].qty += delta;
+  if (cart[itemId].qty <= 0) delete cart[itemId];
+
+  const countEl = document.getElementById(`count-${itemId}`);
+  if (countEl) countEl.textContent = cart[itemId] ? cart[itemId].qty : 0;
+
+  updateCartBar();
+}
+
+function updateCartBar() {
+  const bar = document.getElementById('cartBar');
+  const items = Object.values(cart);
+  const totalQty = items.reduce((sum, i) => sum + i.qty, 0);
+  const totalPrice = items.reduce((sum, i) => sum + i.qty * i.price, 0);
+
+  if (totalQty === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  bar.style.display = 'flex';
+  document.getElementById('cartCount').textContent = `${totalQty} أصناف`;
+  document.getElementById('cartTotal').textContent = `${totalPrice.toFixed(2)} ر.ع`;
+}
+
+function openCartModal() {
+  const items = Object.entries(cart);
+  if (items.length === 0) return;
+
+  const total = items.reduce((sum, [, i]) => sum + i.qty * i.price, 0);
+
+  let linesHtml = '';
+  items.forEach(([id, i]) => {
+    linesHtml += `
+      <div class="cart-line">
+        <span>${i.name} × ${i.qty}</span>
+        <span>${(i.qty * i.price).toFixed(2)} ر.ع</span>
+      </div>
+    `;
+  });
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'cartOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="closeCartModal()">×</button>
+      <h3 style="margin:8px 0 16px;">مراجعة الطلب</h3>
+      ${linesHtml}
+      <div class="cart-total-line">
+        <span>الإجمالي</span>
+        <span>${total.toFixed(2)} ر.ع</span>
+      </div>
+
+      <div class="field" style="margin-top:16px;">
+        <label for="custName">اسمك</label>
+        <input type="text" id="custName" placeholder="مثال: أحمد">
+      </div>
+      <div class="field">
+        <label for="tableNum">رقم الطاولة (اختياري)</label>
+        <input type="text" id="tableNum" placeholder="مثال: 5">
+      </div>
+
+      <button class="btn" style="width:100%;" onclick="submitOrder()">إرسال الطلب</button>
+      <div id="orderError" class="error-msg"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function closeCartModal() {
+  const overlay = document.getElementById('cartOverlay');
+  if (overlay) overlay.remove();
+}
+
+async function submitOrder() {
+  const errorEl = document.getElementById('orderError');
+  const name = document.getElementById('custName').value.trim();
+  const table = document.getElementById('tableNum').value.trim();
+
+  if (!name) {
+    errorEl.textContent = 'الرجاء إدخال اسمك.';
+    return;
+  }
+
+  const items = Object.values(cart).map(i => ({ name: i.name, price: i.price, qty: i.qty }));
+  const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
+
+  try {
+    await db.collection('shops').doc(shopId).collection('orders').add({
+      customerName: name,
+      tableNumber: table || null,
+      items,
+      total,
+      status: 'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Reset cart & show success
+    cart = {};
+    updateCartBar();
+    document.querySelectorAll('.qty-count').forEach(el => el.textContent = '0');
+
+    document.querySelector('.modal-sheet').innerHTML = `
+      <div class="order-success">
+        <div class="big-check">✓</div>
+        <h3>تم إرسال طلبك!</h3>
+        <p style="color:var(--stone);">راح يوصلك قريباً</p>
+        <button class="btn" onclick="closeCartModal()" style="margin-top:10px;">تمام</button>
+      </div>
+    `;
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = 'حدث خطأ أثناء إرسال الطلب. حاول مرة أخرى.';
   }
 }
 

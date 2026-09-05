@@ -15,6 +15,12 @@
     <button class="btn btn-ghost" onclick="logout()">تسجيل خروج</button>
   </div>
 
+  <!-- Incoming orders -->
+  <h3 style="margin:0 0 12px;">الطلبات الواردة</h3>
+  <div id="ordersList" style="margin-bottom:28px;">
+    <div class="state-msg">جاري التحميل...</div>
+  </div>
+
   <!-- Add / edit item form -->
   <div class="card">
     <h3 style="margin-bottom:16px;" id="formTitle">إضافة صنف جديد</h3>
@@ -88,10 +94,60 @@ auth.onAuthStateChanged(async user => {
 
   await loadShopInfo();
   await loadItems();
+  listenToOrders();
 });
 
 function logout() {
   auth.signOut().then(() => window.location.href = 'login.html');
+}
+
+// ---- Live orders listener ----
+const statusLabels = { pending: 'جديد', preparing: 'قيد التحضير', ready: 'جاهز' };
+const statusClasses = { pending: 'status-pending', preparing: 'status-preparing', ready: 'status-ready' };
+const nextStatus = { pending: 'preparing', preparing: 'ready' };
+const nextLabel = { pending: 'ابدأ التحضير', preparing: 'تم — جاهز' };
+
+function listenToOrders() {
+  db.collection('shops').doc(currentShopId).collection('orders')
+    .where('status', 'in', ['pending', 'preparing'])
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(snap => {
+      const listEl = document.getElementById('ordersList');
+
+      if (snap.empty) {
+        listEl.innerHTML = '<div class="state-msg">لا توجد طلبات حالياً.</div>';
+        return;
+      }
+
+      let html = '';
+      snap.forEach(doc => {
+        const order = doc.data();
+        const itemsText = order.items.map(i => `${i.name} ×${i.qty}`).join('، ');
+        const status = order.status || 'pending';
+
+        html += `
+          <div class="order-card">
+            <div class="order-card-top">
+              <strong>${order.customerName}${order.tableNumber ? ' · طاولة ' + order.tableNumber : ''}</strong>
+              <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
+            </div>
+            <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ر.ع</div>
+            <div class="order-actions">
+              ${nextStatus[status] ? `<button class="btn" style="padding:6px 14px; font-size:0.85rem;" onclick='advanceOrder("${doc.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
+            </div>
+          </div>
+        `;
+      });
+      listEl.innerHTML = html;
+    }, err => {
+      console.error(err);
+      document.getElementById('ordersList').innerHTML = '<div class="state-msg">تعذر تحميل الطلبات.</div>';
+    });
+}
+
+async function advanceOrder(orderId, newStatus) {
+  await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId)
+    .update({ status: newStatus });
 }
 
 // ---- Load shop name for header ----
