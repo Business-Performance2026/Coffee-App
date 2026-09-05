@@ -297,16 +297,22 @@ function trackOrder(orderId) {
 
 function renderTracker(status) {
   const stepIndex = statusSteps.indexOf(status);
-  let html = '<div class="order-track">';
+
+  let barHtml = '<div class="timeline-bar">';
   statusSteps.forEach((s, i) => {
     const state = i < stepIndex ? 'done' : (i === stepIndex ? 'active' : '');
-    html += `<div class="track-step ${state}"><div class="track-dot">${i < stepIndex ? '✓' : i + 1}</div><div class="track-label">${statusStepLabels[s]}</div></div>`;
-    if (i < statusSteps.length - 1) {
-      html += `<div class="track-line ${i < stepIndex ? 'done' : ''}"></div>`;
-    }
+    barHtml += `<div class="timeline-segment ${state}"></div>`;
   });
-  html += '</div>';
-  return html;
+  barHtml += '</div>';
+
+  let labelsHtml = '<div class="timeline-labels">';
+  statusSteps.forEach((s, i) => {
+    const state = i < stepIndex ? 'done' : (i === stepIndex ? 'active' : '');
+    labelsHtml += `<span class="${state}">${statusStepLabels[s]}</span>`;
+  });
+  labelsHtml += '</div>';
+
+  return `<div class="order-track">${barHtml}${labelsHtml}</div>`;
 }
 
 function openStatusModal() {

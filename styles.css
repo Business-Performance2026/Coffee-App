@@ -503,3 +503,72 @@ button, input, select {
 .cart-bar {
   bottom: calc(16px + env(safe-area-inset-bottom));
 }
+
+/* ---- Order status tracking (customer side) ---- */
+.status-bar {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: 16px;
+  right: 16px;
+  max-width: 608px;
+  margin: 0 auto;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 999px;
+  padding: 14px 22px;
+  text-align: center;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  z-index: 10;
+}
+
+.status-bar.status-bar-ready {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.order-track {
+  padding: 14px 4px 4px;
+}
+
+.timeline-bar {
+  display: flex;
+  gap: 4px;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.timeline-segment {
+  flex: 1;
+  background: var(--line);
+  transition: background 0.3s ease;
+}
+
+.timeline-segment.done {
+  background: var(--accent);
+}
+
+.timeline-segment.active {
+  background: var(--accent);
+  opacity: 0.5;
+}
+
+.timeline-labels {
+  display: flex;
+  margin-top: 10px;
+}
+
+.timeline-labels span {
+  flex: 1;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--stone);
+}
+
+.timeline-labels span.done,
+.timeline-labels span.active {
+  color: var(--ink);
+  font-weight: 500;
+}
