@@ -313,6 +313,8 @@ function trackOrder(orderId) {
 
       const trackerEl = document.getElementById('trackerContainer');
       if (trackerEl) trackerEl.innerHTML = renderTracker(status);
+    }, err => {
+      console.error('Order tracking error:', err);
     });
 }
 
