@@ -8,6 +8,8 @@
 </head>
 <body>
 
+<audio id="alertSound" src="beep.wav" preload="auto"></audio>
+
 <div class="wrap" id="soundBanner" style="max-width:640px; margin:12px auto 0; display:none;">
   <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px;">
     <span>🔔 فعّل صوت التنبيهات عشان تسمع الطلبات الجديدة</span>
@@ -124,47 +126,32 @@ function logout() {
 }
 
 // ---- Sound alert system ----
-let audioCtx = null;
 let soundEnabled = false;
+const alertAudio = document.getElementById('alertSound');
 
 function enableSound() {
-  try {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    audioCtx.resume().then(() => {
+  alertAudio.play()
+    .then(() => {
       soundEnabled = true;
       document.getElementById('soundBanner').style.display = 'none';
-      // Play a quiet confirmation beep so the owner knows it worked
-      playAlertSound();
+    })
+    .catch(err => {
+      console.error('Sound unlock failed:', err);
+      alert('تعذر تفعيل الصوت: ' + err.message + '\nتأكد إن صوت الجهاز مو مكتوم.');
     });
-  } catch (e) {
-    console.error('Could not enable sound:', e);
-  }
 }
 
 // Try to silently unlock audio on the very first tap/click anywhere on the page
-// (covers owners who interact with the page before noticing the banner)
 document.addEventListener('click', function unlockOnce() {
-  if (!soundEnabled) enableSound();
+  if (!soundEnabled) {
+    alertAudio.play().then(() => { soundEnabled = true; }).catch(() => {});
+  }
   document.removeEventListener('click', unlockOnce);
 }, { once: true });
 
 function playAlertSound() {
-  if (!audioCtx) return;
-  try {
-    [0, 0.25].forEach(delay => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.15, audioCtx.currentTime + delay);
-      osc.start(audioCtx.currentTime + delay);
-      osc.stop(audioCtx.currentTime + delay + 0.18);
-    });
-  } catch (e) { console.error('Sound error:', e); }
+  alertAudio.currentTime = 0;
+  alertAudio.play().catch(err => console.error('Playback error:', err));
 }
 
 // ---- Live orders listener ----
