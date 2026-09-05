@@ -18,6 +18,11 @@
   <span id="cartTotal">0.00 ر.ع</span>
 </div>
 
+<!-- Persistent order status bar (shown after an order is placed) -->
+<div class="status-bar" id="orderStatusBar" style="display:none;" onclick="openStatusModal()">
+  <span id="statusBarText"></span>
+</div>
+
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
@@ -231,7 +236,7 @@ async function submitOrder() {
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
 
   try {
-    await db.collection('shops').doc(shopId).collection('orders').add({
+    const docRef = await db.collection('shops').doc(shopId).collection('orders').add({
       customerName: name,
       tableNumber: table || null,
       items,
@@ -240,23 +245,96 @@ async function submitOrder() {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    // Reset cart & show success
+    // Reset cart
     cart = {};
     updateCartBar();
     document.querySelectorAll('.qty-count').forEach(el => el.textContent = '0');
 
+    // Start live tracking of this order and show the step tracker
+    trackOrder(docRef.id);
+
     document.querySelector('.modal-sheet').innerHTML = `
-      <div class="order-success">
-        <div class="big-check">✓</div>
-        <h3>تم إرسال طلبك!</h3>
-        <p style="color:var(--stone);">راح يوصلك قريباً</p>
-        <button class="btn" onclick="closeCartModal()" style="margin-top:10px;">تمام</button>
-      </div>
+      <h3 style="margin:8px 0 20px; text-align:center;">تم إرسال طلبك!</h3>
+      <div id="trackerContainer">${renderTracker('pending')}</div>
+      <button class="btn" style="width:100%; margin-top:24px;" onclick="closeCartModal()">تمام</button>
     `;
   } catch (err) {
     console.error(err);
     errorEl.textContent = 'حدث خطأ أثناء إرسال الطلب. حاول مرة أخرى.';
   }
+}
+
+// ---- Live order status tracking ----
+const statusSteps = ['pending', 'preparing', 'ready'];
+const statusStepLabels = { pending: 'استلم طلبك', preparing: 'جاري التحضير', ready: 'الطلب جاهز' };
+const statusBarTextMap = {
+  pending: '✅ تم استلام طلبك',
+  preparing: '🔥 جاري تحضير طلبك',
+  ready: '🎉 طلبك جاهز — تفضل استلمه'
+};
+
+let activeOrderId = null;
+let activeOrderUnsub = null;
+
+function trackOrder(orderId) {
+  activeOrderId = orderId;
+  if (activeOrderUnsub) activeOrderUnsub();
+
+  activeOrderUnsub = db.collection('shops').doc(shopId).collection('orders').doc(orderId)
+    .onSnapshot(doc => {
+      if (!doc.exists) return;
+      const status = doc.data().status || 'pending';
+
+      const bar = document.getElementById('orderStatusBar');
+      bar.style.display = 'block';
+      document.getElementById('statusBarText').textContent = statusBarTextMap[status] || '';
+      bar.classList.toggle('status-bar-ready', status === 'ready');
+
+      const trackerEl = document.getElementById('trackerContainer');
+      if (trackerEl) trackerEl.innerHTML = renderTracker(status);
+    });
+}
+
+function renderTracker(status) {
+  const stepIndex = statusSteps.indexOf(status);
+  let html = '<div class="order-track">';
+  statusSteps.forEach((s, i) => {
+    const state = i < stepIndex ? 'done' : (i === stepIndex ? 'active' : '');
+    html += `<div class="track-step ${state}"><div class="track-dot">${i < stepIndex ? '✓' : i + 1}</div><div class="track-label">${statusStepLabels[s]}</div></div>`;
+    if (i < statusSteps.length - 1) {
+      html += `<div class="track-line ${i < stepIndex ? 'done' : ''}"></div>`;
+    }
+  });
+  html += '</div>';
+  return html;
+}
+
+function openStatusModal() {
+  if (!activeOrderId) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'statusOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="closeStatusModal()">×</button>
+      <h3 style="margin:8px 0 20px; text-align:center;">حالة طلبك</h3>
+      <div id="trackerContainer">${renderTracker(statusSteps[0])}</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Immediately refresh with the real current status
+  db.collection('shops').doc(shopId).collection('orders').doc(activeOrderId).get().then(doc => {
+    if (doc.exists) {
+      document.getElementById('trackerContainer').innerHTML = renderTracker(doc.data().status || 'pending');
+    }
+  });
+}
+
+function closeStatusModal() {
+  const overlay = document.getElementById('statusOverlay');
+  if (overlay) overlay.remove();
 }
 
 loadMenu();
