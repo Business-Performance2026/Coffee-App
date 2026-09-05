@@ -22,6 +22,14 @@
     </div>
     <button class="btn" style="width:100%;" onclick="login()">دخول</button>
     <div id="error" class="error-msg"></div>
+    <div id="successMsg" style="color:#3D6B4F; font-size:0.85rem; margin-top:8px;"></div>
+
+    <div style="text-align:center; margin-top:16px; font-size:0.85rem;">
+      <a href="#" onclick="forgotPassword(); return false;" style="color:var(--accent);">نسيت كلمة المرور؟</a>
+    </div>
+    <div style="text-align:center; margin-top:10px; font-size:0.85rem; color:var(--stone);">
+      ما عندك حساب؟ <a href="signup.html" style="color:var(--accent);">سجّل كوفيك الآن</a>
+    </div>
   </div>
 </div>
 
@@ -59,6 +67,28 @@ function login() {
 document.getElementById('password').addEventListener('keydown', e => {
   if (e.key === 'Enter') login();
 });
+
+function forgotPassword() {
+  const email = document.getElementById('email').value.trim();
+  const errorEl = document.getElementById('error');
+  const successEl = document.getElementById('successMsg');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  if (!email) {
+    errorEl.textContent = 'اكتب بريدك الإلكتروني بالخانة فوق أولاً، وبعدين اضغط "نسيت كلمة المرور".';
+    return;
+  }
+
+  auth.sendPasswordResetEmail(email)
+    .then(() => {
+      successEl.textContent = 'تم إرسال رابط إعادة تعيين كلمة المرور لبريدك الإلكتروني ✓';
+    })
+    .catch(err => {
+      console.error(err);
+      errorEl.textContent = 'تعذر إرسال رابط إعادة التعيين. تأكد من صحة البريد الإلكتروني.';
+    });
+}
 </script>
 
 </body>

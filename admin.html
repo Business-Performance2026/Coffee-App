@@ -148,11 +148,17 @@ async function loadShops() {
     const shop = doc.data();
     const info = shop.info || {};
     const active = info.subscriptionStatus === 'active';
+    const statusLabel = info.subscriptionStatus === 'pending' ? 'بانتظار التفعيل' : (active ? 'مفعّل ✓' : 'موقوف');
     html += `
-      <div class="dashboard-item">
+      <div class="dashboard-item" style="flex-wrap:wrap;">
         <div class="grow">
-          <div class="item-name">${info.name || '(بدون اسم)'}</div>
-          <div class="item-desc">${info.location || ''} · ${active ? 'مفعّل ✓' : 'موقوف'}</div>
+          <div class="item-name">${info.name || info.email || '(بدون اسم)'}</div>
+          <div class="item-desc">${info.location || ''} · ${statusLabel}</div>
+          ${!active && info.suspensionReason ? `<div class="item-desc" style="color:#B3441E;">السبب: ${info.suspensionReason}</div>` : ''}
+          <div class="field" style="margin:8px 0 0;">
+            <label style="font-size:0.75rem;">تاريخ انتهاء الاشتراك</label>
+            <input type="date" value="${info.subscriptionEndDate || ''}" onchange="updateEndDate('${doc.id}', this.value)" style="padding:6px 8px;">
+          </div>
         </div>
         <button class="btn ${active ? 'btn-danger' : 'btn-ghost'}" onclick='toggleSubscription("${doc.id}", ${active})'>
           ${active ? 'إيقاف' : 'تفعيل'}
@@ -163,11 +169,27 @@ async function loadShops() {
   listEl.innerHTML = html;
 }
 
+async function updateEndDate(shopId, value) {
+  await db.collection('shops').doc(shopId).update({ 'info.subscriptionEndDate': value || null });
+}
+
 // ---- Toggle a shop's subscription on/off ----
 async function toggleSubscription(shopId, currentlyActive) {
-  await db.collection('shops').doc(shopId).update({
+  const updateData = {
     'info.subscriptionStatus': currentlyActive ? 'expired' : 'active'
-  });
+  };
+
+  if (currentlyActive) {
+    // Being suspended — ask why, so the owner can see the reason on their dashboard
+    const reason = prompt('ليش تبي توقف هذا الكوفي؟ (بيظهر السبب لصاحب الكوفي)');
+    if (reason === null) return; // admin cancelled the prompt — abort the whole action
+    updateData['info.suspensionReason'] = reason || 'غير محدد';
+  } else {
+    // Being reactivated — clear any old suspension reason
+    updateData['info.suspensionReason'] = firebase.firestore.FieldValue.delete();
+  }
+
+  await db.collection('shops').doc(shopId).update(updateData);
   await loadShops();
 }
 

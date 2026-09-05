@@ -709,6 +709,27 @@ button, input, select {
 
 .stock-low { color: #B3441E; font-size: 0.78rem; margin-top:2px; }
 
+/* ---- Subscription status banners (owner dashboard) ---- */
+.sub-banner {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.sub-banner-danger {
+  background: #FBEAE5;
+  color: #B3441E;
+  border: 1px solid #E4B8AC;
+}
+
+.sub-banner-warning {
+  background: #FDF3D9;
+  color: #8A6414;
+  border: 1px solid #E9D190;
+}
+
 /* ---- Sales tab ---- */
 .range-tabs {
   display: flex;

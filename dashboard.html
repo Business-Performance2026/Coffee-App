@@ -12,6 +12,8 @@
 
 <div class="wrap" id="app" style="display:none; padding-bottom:80px;">
 
+  <div id="subscriptionBanner"></div>
+
   <div class="top-bar">
     <div class="shop-name display" id="shopNameHeader">لوحة التحكم</div>
     <div class="bell-wrap" onclick="switchTab('pos')">
@@ -396,6 +398,8 @@ async function loadShopInfo() {
     document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
     document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
 
+    renderSubscriptionBanner(info);
+
     if (info.logo) {
       const preview = document.getElementById('logoPreview');
       preview.src = info.logo;
@@ -419,6 +423,41 @@ async function loadShopInfo() {
       document.getElementById('myMenuUrl').insertAdjacentHTML('afterend', `<div class="error-msg">تعذر توليد الباركود: ${qrErr.message}</div>`);
     }
   }
+}
+
+function renderSubscriptionBanner(info) {
+  const bannerEl = document.getElementById('subscriptionBanner');
+  const isActive = info.subscriptionStatus === 'active';
+
+  if (!isActive) {
+    bannerEl.innerHTML = `
+      <div class="sub-banner sub-banner-danger">
+        ⚠️ حسابك موقوف حالياً — قائمتك غير ظاهرة للعملاء.
+        ${info.suspensionReason ? `<br>السبب: ${info.suspensionReason}` : ''}
+      </div>
+    `;
+    return;
+  }
+
+  if (info.subscriptionEndDate) {
+    const end = new Date(info.subscriptionEndDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
+
+    if (daysLeft <= 3 && daysLeft >= 0) {
+      const daysText = daysLeft === 0 ? 'اليوم' : (daysLeft === 1 ? 'يوم واحد' : `${daysLeft} أيام`);
+      bannerEl.innerHTML = `
+        <div class="sub-banner sub-banner-warning">
+          ⏰ اشتراكك سينتهي خلال ${daysText}. تواصل معنا للتجديد.
+        </div>
+      `;
+      return;
+    }
+  }
+
+  bannerEl.innerHTML = '';
 }
 
 function downloadMyQr() {
