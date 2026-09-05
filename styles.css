@@ -547,10 +547,14 @@ button, input, select {
   display: block;
 }
 
-.grid-add-btn {
+.grid-qty-container {
   position: absolute;
   bottom: -14px;
   inset-inline-end: 10px;
+  z-index: 2;
+}
+
+.grid-add-btn {
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -567,9 +571,6 @@ button, input, select {
 }
 
 .grid-qty-stepper {
-  position: absolute;
-  bottom: -14px;
-  inset-inline-end: 10px;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -579,6 +580,7 @@ button, input, select {
   border: 3px solid white;
   box-shadow: 0 4px 10px rgba(0,0,0,0.22);
   padding: 0 2px;
+  white-space: nowrap;
 }
 
 .grid-qty-stepper button {
@@ -593,6 +595,7 @@ button, input, select {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .grid-qty-stepper .grid-qty-num {
@@ -600,6 +603,7 @@ button, input, select {
   text-align: center;
   font-weight: 600;
   font-size: 0.82rem;
+  flex-shrink: 0;
 }
 
 .grid-qty-badge {
