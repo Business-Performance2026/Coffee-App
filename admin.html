@@ -32,6 +32,9 @@
     <button class="btn btn-ghost" onclick="adminLogout()">تسجيل خروج</button>
   </div>
 
+  <!-- Expiring-soon alert (auto-computed on load) -->
+  <div id="expiringBanner"></div>
+
   <!-- Overview stats -->
   <div class="sales-summary" style="flex-wrap:wrap; margin-bottom:16px;">
     <div class="sales-summary-box">
@@ -181,8 +184,47 @@ async function loadShops() {
   document.getElementById('statPending').textContent = pending;
   document.getElementById('statExpired').textContent = expired;
 
+  renderExpiringBanner();
   renderShopsList();
 }
+
+function renderExpiringBanner() {
+  const bannerEl = document.getElementById('expiringBanner');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const expiringSoon = allShopsData
+    .filter(s => s.info.subscriptionStatus === 'active' && s.info.subscriptionEndDate)
+    .map(s => {
+      const end = new Date(s.info.subscriptionEndDate);
+      end.setHours(0, 0, 0, 0);
+      const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
+      return { ...s, daysLeft };
+    })
+    .filter(s => s.daysLeft <= 3)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+
+  if (expiringSoon.length === 0) {
+    bannerEl.innerHTML = '';
+    return;
+  }
+
+  let rows = expiringSoon.map(s => {
+    const label = s.daysLeft < 0
+      ? `منتهي منذ ${Math.abs(s.daysLeft)} يوم`
+      : (s.daysLeft === 0 ? 'ينتهي اليوم' : `باقي ${s.daysLeft} يوم`);
+    return `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.06);">
+      <span>${s.info.name || s.info.email || '(بدون اسم)'}</span>
+      <strong>${label}</strong>
+    </div>`;
+  }).join('');
+
+  bannerEl.innerHTML = `
+    <div class="sub-banner sub-banner-warning" style="margin-bottom:16px;">
+      ⏰ <strong>${expiringSoon.length}</strong> كوفي محتاج متابعة (اشتراكهم قارب ينتهي أو انتهى):
+      <div style="margin-top:8px;">${rows}</div>
+    </div>
+  `;
 
 function setStatusFilter(filter, btnEl) {
   statusFilter = filter;
