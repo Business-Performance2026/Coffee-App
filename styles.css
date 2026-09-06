@@ -883,6 +883,23 @@ button, input, select {
   padding: 6px;
 }
 
+/* ---- Category suggestion chips ---- */
+.category-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--stone);
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.category-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .cart-bar {
   bottom: calc(16px + env(safe-area-inset-bottom));
 }

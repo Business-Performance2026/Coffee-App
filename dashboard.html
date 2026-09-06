@@ -68,11 +68,13 @@
         <div class="field">
           <label for="itemCategory" data-i18n="itemCatAr">التصنيف (عربي)</label>
           <input type="text" id="itemCategory" placeholder="مثال: مشروبات ساخنة">
+          <div id="categoryChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
         </div>
 
         <div class="field">
           <label for="itemCategoryEn" data-i18n="itemCatEn">التصنيف (إنجليزي)</label>
           <input type="text" id="itemCategoryEn" placeholder="e.g. Hot Drinks">
+          <div id="categoryEnChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
         </div>
 
         <div class="field">
@@ -779,9 +781,31 @@ async function saveShopInfo() {
   }
 }
 
+function renderCategoryChips(containerId, inputId, categories) {
+  const container = document.getElementById(containerId);
+  if (categories.size === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = Array.from(categories).map(cat => `
+    <button type="button" class="category-chip" onclick="document.getElementById('${inputId}').value = this.textContent">${cat}</button>
+  `).join('');
+}
+
 async function loadItems() {
   const listEl = document.getElementById('itemsList');
   const snap = await db.collection('shops').doc(currentShopId).collection('menu').orderBy('category').get();
+
+  // Collect distinct categories used so far, to power the suggestion chips
+  const categoriesAr = new Set();
+  const categoriesEn = new Set();
+  snap.forEach(doc => {
+    const item = doc.data();
+    if (item.category) categoriesAr.add(item.category);
+    if (item.categoryEn) categoriesEn.add(item.categoryEn);
+  });
+  renderCategoryChips('categoryChips', 'itemCategory', categoriesAr);
+  renderCategoryChips('categoryEnChips', 'itemCategoryEn', categoriesEn);
 
   if (snap.empty) {
     listEl.innerHTML = `<div class="state-msg">${dt('noItemsYet')}</div>`;
