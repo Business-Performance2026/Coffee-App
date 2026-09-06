@@ -155,7 +155,7 @@ async function loadMenu() {
       <div class="menu-hero" ${coverStyle}>
         ${shopInfo.logo ? `<img src="${shopInfo.logo}" class="menu-hero-logo" alt="${shopName}">` : ''}
         <div class="menu-hero-name display">${shopName}</div>
-        ${shopInfo.tagline ? `<div class="menu-hero-tagline">${shopInfo.tagline}</div>` : ''}
+        ${(currentLang === 'en' && shopInfo.taglineEn) ? `<div class="menu-hero-tagline">${shopInfo.taglineEn}</div>` : (shopInfo.tagline ? `<div class="menu-hero-tagline">${shopInfo.tagline}</div>` : '')}
         ${shopInfo.location ? `<div class="menu-hero-location">${shopInfo.location}</div>` : ''}
       </div>
     `;

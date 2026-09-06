@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة التحكم</title>
+<title data-i18n="pageTitle">لوحة التحكم</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<div id="loadingMsg" class="state-msg">جاري التحقق من تسجيل الدخول...</div>
+<div id="loadingMsg" class="state-msg" data-i18n="checkingLogin">جاري التحقق من تسجيل الدخول...</div>
 
 <div class="wrap" id="app" style="display:none; padding-bottom:80px;">
 
@@ -16,8 +16,11 @@
 
   <div class="top-bar">
     <div class="shop-name display" id="shopNameHeader">لوحة التحكم</div>
-    <div class="bell-wrap" onclick="switchTab('pos')">
-      🔔<span class="bell-badge" id="bellBadge" style="display:none;">0</span>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <button class="lang-toggle" id="dashLangToggle" onclick="toggleDashLang()" style="position:static; box-shadow:none; padding:6px 12px;">EN</button>
+      <div class="bell-wrap" onclick="switchTab('pos')">
+        🔔<span class="bell-badge" id="bellBadge" style="display:none;">0</span>
+      </div>
     </div>
   </div>
 
@@ -26,64 +29,64 @@
 
     <div class="icon-subnav">
       <button class="icon-subnav-btn" data-sub="qr" onclick="switchSubView('qr')">
-        <span class="icon-subnav-icon">📱</span><span class="icon-subnav-label">الباركود</span>
+        <span class="icon-subnav-icon">📱</span><span class="icon-subnav-label" data-i18n="subQr">الباركود</span>
       </button>
       <button class="icon-subnav-btn" data-sub="add" onclick="switchSubView('add')">
-        <span class="icon-subnav-icon">➕</span><span class="icon-subnav-label">إضافة صنف</span>
+        <span class="icon-subnav-icon">➕</span><span class="icon-subnav-label" data-i18n="subAdd">إضافة صنف</span>
       </button>
       <button class="icon-subnav-btn active" data-sub="list" onclick="switchSubView('list')">
-        <span class="icon-subnav-icon">📃</span><span class="icon-subnav-label">قائمة الأصناف</span>
+        <span class="icon-subnav-icon">📃</span><span class="icon-subnav-label" data-i18n="subList">قائمة الأصناف</span>
       </button>
     </div>
 
     <!-- Sub-view: QR -->
     <div id="sub-qr" class="sub-view">
       <div class="card" style="text-align:center;">
-        <h3 style="margin-bottom:12px;">باركود قائمتك</h3>
+        <h3 style="margin-bottom:12px;" data-i18n="qrTitle">باركود قائمتك</h3>
         <canvas id="myQrCanvas"></canvas>
         <div id="myMenuUrl" style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:10px 0;"></div>
-        <button class="btn btn-ghost" onclick="downloadMyQr()">تحميل الباركود</button>
+        <button class="btn btn-ghost" onclick="downloadMyQr()" data-i18n="downloadQr">تحميل الباركود</button>
       </div>
     </div>
 
     <!-- Sub-view: Add item -->
     <div id="sub-add" class="sub-view">
       <div class="card">
-        <h3 style="margin-bottom:16px;" id="formTitle">إضافة صنف جديد</h3>
+        <h3 style="margin-bottom:16px;" id="formTitle" data-i18n="addItemTitle">إضافة صنف جديد</h3>
         <input type="hidden" id="itemId">
 
         <div class="field">
-          <label for="itemName">اسم الصنف (عربي)</label>
+          <label for="itemName" data-i18n="itemNameAr">اسم الصنف (عربي)</label>
           <input type="text" id="itemName" placeholder="مثال: لاتيه">
         </div>
 
         <div class="field">
-          <label for="itemNameEn">اسم الصنف (إنجليزي)</label>
+          <label for="itemNameEn" data-i18n="itemNameEnLbl">اسم الصنف (إنجليزي)</label>
           <input type="text" id="itemNameEn" placeholder="e.g. Latte">
         </div>
 
         <div class="field">
-          <label for="itemCategory">التصنيف (عربي)</label>
+          <label for="itemCategory" data-i18n="itemCatAr">التصنيف (عربي)</label>
           <input type="text" id="itemCategory" placeholder="مثال: مشروبات ساخنة">
         </div>
 
         <div class="field">
-          <label for="itemCategoryEn">التصنيف (إنجليزي)</label>
+          <label for="itemCategoryEn" data-i18n="itemCatEn">التصنيف (إنجليزي)</label>
           <input type="text" id="itemCategoryEn" placeholder="e.g. Hot Drinks">
         </div>
 
         <div class="field">
-          <label for="itemDesc">الوصف (اختياري)</label>
+          <label for="itemDesc" data-i18n="itemDescLbl">الوصف (اختياري)</label>
           <input type="text" id="itemDesc" placeholder="مثال: إسبريسو مع حليب مبخر">
         </div>
 
         <div class="field">
-          <label for="itemPrice">السعر (ر.ع)</label>
+          <label for="itemPrice" data-i18n="itemPriceLbl">السعر (ر.ع)</label>
           <input type="number" step="0.01" id="itemPrice" placeholder="1.50">
         </div>
 
         <div class="field">
-          <label for="itemImage">صورة المنتج</label>
+          <label for="itemImage" data-i18n="itemImageLbl">صورة المنتج</label>
           <input type="file" id="itemImage" accept="image/*">
           <img id="itemImagePreview" src="" alt="" style="width:100%; max-height:140px; object-fit:cover; border-radius:8px; margin-top:8px; display:none;">
           <div id="uploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
@@ -91,11 +94,11 @@
 
         <div class="field" style="display:flex; align-items:center; gap:8px;">
           <input type="checkbox" id="itemAvailable" checked style="width:auto;">
-          <label for="itemAvailable" style="margin:0;">متاح حالياً</label>
+          <label for="itemAvailable" style="margin:0;" data-i18n="itemAvailableLbl">متاح حالياً</label>
         </div>
 
-        <button class="btn" onclick="saveItem()">حفظ الصنف</button>
-        <button class="btn btn-ghost" onclick="resetForm()" style="margin-right:8px;">إلغاء</button>
+        <button class="btn" onclick="saveItem()" data-i18n="saveItemBtn">حفظ الصنف</button>
+        <button class="btn btn-ghost" onclick="resetForm()" style="margin-right:8px;" data-i18n="cancelBtn">إلغاء</button>
         <div id="formError" class="error-msg"></div>
       </div>
     </div>
@@ -111,9 +114,9 @@
 
   <!-- ===================== TAB 2: نقطة البيع (POS) ===================== -->
   <div id="view-pos" class="tab-view">
-    <button class="btn" style="width:100%; margin-bottom:20px;" onclick="openNewOrderModal()">+ طلب جديد (كاونتر)</button>
+    <button class="btn" style="width:100%; margin-bottom:20px;" onclick="openNewOrderModal()" data-i18n="newCounterOrderBtn">+ طلب جديد (كاونتر)</button>
 
-    <h3 style="margin:0 0 12px;">الطلبات الواردة</h3>
+    <h3 style="margin:0 0 12px;" data-i18n="incomingOrdersTitle">الطلبات الواردة</h3>
     <div id="ordersList">
       <div class="state-msg">جاري التحميل...</div>
     </div>
@@ -122,7 +125,7 @@
   <!-- ===================== TAB 3: المخزون (Inventory) ===================== -->
   <div id="view-inventory" class="tab-view">
     <p style="color:var(--stone); font-size:0.85rem; margin-bottom:16px;">
-      حدد كمية المخزون لأي صنف تبي تتابعه. اتركه فاضي لو الكمية غير محدودة.
+      <span data-i18n="inventoryIntro">حدد كمية المخزون لأي صنف تبي تتابعه. اتركه فاضي لو الكمية غير محدودة.</span>
     </p>
     <div class="card" id="inventoryList">
       <div class="state-msg">جاري التحميل...</div>
@@ -132,23 +135,23 @@
   <!-- ===================== TAB 4: المبيعات (Sales) ===================== -->
   <div id="view-sales" class="tab-view">
     <div class="range-tabs">
-      <button class="range-tab active" data-range="day" onclick="loadSales('day', this)">اليوم</button>
-      <button class="range-tab" data-range="week" onclick="loadSales('week', this)">هذا الأسبوع</button>
-      <button class="range-tab" data-range="month" onclick="loadSales('month', this)">هذا الشهر</button>
+      <button class="range-tab active" data-range="day" onclick="loadSales('day', this)" data-i18n="rangeDay">اليوم</button>
+      <button class="range-tab" data-range="week" onclick="loadSales('week', this)" data-i18n="rangeWeek">هذا الأسبوع</button>
+      <button class="range-tab" data-range="month" onclick="loadSales('month', this)" data-i18n="rangeMonth">هذا الشهر</button>
     </div>
 
     <div class="sales-summary">
       <div class="sales-summary-box">
         <span class="big-num" id="salesTotal">0.00</span>
-        <span class="label">إجمالي المبيعات (ر.ع)</span>
+        <span class="label" data-i18n="totalSalesLbl">إجمالي المبيعات (ر.ع)</span>
       </div>
       <div class="sales-summary-box">
         <span class="big-num" id="salesCount">0</span>
-        <span class="label">عدد الطلبات</span>
+        <span class="label" data-i18n="orderCountLbl">عدد الطلبات</span>
       </div>
     </div>
 
-    <h3 style="margin:0 0 12px;">الأكثر مبيعاً</h3>
+    <h3 style="margin:0 0 12px;" data-i18n="topSellingTitle">الأكثر مبيعاً</h3>
     <div class="card" id="topItemsList">
       <div class="state-msg">جاري التحميل...</div>
     </div>
@@ -158,76 +161,81 @@
   <div id="view-account" class="tab-view">
 
     <div class="card">
-      <h3 style="margin-bottom:16px;">معلومات الكوفي</h3>
+      <h3 style="margin-bottom:16px;" data-i18n="shopInfoTitle">معلومات الكوفي</h3>
 
       <div class="field" style="display:flex; align-items:center; gap:14px;">
         <img id="logoPreview" src="" alt="" style="width:56px; height:56px; border-radius:50%; object-fit:cover; background:var(--paper-dim); display:none;">
         <div style="flex:1;">
-          <label for="shopLogoInput">شعار الكوفي</label>
+          <label for="shopLogoInput" data-i18n="logoLbl">شعار الكوفي</label>
           <input type="file" id="shopLogoInput" accept="image/*">
           <div id="logoUploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
         </div>
       </div>
 
       <div class="field">
-        <label for="shopCoverInput">صورة الغلاف</label>
+        <label for="shopCoverInput" data-i18n="coverLbl">صورة الغلاف</label>
         <input type="file" id="shopCoverInput" accept="image/*">
         <img id="coverPreview" src="" alt="" style="width:100%; max-height:100px; object-fit:cover; border-radius:8px; margin-top:8px; display:none;">
         <div id="coverUploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
       </div>
 
       <div class="field">
-        <label for="shopNameInput">اسم المحل (عربي)</label>
+        <label for="shopNameInput" data-i18n="shopNameArLbl">اسم المحل (عربي)</label>
         <input type="text" id="shopNameInput">
       </div>
 
       <div class="field">
-        <label for="shopNameEnInput">اسم المحل (إنجليزي)</label>
+        <label for="shopNameEnInput" data-i18n="shopNameEnLbl">اسم المحل (إنجليزي)</label>
         <input type="text" id="shopNameEnInput" placeholder="e.g. Sarj Coffee">
       </div>
 
       <div class="field">
-        <label for="shopTaglineInput">شعار نصي قصير (اختياري)</label>
+        <label for="shopTaglineInput" data-i18n="taglineArLbl">شعار نصي قصير (عربي)</label>
         <input type="text" id="shopTaglineInput">
       </div>
 
       <div class="field">
-        <label for="shopLocationInput">الموقع</label>
+        <label for="shopTaglineEnInput" data-i18n="taglineEnLbl">شعار نصي قصير (إنجليزي)</label>
+        <input type="text" id="shopTaglineEnInput" placeholder="e.g. The pleasure of the moment">
+      </div>
+
+      <div class="field">
+        <label for="shopLocationInput" data-i18n="locationLbl">الموقع</label>
         <input type="text" id="shopLocationInput">
       </div>
 
       <div class="field">
-        <label for="shopPhoneInput">رقم الهاتف</label>
+        <label for="shopPhoneInput" data-i18n="phoneLbl">رقم الهاتف</label>
         <input type="tel" id="shopPhoneInput" placeholder="+968 9xxxxxxx">
       </div>
 
       <div class="field">
-        <label for="shopWhatsappInput">رقم الواتساب</label>
+        <label for="shopWhatsappInput" data-i18n="whatsappLbl">رقم الواتساب</label>
         <input type="tel" id="shopWhatsappInput" placeholder="+968 9xxxxxxx">
       </div>
 
       <div class="field">
-        <label for="shopEmailInput">البريد الإلكتروني</label>
+        <label for="shopEmailInput" data-i18n="emailLbl">البريد الإلكتروني</label>
         <input type="email" id="shopEmailInput">
       </div>
 
       <div class="field">
-        <label for="shopColorInput">اللون المميز</label>
+        <label for="shopColorInput" data-i18n="colorLbl">اللون المميز</label>
         <input type="color" id="shopColorInput" style="width:80px; padding:4px;">
       </div>
 
       <div class="field">
-        <label for="shopPrepTimeInput">الوقت التقريبي للتحضير (دقائق)</label>
+        <label for="shopPrepTimeInput" data-i18n="prepTimeLbl">الوقت التقريبي للتحضير (دقائق)</label>
         <input type="number" id="shopPrepTimeInput" min="1">
       </div>
 
-      <button class="btn" onclick="saveShopInfo()">حفظ التغييرات</button>
+      <button class="btn" onclick="saveShopInfo()" data-i18n="saveChangesBtn">حفظ التغييرات</button>
       <div id="shopInfoError" class="error-msg"></div>
       <div id="shopInfoSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
     </div>
 
     <div class="card">
-      <button class="btn btn-ghost" style="width:100%;" onclick="logout()">تسجيل خروج</button>
+      <button class="btn btn-ghost" style="width:100%;" onclick="logout()" data-i18n="logoutBtn">تسجيل خروج</button>
     </div>
 
   </div>
@@ -237,19 +245,19 @@
 <!-- ===================== Bottom navigation ===================== -->
 <div class="bottom-nav" id="bottomNav" style="display:none;">
   <button class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
-    <span class="nav-icon">📋</span><span class="nav-label">لوحة التحكم</span>
+    <span class="nav-icon">📋</span><span class="nav-label" data-i18n="navDashboard">لوحة التحكم</span>
   </button>
   <button class="nav-item" data-tab="pos" onclick="switchTab('pos')">
-    <span class="nav-icon">🧾</span><span class="nav-label">نقطة البيع</span>
+    <span class="nav-icon">🧾</span><span class="nav-label" data-i18n="navPos">نقطة البيع</span>
   </button>
   <button class="nav-item" data-tab="inventory" onclick="switchTab('inventory')">
-    <span class="nav-icon">📦</span><span class="nav-label">المخزون</span>
+    <span class="nav-icon">📦</span><span class="nav-label" data-i18n="navInventory">المخزون</span>
   </button>
   <button class="nav-item" data-tab="sales" onclick="switchTab('sales')">
-    <span class="nav-icon">📊</span><span class="nav-label">المبيعات</span>
+    <span class="nav-icon">📊</span><span class="nav-label" data-i18n="navSales">المبيعات</span>
   </button>
   <button class="nav-item" data-tab="account" onclick="switchTab('account')">
-    <span class="nav-icon">👤</span><span class="nav-label">الحساب</span>
+    <span class="nav-icon">👤</span><span class="nav-label" data-i18n="navAccount">الحساب</span>
   </button>
 </div>
 
@@ -291,6 +299,7 @@ auth.onAuthStateChanged(async user => {
   document.getElementById('loadingMsg').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('bottomNav').style.display = 'flex';
+  applyDashLang();
 
   await loadShopInfo();
   await loadItems();
@@ -345,6 +354,130 @@ async function maybeActivateTrial() {
 }
 function logout() {
   auth.signOut().then(() => window.location.href = 'login.html');
+}
+
+// ===================== Dashboard language toggle (AR/EN) =====================
+let dashLang = localStorage.getItem('dashLang') || 'ar';
+
+const dashT = {
+  pageTitle: { ar: 'لوحة التحكم', en: 'Dashboard' },
+  checkingLogin: { ar: 'جاري التحقق من تسجيل الدخول...', en: 'Checking sign-in...' },
+  navDashboard: { ar: 'لوحة التحكم', en: 'Dashboard' },
+  navPos: { ar: 'نقطة البيع', en: 'POS' },
+  navInventory: { ar: 'المخزون', en: 'Inventory' },
+  navSales: { ar: 'المبيعات', en: 'Sales' },
+  navAccount: { ar: 'الحساب', en: 'Account' },
+  subQr: { ar: 'الباركود', en: 'QR Code' },
+  subAdd: { ar: 'إضافة صنف', en: 'Add Item' },
+  subList: { ar: 'قائمة الأصناف', en: 'Items' },
+  qrTitle: { ar: 'باركود قائمتك', en: 'Your menu QR code' },
+  downloadQr: { ar: 'تحميل الباركود', en: 'Download QR code' },
+  itemNameAr: { ar: 'اسم الصنف (عربي)', en: 'Item name (Arabic)' },
+  itemNameEnLbl: { ar: 'اسم الصنف (إنجليزي)', en: 'Item name (English)' },
+  itemCatAr: { ar: 'التصنيف (عربي)', en: 'Category (Arabic)' },
+  itemCatEn: { ar: 'التصنيف (إنجليزي)', en: 'Category (English)' },
+  itemDescLbl: { ar: 'الوصف (اختياري)', en: 'Description (optional)' },
+  itemPriceLbl: { ar: 'السعر (ر.ع)', en: 'Price (OMR)' },
+  itemImageLbl: { ar: 'صورة المنتج', en: 'Item photo' },
+  itemAvailableLbl: { ar: 'متاح حالياً', en: 'Currently available' },
+  saveItemBtn: { ar: 'حفظ الصنف', en: 'Save item' },
+  cancelBtn: { ar: 'إلغاء', en: 'Cancel' },
+  newCounterOrderBtn: { ar: '+ طلب جديد (كاونتر)', en: '+ New order (counter)' },
+  incomingOrdersTitle: { ar: 'الطلبات الواردة', en: 'Incoming orders' },
+  inventoryIntro: { ar: 'حدد كمية المخزون لأي صنف تبي تتابعه. اتركه فاضي لو الكمية غير محدودة.', en: 'Set a stock count for any item you want to track. Leave it blank for unlimited.' },
+  rangeDay: { ar: 'اليوم', en: 'Today' },
+  rangeWeek: { ar: 'هذا الأسبوع', en: 'This week' },
+  rangeMonth: { ar: 'هذا الشهر', en: 'This month' },
+  totalSalesLbl: { ar: 'إجمالي المبيعات (ر.ع)', en: 'Total sales (OMR)' },
+  orderCountLbl: { ar: 'عدد الطلبات', en: 'Number of orders' },
+  topSellingTitle: { ar: 'الأكثر مبيعاً', en: 'Top selling' },
+  shopInfoTitle: { ar: 'معلومات الكوفي', en: 'Shop info' },
+  logoLbl: { ar: 'شعار الكوفي', en: 'Shop logo' },
+  coverLbl: { ar: 'صورة الغلاف', en: 'Cover photo' },
+  shopNameArLbl: { ar: 'اسم المحل (عربي)', en: 'Shop name (Arabic)' },
+  shopNameEnLbl: { ar: 'اسم المحل (إنجليزي)', en: 'Shop name (English)' },
+  taglineArLbl: { ar: 'شعار نصي قصير (عربي)', en: 'Short tagline (Arabic)' },
+  taglineEnLbl: { ar: 'شعار نصي قصير (إنجليزي)', en: 'Short tagline (English)' },
+  locationLbl: { ar: 'الموقع', en: 'Location' },
+  phoneLbl: { ar: 'رقم الهاتف', en: 'Phone number' },
+  whatsappLbl: { ar: 'رقم الواتساب', en: 'WhatsApp number' },
+  emailLbl: { ar: 'البريد الإلكتروني', en: 'Email' },
+  colorLbl: { ar: 'اللون المميز', en: 'Accent color' },
+  prepTimeLbl: { ar: 'الوقت التقريبي للتحضير (دقائق)', en: 'Estimated prep time (minutes)' },
+  saveChangesBtn: { ar: 'حفظ التغييرات', en: 'Save changes' },
+  logoutBtn: { ar: 'تسجيل خروج', en: 'Log out' },
+  loadingGeneric: { ar: 'جاري التحميل...', en: 'Loading...' },
+  noItemsYet: { ar: 'لا توجد أصناف بعد. أضف أول صنف بالأعلى.', en: 'No items yet. Add your first one above.' },
+  editBtn: { ar: 'تعديل', en: 'Edit' },
+  deleteBtn: { ar: 'حذف', en: 'Delete' },
+  hideBtn: { ar: 'إخفاء', en: 'Hide' },
+  showBtn: { ar: 'إظهار', en: 'Show' },
+  unavailableTag: { ar: 'غير متاح', en: 'unavailable' },
+  hiddenTag: { ar: 'مخفي عن الزبائن', en: 'hidden from customers' },
+  addItemTitle: { ar: 'إضافة صنف جديد', en: 'Add new item' },
+  editItemTitle: { ar: 'تعديل الصنف', en: 'Edit item' },
+  fillRequiredError: { ar: 'الرجاء تعبئة الاسم والتصنيف والسعر على الأقل.', en: 'Please fill in at least the name, category, and price.' },
+  saveErrorGeneric: { ar: 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.', en: 'An error occurred while saving. Please try again.' },
+  confirmDeleteItem: { ar: 'متأكد تبي تحذف هذا الصنف؟', en: 'Are you sure you want to delete this item?' },
+  noOrdersYet: { ar: 'لا توجد طلبات حالياً.', en: 'No orders right now.' },
+  ordersLoadError: { ar: 'تعذر تحميل الطلبات.', en: 'Could not load orders.' },
+  statusNew: { ar: 'جديد', en: 'New' },
+  statusPreparing: { ar: 'قيد التحضير', en: 'Preparing' },
+  statusReady: { ar: 'جاهز', en: 'Ready' },
+  startPreparingBtn: { ar: 'ابدأ التحضير', en: 'Start preparing' },
+  markReadyBtn: { ar: 'تم — جاهز', en: 'Done — ready' },
+  tableLabel: { ar: 'طاولة', en: 'Table' },
+  addOneItemError: { ar: 'أضف صنف واحد على الأقل.', en: 'Add at least one item.' },
+  orderSendErrorGeneric: { ar: 'حدث خطأ أثناء إرسال الطلب.', en: 'An error occurred while sending the order.' },
+  counterCustomer: { ar: 'عميل الكاونتر', en: 'Counter customer' },
+  newCounterOrderTitle: { ar: 'طلب جديد من الكاونتر', en: 'New counter order' },
+  customerNameOptional: { ar: 'اسم العميل (اختياري)', en: 'Customer name (optional)' },
+  addFirstItemsHint: { ar: 'أضف أصناف بالقائمة أولاً من تبويب "لوحة التحكم".', en: 'Add items to your menu first from the Dashboard tab.' },
+  lowStockWarning: { ar: '⚠️ كمية منخفضة', en: '⚠️ Low stock' },
+  noSalesPeriod: { ar: 'لا توجد مبيعات بهذي الفترة.', en: 'No sales in this period.' },
+  salesUnit: { ar: 'مبيعات', en: 'sold' },
+  qrLibraryError: { ar: 'مكتبة QR ما تحمّلت من الإنترنت', en: 'QR library failed to load' },
+  qrGenerationFailed: { ar: 'تعذر توليد الباركود', en: 'Could not generate QR code' },
+  logoUploading: { ar: 'جاري تجهيز ورفع الشعار...', en: 'Preparing and uploading logo...' },
+  logoUploaded: { ar: 'تم رفع الشعار ✓ — لا تنسى تضغط "حفظ التغييرات"', en: 'Logo uploaded ✓ — don\'t forget to click "Save changes"' },
+  logoUploadFailed: { ar: 'فشل رفع الشعار، حاول مرة أخرى.', en: 'Logo upload failed, please try again.' },
+  coverUploading: { ar: 'جاري تجهيز ورفع صورة الغلاف...', en: 'Preparing and uploading cover photo...' },
+  coverUploaded: { ar: 'تم رفع الغلاف ✓ — لا تنسى تضغط "حفظ التغييرات"', en: 'Cover uploaded ✓ — don\'t forget to click "Save changes"' },
+  coverUploadFailed: { ar: 'فشل رفع الغلاف، حاول مرة أخرى.', en: 'Cover upload failed, please try again.' },
+  itemImageUploading: { ar: 'جاري تجهيز ورفع الصورة...', en: 'Preparing and uploading photo...' },
+  itemImageUploaded: { ar: 'تم رفع الصورة ✓', en: 'Photo uploaded ✓' },
+  itemImageUploadFailed: { ar: 'فشل رفع الصورة، حاول مرة أخرى.', en: 'Photo upload failed, please try again.' },
+  shopNameRequiredError: { ar: 'اسم الكوفي مطلوب.', en: 'Shop name is required.' },
+  savedSuccess: { ar: 'تم الحفظ ✓', en: 'Saved ✓' },
+  currency: { ar: 'ر.ع', en: 'OMR' }
+};
+
+function dt(key) {
+  return (dashT[key] && dashT[key][dashLang]) || key;
+}
+
+function applyDashLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.textContent = dt(key);
+  });
+  document.getElementById('dashLangToggle').textContent = dashLang === 'ar' ? 'EN' : 'عربي';
+  document.documentElement.dir = dashLang === 'ar' ? 'rtl' : 'ltr';
+}
+
+function toggleDashLang() {
+  dashLang = dashLang === 'ar' ? 'en' : 'ar';
+  localStorage.setItem('dashLang', dashLang);
+  applyDashLang();
+
+  // Re-render dynamic lists so they pick up the new language too
+  loadItems();
+  if (ordersUnsub) ordersUnsub();
+  listenToOrders();
+  if (document.getElementById('view-inventory').classList.contains('active')) loadInventory();
+  if (document.getElementById('view-sales').classList.contains('active')) {
+    loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
+  }
 }
 
 // ===================== Image resize helper =====================
@@ -454,6 +587,7 @@ async function loadShopInfo() {
     document.getElementById('shopNameInput').value = info.name || '';
     document.getElementById('shopNameEnInput').value = info.nameEn || '';
     document.getElementById('shopTaglineInput').value = info.tagline || '';
+    document.getElementById('shopTaglineEnInput').value = info.taglineEn || '';
     document.getElementById('shopLocationInput').value = info.location || '';
     document.getElementById('shopPhoneInput').value = info.phone || '';
     document.getElementById('shopWhatsappInput').value = info.whatsapp || '';
@@ -483,7 +617,7 @@ async function loadShopInfo() {
       await QRCode.toCanvas(document.getElementById('myQrCanvas'), menuUrl, { width: 180 });
     } catch (qrErr) {
       console.error('QR generation failed:', qrErr);
-      document.getElementById('myMenuUrl').insertAdjacentHTML('afterend', `<div class="error-msg">تعذر توليد الباركود: ${qrErr.message}</div>`);
+      document.getElementById('myMenuUrl').insertAdjacentHTML('afterend', `<div class="error-msg">${dt('qrGenerationFailed')}: ${qrErr.message}</div>`);
     }
   }
 }
@@ -544,7 +678,7 @@ document.getElementById('shopLogoInput').addEventListener('change', async (e) =>
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = document.getElementById('logoUploadStatus');
-  statusEl.textContent = 'جاري تجهيز ورفع الشعار...';
+  statusEl.textContent = dt('logoUploading');
   try {
     const resizedBlob = await resizeImage(file, 500, 0.85);
     const path = `shops/${currentShopId}/logo_${Date.now()}_${file.name}`;
@@ -557,7 +691,7 @@ document.getElementById('shopLogoInput').addEventListener('change', async (e) =>
     statusEl.textContent = 'تم رفع الشعار ✓ — لا تنسى تضغط "حفظ التغييرات"';
   } catch (err) {
     console.error(err);
-    statusEl.textContent = 'فشل رفع الشعار، حاول مرة أخرى.';
+    statusEl.textContent = dt('logoUploadFailed');
   }
 });
 
@@ -565,7 +699,7 @@ document.getElementById('shopCoverInput').addEventListener('change', async (e) =
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = document.getElementById('coverUploadStatus');
-  statusEl.textContent = 'جاري تجهيز ورفع صورة الغلاف...';
+  statusEl.textContent = dt('coverUploading');
   try {
     const resizedBlob = await resizeImage(file, 1200, 0.82);
     const path = `shops/${currentShopId}/cover_${Date.now()}_${file.name}`;
@@ -578,7 +712,7 @@ document.getElementById('shopCoverInput').addEventListener('change', async (e) =
     statusEl.textContent = 'تم رفع الغلاف ✓ — لا تنسى تضغط "حفظ التغييرات"';
   } catch (err) {
     console.error(err);
-    statusEl.textContent = 'فشل رفع الغلاف، حاول مرة أخرى.';
+    statusEl.textContent = dt('coverUploadFailed');
   }
 });
 
@@ -591,6 +725,7 @@ async function saveShopInfo() {
   const name = document.getElementById('shopNameInput').value.trim();
   const nameEn = document.getElementById('shopNameEnInput').value.trim();
   const tagline = document.getElementById('shopTaglineInput').value.trim();
+  const taglineEn = document.getElementById('shopTaglineEnInput').value.trim();
   const location = document.getElementById('shopLocationInput').value.trim();
   const phone = document.getElementById('shopPhoneInput').value.trim();
   const whatsapp = document.getElementById('shopWhatsappInput').value.trim();
@@ -599,7 +734,7 @@ async function saveShopInfo() {
   const prepTime = parseInt(document.getElementById('shopPrepTimeInput').value) || 10;
 
   if (!name) {
-    errorEl.textContent = 'اسم الكوفي مطلوب.';
+    errorEl.textContent = dt('shopNameRequiredError');
     return;
   }
 
@@ -608,6 +743,7 @@ async function saveShopInfo() {
       'info.name': name,
       'info.nameEn': nameEn,
       'info.tagline': tagline,
+      'info.taglineEn': taglineEn,
       'info.location': location,
       'info.phone': phone,
       'info.whatsapp': whatsapp,
@@ -620,10 +756,10 @@ async function saveShopInfo() {
 
     await db.collection('shops').doc(currentShopId).update(updateData);
     document.getElementById('shopNameHeader').textContent = name;
-    successEl.textContent = 'تم الحفظ ✓';
+    successEl.textContent = dt('savedSuccess');
   } catch (err) {
     console.error(err);
-    errorEl.textContent = 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.';
+    errorEl.textContent = dt('saveErrorGeneric');
   }
 }
 
@@ -632,7 +768,7 @@ async function loadItems() {
   const snap = await db.collection('shops').doc(currentShopId).collection('menu').orderBy('category').get();
 
   if (snap.empty) {
-    listEl.innerHTML = '<div class="state-msg">لا توجد أصناف بعد. أضف أول صنف بالأعلى.</div>';
+    listEl.innerHTML = `<div class="state-msg">${dt('noItemsYet')}</div>`;
     return;
   }
 
@@ -645,11 +781,11 @@ async function loadItems() {
         ${item.image ? `<img src="${item.image}">` : '<div class="item-photo"></div>'}
         <div class="grow">
           <div class="item-name">${item.name} — ${Number(item.price).toFixed(2)} ر.ع</div>
-          <div class="item-desc">${item.category}${item.available === false ? ' · غير متاح' : ''}${isHidden ? ' · مخفي عن الزبائن' : ''}</div>
+          <div class="item-desc">${item.category}${item.available === false ? ' · ' + dt('unavailableTag') : ''}${isHidden ? ' · ' + dt('hiddenTag') : ''}</div>
         </div>
-        <button class="btn btn-ghost" style="padding:6px 10px; font-size:0.8rem;" title="${isHidden ? 'إظهار للزبائن' : 'إخفاء عن الزبائن'}" onclick='toggleHidden("${doc.id}", ${isHidden})'>${isHidden ? 'إظهار' : 'إخفاء'}</button>
-        <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>تعديل</button>
-        <button class="btn btn-danger" onclick='deleteItem("${doc.id}")'>حذف</button>
+        <button class="btn btn-ghost" style="padding:6px 10px; font-size:0.8rem;" onclick='toggleHidden("${doc.id}", ${isHidden})'>${isHidden ? dt('showBtn') : dt('hideBtn')}</button>
+        <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>${dt('editBtn')}</button>
+        <button class="btn btn-danger" onclick='deleteItem("${doc.id}")'>${dt('deleteBtn')}</button>
       </div>
     `;
   });
@@ -665,7 +801,7 @@ document.getElementById('itemImage').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = document.getElementById('uploadStatus');
-  statusEl.textContent = 'جاري تجهيز ورفع الصورة...';
+  statusEl.textContent = dt('itemImageUploading');
   try {
     const resizedBlob = await resizeImage(file, 900, 0.82);
     const path = `shops/${currentShopId}/${Date.now()}_${file.name}`;
@@ -679,7 +815,7 @@ document.getElementById('itemImage').addEventListener('change', async (e) => {
     statusEl.textContent = 'تم رفع الصورة ✓';
   } catch (err) {
     console.error(err);
-    statusEl.textContent = 'فشل رفع الصورة، حاول مرة أخرى.';
+    statusEl.textContent = dt('itemImageUploadFailed');
   }
 });
 
@@ -697,7 +833,7 @@ async function saveItem() {
   const available = document.getElementById('itemAvailable').checked;
 
   if (!name || !category || isNaN(price)) {
-    errorEl.textContent = 'الرجاء تعبئة الاسم والتصنيف والسعر على الأقل.';
+    errorEl.textContent = dt('fillRequiredError');
     return;
   }
 
@@ -733,7 +869,7 @@ async function editItem(id) {
   document.getElementById('itemDesc').value = item.description || '';
   document.getElementById('itemPrice').value = item.price || '';
   document.getElementById('itemAvailable').checked = item.available !== false;
-  document.getElementById('formTitle').textContent = 'تعديل الصنف';
+  document.getElementById('formTitle').textContent = dt('editItemTitle');
   uploadedImageUrl = item.image || null;
 
   const preview = document.getElementById('itemImagePreview');
@@ -749,7 +885,7 @@ async function editItem(id) {
 }
 
 async function deleteItem(id) {
-  if (!confirm('متأكد تبي تحذف هذا الصنف؟')) return;
+  if (!confirm(dt('confirmDeleteItem'))) return;
   await db.collection('shops').doc(currentShopId).collection('menu').doc(id).delete();
   await loadItems();
 }
@@ -766,20 +902,19 @@ function resetForm() {
   document.getElementById('itemImage').value = '';
   document.getElementById('itemImagePreview').style.display = 'none';
   document.getElementById('uploadStatus').textContent = '';
-  document.getElementById('formTitle').textContent = 'إضافة صنف جديد';
+  document.getElementById('formTitle').textContent = dt('addItemTitle');
   document.getElementById('formError').textContent = '';
   uploadedImageUrl = null;
 }
 
 // ===================== TAB 2: POS (orders + manual order) =====================
-const statusLabels = { pending: 'جديد', preparing: 'قيد التحضير', ready: 'جاهز' };
 const statusClasses = { pending: 'status-pending', preparing: 'status-preparing', ready: 'status-ready' };
 const nextStatus = { pending: 'preparing', preparing: 'ready' };
-const nextLabel = { pending: 'ابدأ التحضير', preparing: 'تم — جاهز' };
 let isFirstOrdersLoad = true;
+let ordersUnsub = null;
 
 function listenToOrders() {
-  db.collection('shops').doc(currentShopId).collection('orders')
+  ordersUnsub = db.collection('shops').doc(currentShopId).collection('orders')
     .where('status', 'in', ['pending', 'preparing'])
     .orderBy('createdAt', 'desc')
     .onSnapshot(snap => {
@@ -807,9 +942,12 @@ function listenToOrders() {
       }
 
       if (snap.empty) {
-        listEl.innerHTML = '<div class="state-msg">لا توجد طلبات حالياً.</div>';
+        listEl.innerHTML = `<div class="state-msg">${dt('noOrdersYet')}</div>`;
         return;
       }
+
+      const statusLabels = { pending: dt('statusNew'), preparing: dt('statusPreparing'), ready: dt('statusReady') };
+      const nextLabel = { pending: dt('startPreparingBtn'), preparing: dt('markReadyBtn') };
 
       let html = '';
       snap.forEach(doc => {
@@ -820,10 +958,10 @@ function listenToOrders() {
         html += `
           <div class="order-card">
             <div class="order-card-top">
-              <strong>${order.orderType === 'car' ? `🚗 ${order.carColor || ''} (${order.carNumber || ''})` : ('🍽️ طاولة ' + (order.tableNumber || '—'))}</strong>
+              <strong>${order.orderType === 'car' ? `🚗 ${order.carColor || ''} (${order.carNumber || ''})` : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
               <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
             </div>
-            <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ر.ع</div>
+            <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
             ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
             <div class="order-actions">
               ${nextStatus[status] ? `<button class="btn" style="padding:6px 14px; font-size:0.85rem;" onclick='advanceOrder("${doc.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
@@ -834,7 +972,7 @@ function listenToOrders() {
       listEl.innerHTML = html;
     }, err => {
       console.error(err);
-      document.getElementById('ordersList').innerHTML = '<div class="state-msg">تعذر تحميل الطلبات.</div>';
+      document.getElementById('ordersList').innerHTML = `<div class="state-msg">${dt('ordersLoadError')}</div>`;
     });
 }
 
@@ -873,11 +1011,11 @@ async function openNewOrderModal() {
   overlay.innerHTML = `
     <div class="modal-sheet">
       <button class="close-x" onclick="document.getElementById('posOverlay').remove()">×</button>
-      <h3 style="margin:8px 0 16px;">طلب جديد من الكاونتر</h3>
+      <h3 style="margin:8px 0 16px;">${dt('newCounterOrderTitle')}</h3>
       ${itemsHtml}
       <div class="field" style="margin-top:16px;">
-        <label for="posCustomerName">اسم العميل (اختياري)</label>
-        <input type="text" id="posCustomerName" placeholder="عميل الكاونتر">
+        <label for="posCustomerName">${dt('customerNameOptional')}</label>
+        <input type="text" id="posCustomerName" placeholder="${dt('counterCustomer')}">
       </div>
       <button class="btn" style="width:100%; margin-top:10px;" onclick="submitPosOrder()">إرسال الطلب</button>
       <div id="posError" class="error-msg"></div>
@@ -898,11 +1036,11 @@ async function submitPosOrder() {
   const errorEl = document.getElementById('posError');
   const items = Object.values(posCart).map(i => ({ name: i.name, price: i.price, qty: i.qty }));
   if (items.length === 0) {
-    errorEl.textContent = 'أضف صنف واحد على الأقل.';
+    errorEl.textContent = dt('addOneItemError');
     return;
   }
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
-  const name = document.getElementById('posCustomerName').value.trim() || 'عميل الكاونتر';
+  const name = document.getElementById('posCustomerName').value.trim() || dt('counterCustomer');
 
   try {
     await db.collection('shops').doc(currentShopId).collection('orders').add({
@@ -917,7 +1055,7 @@ async function submitPosOrder() {
     document.getElementById('posOverlay').remove();
   } catch (err) {
     console.error(err);
-    errorEl.textContent = 'حدث خطأ أثناء إرسال الطلب.';
+    errorEl.textContent = dt('orderSendErrorGeneric');
   }
 }
 
@@ -927,7 +1065,7 @@ async function loadInventory() {
   const snap = await db.collection('shops').doc(currentShopId).collection('menu').orderBy('category').get();
 
   if (snap.empty) {
-    listEl.innerHTML = '<div class="state-msg">أضف أصناف بالقائمة أولاً من تبويب "لوحة التحكم".</div>';
+    listEl.innerHTML = `<div class="state-msg">${dt('addFirstItemsHint')}</div>`;
     return;
   }
 
@@ -940,7 +1078,7 @@ async function loadInventory() {
       <div class="inventory-row">
         <div class="grow">
           <div class="item-name">${item.name}</div>
-          ${isLow ? `<div class="stock-low">⚠️ كمية منخفضة</div>` : ''}
+          ${isLow ? `<div class="stock-low">${dt('lowStockWarning')}</div>` : ''}
         </div>
         <input type="number" min="0" placeholder="غير محدود" value="${stock !== undefined && stock !== null ? stock : ''}"
                onchange="updateStock('${doc.id}', this.value)">
@@ -996,10 +1134,10 @@ async function loadSales(range, btnEl) {
   const sorted = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topEl = document.getElementById('topItemsList');
   if (sorted.length === 0) {
-    topEl.innerHTML = '<div class="state-msg">لا توجد مبيعات بهذي الفترة.</div>';
+    topEl.innerHTML = `<div class="state-msg">${dt('noSalesPeriod')}</div>`;
   } else {
     topEl.innerHTML = sorted.map(([name, qty]) => `
-      <div class="top-item-row"><span>${name}</span><span>${qty} مبيعات</span></div>
+      <div class="top-item-row"><span>${name}</span><span>${qty} ${dt('salesUnit')}</span></div>
     `).join('');
   }
 }
