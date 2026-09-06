@@ -747,6 +747,38 @@ button, input, select {
   color: var(--ink);
 }
 
+/* ---- Order type toggle (car / table) ---- */
+.order-type-toggle {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.order-type-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: white;
+  cursor: pointer;
+  color: var(--stone);
+  font-family: inherit;
+  font-size: 0.82rem;
+}
+
+.order-type-btn .order-type-icon { font-size: 1.5rem; }
+
+.order-type-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, white);
+  font-weight: 500;
+}
+
 /* ---- Sales tab ---- */
 .range-tabs {
   display: flex;

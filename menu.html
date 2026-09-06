@@ -69,7 +69,14 @@ const translations = {
   stepReady: { ar: 'الطلب جاهز', en: 'Ready' },
   barReceived: { ar: '✅ تم استلام طلبك', en: '✅ Order received' },
   barPreparing: { ar: '🔥 جاري تحضير طلبك', en: '🔥 Preparing your order' },
-  barReady: { ar: '🎉 طلبك جاهز — تفضل استلمه', en: '🎉 Your order is ready — please pick it up' }
+  barReady: { ar: '🎉 طلبك جاهز — تفضل استلمه', en: '🎉 Your order is ready — please pick it up' },
+  orderFromCar: { ar: 'طلب من السيارة', en: 'Order from car' },
+  orderFromTable: { ar: 'طلب من الطاولة', en: 'Order from table' },
+  carNumber: { ar: 'رقم السيارة', en: 'Car plate number' },
+  carNumberPlaceholder: { ar: 'مثال: 12345', en: 'e.g. 12345' },
+  carColor: { ar: 'لون ونوع السيارة', en: 'Car color & model' },
+  carColorPlaceholder: { ar: 'مثال: تويوتا بيضاء', en: 'e.g. White Toyota' },
+  carFieldsError: { ar: 'الرجاء إدخال رقم السيارة ولونها.', en: 'Please enter your car plate number and color.' }
 };
 
 function t(key) {
@@ -267,6 +274,7 @@ function openCartModal() {
   const items = Object.entries(cart);
   if (items.length === 0) return;
 
+  selectedOrderType = 'table';
   const total = items.reduce((sum, [, i]) => sum + i.qty * i.price, 0);
 
   let linesHtml = '';
@@ -292,13 +300,36 @@ function openCartModal() {
         <span>${total.toFixed(2)} ${t('currency')}</span>
       </div>
 
+      <div class="order-type-toggle">
+        <button class="order-type-btn active" id="typeTableBtn" onclick="setOrderType('table')">
+          <span class="order-type-icon">🍽️</span><span>${t('orderFromTable')}</span>
+        </button>
+        <button class="order-type-btn" id="typeCarBtn" onclick="setOrderType('car')">
+          <span class="order-type-icon">🚗</span><span>${t('orderFromCar')}</span>
+        </button>
+      </div>
+
+      <div id="tableFields">
+        <div class="field">
+          <label for="tableNum">${t('tableNumber')}</label>
+          <input type="text" id="tableNum" placeholder="${t('tablePlaceholder')}">
+        </div>
+      </div>
+
+      <div id="carFields" style="display:none;">
+        <div class="field">
+          <label for="carNumber">${t('carNumber')}</label>
+          <input type="text" id="carNumber" placeholder="${t('carNumberPlaceholder')}">
+        </div>
+        <div class="field">
+          <label for="carColor">${t('carColor')}</label>
+          <input type="text" id="carColor" placeholder="${t('carColorPlaceholder')}">
+        </div>
+      </div>
+
       <div class="field" style="margin-top:16px;">
         <label for="custName">${t('yourName')}</label>
         <input type="text" id="custName" placeholder="${t('namePlaceholder')}" value="${localStorage.getItem('customerName') || ''}">
-      </div>
-      <div class="field">
-        <label for="tableNum">${t('tableNumber')}</label>
-        <input type="text" id="tableNum" placeholder="${t('tablePlaceholder')}">
       </div>
       <div class="field">
         <label for="orderNotes">${t('notesLabel')}</label>
@@ -312,6 +343,16 @@ function openCartModal() {
   document.body.appendChild(overlay);
 }
 
+let selectedOrderType = 'table';
+
+function setOrderType(type) {
+  selectedOrderType = type;
+  document.getElementById('typeTableBtn').classList.toggle('active', type === 'table');
+  document.getElementById('typeCarBtn').classList.toggle('active', type === 'car');
+  document.getElementById('tableFields').style.display = type === 'table' ? 'block' : 'none';
+  document.getElementById('carFields').style.display = type === 'car' ? 'block' : 'none';
+}
+
 function closeCartModal() {
   const overlay = document.getElementById('cartOverlay');
   if (overlay) overlay.remove();
@@ -320,12 +361,24 @@ function closeCartModal() {
 async function submitOrder() {
   const errorEl = document.getElementById('orderError');
   const name = document.getElementById('custName').value.trim();
-  const table = document.getElementById('tableNum').value.trim();
   const notes = document.getElementById('orderNotes').value.trim();
 
   if (!name) {
     errorEl.textContent = t('enterNameError');
     return;
+  }
+
+  let table = null, carNumber = null, carColor = null;
+
+  if (selectedOrderType === 'car') {
+    carNumber = document.getElementById('carNumber').value.trim();
+    carColor = document.getElementById('carColor').value.trim();
+    if (!carNumber || !carColor) {
+      errorEl.textContent = t('carFieldsError');
+      return;
+    }
+  } else {
+    table = document.getElementById('tableNum').value.trim();
   }
 
   localStorage.setItem('customerName', name);
@@ -336,7 +389,10 @@ async function submitOrder() {
   try {
     const docRef = await db.collection('shops').doc(shopId).collection('orders').add({
       customerName: name,
+      orderType: selectedOrderType,
       tableNumber: table || null,
+      carNumber: carNumber || null,
+      carColor: carColor || null,
       notes: notes || null,
       items,
       total,
