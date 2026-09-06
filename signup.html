@@ -16,7 +16,7 @@
 
   <div class="card">
     <div class="field">
-      <label for="signupEmail">البريد الإلكتروني</label>
+      <label for="signupEmail">البريد الإلكتروني <span style="color:#B3441E;">*</span></label>
       <input type="email" id="signupEmail" placeholder="you@example.com">
     </div>
 
@@ -31,8 +31,11 @@
     </div>
 
     <div class="field">
-      <label for="signupWhatsapp">رقم الواتساب</label>
-      <input type="tel" id="signupWhatsapp" placeholder="+968 9xxxxxxx">
+      <label for="signupWhatsapp">رقم الواتساب <span style="color:#B3441E;">*</span></label>
+      <div style="display:flex; gap:8px;">
+        <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
+        <input type="tel" id="signupWhatsapp" placeholder="9xxxxxxx" style="flex:1;">
+      </div>
     </div>
 
     <button class="btn" style="width:100%;" onclick="signup()">إنشاء الحساب</button>
@@ -57,10 +60,23 @@ async function signup() {
   const email = document.getElementById('signupEmail').value.trim();
   const password = document.getElementById('signupPassword').value;
   const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
-  const whatsapp = document.getElementById('signupWhatsapp').value.trim();
+  const localNumber = document.getElementById('signupWhatsapp').value.trim().replace(/[\s-]/g, '');
+  const whatsapp = localNumber ? '+968' + localNumber : '';
 
-  if (!email || !password || !passwordConfirm || !whatsapp) {
-    errorEl.textContent = 'الرجاء تعبئة كل الحقول.';
+  if (!email) {
+    errorEl.textContent = 'البريد الإلكتروني مطلوب.';
+    return;
+  }
+  if (!localNumber) {
+    errorEl.textContent = 'رقم الواتساب مطلوب.';
+    return;
+  }
+  if (!/^[0-9]{7,9}$/.test(localNumber)) {
+    errorEl.textContent = 'رقم الواتساب غير صحيح. اكتب رقمك بدون رمز الدولة (مثال: 91234567).';
+    return;
+  }
+  if (!password || !passwordConfirm) {
+    errorEl.textContent = 'الرجاء تعبئة كلمة المرور وتأكيدها.';
     return;
   }
   if (password.length < 6) {
