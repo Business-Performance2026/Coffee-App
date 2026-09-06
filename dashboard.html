@@ -271,6 +271,21 @@ auth.onAuthStateChanged(async user => {
     return;
   }
   currentShopId = user.uid;
+
+  const shopDoc = await db.collection('shops').doc(currentShopId).get();
+  const info = shopDoc.exists ? (shopDoc.data().info || {}) : {};
+
+  if (info.selfSignup) {
+    // Refresh emailVerified status in case they just clicked the link in another tab
+    await user.reload();
+    if (!user.emailVerified) {
+      document.getElementById('loadingMsg').style.display = 'none';
+      showVerifyEmailScreen(user);
+      return;
+    }
+    await maybeActivateTrial();
+  }
+
   document.getElementById('loadingMsg').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('bottomNav').style.display = 'flex';
@@ -280,6 +295,52 @@ auth.onAuthStateChanged(async user => {
   listenToOrders();
 });
 
+function showVerifyEmailScreen(user) {
+  const wrap = document.createElement('div');
+  wrap.className = 'wrap';
+  wrap.style.maxWidth = '420px';
+  wrap.style.paddingTop = '50px';
+  wrap.innerHTML = `
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">📧</div>
+      <h3 style="margin-bottom:10px;">أكد بريدك الإلكتروني</h3>
+      <p style="color:var(--stone); font-size:0.9rem; margin-bottom:16px;">
+        أرسلنا رابط تأكيد إلى <strong>${user.email}</strong>. اضغط الرابط، وبعدين حدّث هذي الصفحة.
+      </p>
+      <button class="btn" onclick="location.reload()">تحققت — حدّث الصفحة</button>
+      <button class="btn btn-ghost" style="margin-top:10px;" onclick="resendVerification()">إعادة إرسال الرابط</button>
+      <div id="resendMsg" style="font-size:0.85rem; color:#3D6B4F; margin-top:10px;"></div>
+      <button class="btn btn-ghost" style="margin-top:16px; width:100%;" onclick="logout()">تسجيل خروج</button>
+    </div>
+  `;
+  document.body.appendChild(wrap);
+}
+
+function resendVerification() {
+  auth.currentUser.sendEmailVerification()
+    .then(() => { document.getElementById('resendMsg').textContent = 'تم إرسال الرابط مرة أخرى ✓'; })
+    .catch(err => { console.error(err); });
+}
+
+// One-time: activate a 7-day free trial the first time the owner logs in
+// with a verified email, if they haven't already had a trial or subscription.
+async function maybeActivateTrial() {
+  const doc = await db.collection('shops').doc(currentShopId).get();
+  if (!doc.exists) return;
+  const info = doc.data().info || {};
+
+  if (info.subscriptionStatus === 'pending' && !info.trialActivated) {
+    const end = new Date();
+    end.setDate(end.getDate() + 7);
+    const endStr = end.toISOString().split('T')[0];
+
+    await db.collection('shops').doc(currentShopId).update({
+      'info.subscriptionStatus': 'active',
+      'info.subscriptionEndDate': endStr,
+      'info.trialActivated': true
+    });
+  }
+}
 function logout() {
   auth.signOut().then(() => window.location.href = 'login.html');
 }
@@ -427,9 +488,9 @@ async function loadShopInfo() {
 
 function renderSubscriptionBanner(info) {
   const bannerEl = document.getElementById('subscriptionBanner');
-  const isActive = info.subscriptionStatus === 'active';
+  const isManuallyActive = info.subscriptionStatus === 'active';
 
-  if (!isActive) {
+  if (!isManuallyActive) {
     bannerEl.innerHTML = `
       <div class="sub-banner sub-banner-danger">
         ⚠️ حسابك موقوف حالياً — قائمتك غير ظاهرة للعملاء.
@@ -446,7 +507,16 @@ function renderSubscriptionBanner(info) {
     end.setHours(0, 0, 0, 0);
     const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
 
-    if (daysLeft <= 3 && daysLeft >= 0) {
+    if (daysLeft < 0) {
+      bannerEl.innerHTML = `
+        <div class="sub-banner sub-banner-danger">
+          ⚠️ انتهى اشتراكك بتاريخ ${info.subscriptionEndDate} — قائمتك غير ظاهرة للعملاء حالياً. تواصل معنا للتجديد.
+        </div>
+      `;
+      return;
+    }
+
+    if (daysLeft <= 3) {
       const daysText = daysLeft === 0 ? 'اليوم' : (daysLeft === 1 ? 'يوم واحد' : `${daysLeft} أيام`);
       bannerEl.innerHTML = `
         <div class="sub-banner sub-banner-warning">

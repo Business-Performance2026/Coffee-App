@@ -76,20 +76,33 @@ async function signup() {
     const cred = await auth.createUserWithEmailAndPassword(email, password);
     const uid = cred.user.uid;
 
-    // Create the shop's Firestore document. Status starts as "pending" —
-    // the shop can set up its menu right away, but won't be visible to
-    // customers (and won't show as an active paying account) until an
-    // admin activates it after confirming payment.
+    // Create the shop's Firestore document. Status starts as "pending" until
+    // the owner verifies their email — at that point the dashboard automatically
+    // activates a 7-day free trial. After the trial ends, an admin needs to
+    // confirm payment and extend the subscription end date.
     await db.collection('shops').doc(uid).set({
       info: {
         name: '',
         whatsapp,
         email,
-        subscriptionStatus: 'pending'
+        subscriptionStatus: 'pending',
+        selfSignup: true
       }
     });
 
-    window.location.href = 'dashboard.html';
+    await cred.user.sendEmailVerification();
+
+    document.querySelector('.card').innerHTML = `
+      <div style="text-align:center; padding:20px 10px;">
+        <div style="font-size:2.5rem; margin-bottom:10px;">📧</div>
+        <h3 style="margin-bottom:10px;">تحقق من بريدك الإلكتروني</h3>
+        <p style="color:var(--stone); font-size:0.9rem;">
+          أرسلنا رابط تأكيد إلى <strong>${email}</strong>.<br>
+          بعد ما تضغط الرابط، سجّل دخولك وبيتفعّل أسبوعك المجاني تلقائياً.
+        </p>
+        <a href="login.html" class="btn" style="display:inline-block; margin-top:16px; text-decoration:none;">تسجيل الدخول</a>
+      </div>
+    `;
   } catch (err) {
     console.error(err);
     if (err.code === 'auth/email-already-in-use') {
