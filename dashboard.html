@@ -820,7 +820,7 @@ function listenToOrders() {
         html += `
           <div class="order-card">
             <div class="order-card-top">
-              <strong>${order.customerName}${order.orderType === 'car' ? ` · 🚗 ${order.carColor || ''} (${order.carNumber || ''})` : (order.tableNumber ? ' · طاولة ' + order.tableNumber : '')}</strong>
+              <strong>${order.orderType === 'car' ? `🚗 ${order.carColor || ''} (${order.carNumber || ''})` : ('🍽️ طاولة ' + (order.tableNumber || '—'))}</strong>
               <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
             </div>
             <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ر.ع</div>

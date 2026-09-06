@@ -328,10 +328,6 @@ function openCartModal() {
       </div>
 
       <div class="field" style="margin-top:16px;">
-        <label for="custName">${t('yourName')}</label>
-        <input type="text" id="custName" placeholder="${t('namePlaceholder')}" value="${localStorage.getItem('customerName') || ''}">
-      </div>
-      <div class="field">
         <label for="orderNotes">${t('notesLabel')}</label>
         <input type="text" id="orderNotes" placeholder="${t('notesPlaceholder')}">
       </div>
@@ -360,13 +356,7 @@ function closeCartModal() {
 
 async function submitOrder() {
   const errorEl = document.getElementById('orderError');
-  const name = document.getElementById('custName').value.trim();
   const notes = document.getElementById('orderNotes').value.trim();
-
-  if (!name) {
-    errorEl.textContent = t('enterNameError');
-    return;
-  }
 
   let table = null, carNumber = null, carColor = null;
 
@@ -381,14 +371,11 @@ async function submitOrder() {
     table = document.getElementById('tableNum').value.trim();
   }
 
-  localStorage.setItem('customerName', name);
-
   const items = Object.values(cart).map(i => ({ name: i.name, price: i.price, qty: i.qty }));
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
 
   try {
     const docRef = await db.collection('shops').doc(shopId).collection('orders').add({
-      customerName: name,
       orderType: selectedOrderType,
       tableNumber: table || null,
       carNumber: carNumber || null,
