@@ -674,17 +674,31 @@ function downloadMyQr() {
   link.click();
 }
 
+// ===================== Storage cleanup helper =====================
+// Deletes a previously uploaded file (by its download URL) — best-effort,
+// so a failed delete never blocks the new upload from completing.
+async function deleteOldImage(url) {
+  if (!url) return;
+  try {
+    await storage.refFromURL(url).delete();
+  } catch (err) {
+    console.error('Old image cleanup failed (non-blocking):', err);
+  }
+}
+
 document.getElementById('shopLogoInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = document.getElementById('logoUploadStatus');
   statusEl.textContent = dt('logoUploading');
   try {
+    const oldUrl = uploadedLogoUrl;
     const resizedBlob = await resizeImage(file, 500, 0.85);
     const path = `shops/${currentShopId}/logo_${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
     await ref.put(resizedBlob);
     uploadedLogoUrl = await ref.getDownloadURL();
+    deleteOldImage(oldUrl);
     const preview = document.getElementById('logoPreview');
     preview.src = uploadedLogoUrl;
     preview.style.display = 'block';
@@ -701,11 +715,13 @@ document.getElementById('shopCoverInput').addEventListener('change', async (e) =
   const statusEl = document.getElementById('coverUploadStatus');
   statusEl.textContent = dt('coverUploading');
   try {
+    const oldUrl = uploadedCoverUrl;
     const resizedBlob = await resizeImage(file, 1200, 0.82);
     const path = `shops/${currentShopId}/cover_${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
     await ref.put(resizedBlob);
     uploadedCoverUrl = await ref.getDownloadURL();
+    deleteOldImage(oldUrl);
     const preview = document.getElementById('coverPreview');
     preview.src = uploadedCoverUrl;
     preview.style.display = 'block';
@@ -803,11 +819,13 @@ document.getElementById('itemImage').addEventListener('change', async (e) => {
   const statusEl = document.getElementById('uploadStatus');
   statusEl.textContent = dt('itemImageUploading');
   try {
+    const oldUrl = uploadedImageUrl;
     const resizedBlob = await resizeImage(file, 900, 0.82);
     const path = `shops/${currentShopId}/${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
     await ref.put(resizedBlob);
     uploadedImageUrl = await ref.getDownloadURL();
+    deleteOldImage(oldUrl);
 
     const preview = document.getElementById('itemImagePreview');
     preview.src = uploadedImageUrl;
@@ -886,7 +904,12 @@ async function editItem(id) {
 
 async function deleteItem(id) {
   if (!confirm(dt('confirmDeleteItem'))) return;
-  await db.collection('shops').doc(currentShopId).collection('menu').doc(id).delete();
+  const ref = db.collection('shops').doc(currentShopId).collection('menu').doc(id);
+  const doc = await ref.get();
+  if (doc.exists && doc.data().image) {
+    deleteOldImage(doc.data().image);
+  }
+  await ref.delete();
   await loadItems();
 }
 
