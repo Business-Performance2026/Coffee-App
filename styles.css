@@ -837,6 +837,67 @@ button, input, select {
   border-bottom: 1px solid var(--line);
 }
 
+/* ---- POS: two-column layout (جديد / قيد التحضير) ---- */
+.pos-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .pos-columns { grid-template-columns: 1fr; }
+}
+
+.pos-column-title {
+  font-size: 0.95rem;
+  color: var(--stone);
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.order-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  background: white;
+}
+
+.order-card.order-urgent {
+  border-color: #C0392B;
+  background: #FBEAE5;
+}
+
+.order-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.order-card-top strong { font-size: 1.05rem; }
+
+.order-elapsed {
+  font-size: 0.78rem;
+  color: var(--stone);
+  margin-bottom: 6px;
+}
+
+.order-urgent .order-elapsed {
+  color: #C0392B;
+  font-weight: 600;
+}
+
+.order-items-line {
+  font-size: 1rem;
+}
+
+.order-actions .btn {
+  padding: 12px 20px;
+  font-size: 1rem;
+  width: 100%;
+}
+
 /* ---- Icon sub-nav inside "لوحة التحكم" tab ---- */
 .icon-subnav {
   display: flex;

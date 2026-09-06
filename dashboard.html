@@ -118,9 +118,15 @@
   <div id="view-pos" class="tab-view">
     <button class="btn" style="width:100%; margin-bottom:20px;" onclick="openNewOrderModal()" data-i18n="newCounterOrderBtn">+ طلب جديد (كاونتر)</button>
 
-    <h3 style="margin:0 0 12px;" data-i18n="incomingOrdersTitle">الطلبات الواردة</h3>
-    <div id="ordersList">
-      <div class="state-msg">جاري التحميل...</div>
+    <div class="pos-columns">
+      <div>
+        <div class="pos-column-title" data-i18n="colNew">جديد</div>
+        <div id="ordersColNew"><div class="state-msg">جاري التحميل...</div></div>
+      </div>
+      <div>
+        <div class="pos-column-title" data-i18n="colPreparing">قيد التحضير</div>
+        <div id="ordersColPreparing"><div class="state-msg">جاري التحميل...</div></div>
+      </div>
     </div>
   </div>
 
@@ -451,7 +457,11 @@ const dashT = {
   itemImageUploadFailed: { ar: 'فشل رفع الصورة، حاول مرة أخرى.', en: 'Photo upload failed, please try again.' },
   shopNameRequiredError: { ar: 'اسم الكوفي مطلوب.', en: 'Shop name is required.' },
   savedSuccess: { ar: 'تم الحفظ ✓', en: 'Saved ✓' },
-  currency: { ar: 'ر.ع', en: 'OMR' }
+  currency: { ar: 'ر.ع', en: 'OMR' },
+  colNew: { ar: 'جديد', en: 'New' },
+  colPreparing: { ar: 'قيد التحضير', en: 'Preparing' },
+  justNow: { ar: 'الآن', en: 'just now' },
+  minutesAgo: { ar: 'دقيقة مضت', en: 'min ago' }
 };
 
 function dt(key) {
@@ -528,6 +538,15 @@ function switchTab(name) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`view-${name}`).classList.add('active');
   document.querySelector(`.nav-item[data-tab="${name}"]`).classList.add('active');
+
+  activeTab = name;
+
+  if (name === 'pos') {
+    requestWakeLock();
+  } else if (wakeLock) {
+    wakeLock.release().catch(() => {});
+    wakeLock = null;
+  }
 
   if (name === 'inventory') loadInventory();
   if (name === 'sales') loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
@@ -959,14 +978,13 @@ const statusClasses = { pending: 'status-pending', preparing: 'status-preparing'
 const nextStatus = { pending: 'preparing', preparing: 'ready' };
 let isFirstOrdersLoad = true;
 let ordersUnsub = null;
+let lastOrdersData = [];
 
 function listenToOrders() {
   ordersUnsub = db.collection('shops').doc(currentShopId).collection('orders')
     .where('status', 'in', ['pending', 'preparing'])
     .orderBy('createdAt', 'desc')
     .onSnapshot(snap => {
-      const listEl = document.getElementById('ordersList');
-
       if (!isFirstOrdersLoad) {
         const newOnes = snap.docChanges().filter(c => c.type === 'added');
         if (newOnes.length > 0) {
@@ -988,44 +1006,95 @@ function listenToOrders() {
         badge.style.display = 'none';
       }
 
-      if (snap.empty) {
-        listEl.innerHTML = `<div class="state-msg">${dt('noOrdersYet')}</div>`;
-        return;
-      }
-
-      const statusLabels = { pending: dt('statusNew'), preparing: dt('statusPreparing'), ready: dt('statusReady') };
-      const nextLabel = { pending: dt('startPreparingBtn'), preparing: dt('markReadyBtn') };
-
-      let html = '';
-      snap.forEach(doc => {
-        const order = doc.data();
-        const itemsText = order.items.map(i => `${i.name} ×${i.qty}`).join('، ');
-        const status = order.status || 'pending';
-
-        html += `
-          <div class="order-card">
-            <div class="order-card-top">
-              <strong>${order.orderType === 'car' ? `🚗 ${order.carColor || ''} (${order.carNumber || ''})` : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
-              <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
-            </div>
-            <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
-            ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
-            <div class="order-actions">
-              ${nextStatus[status] ? `<button class="btn" style="padding:6px 14px; font-size:0.85rem;" onclick='advanceOrder("${doc.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
-            </div>
-          </div>
-        `;
-      });
-      listEl.innerHTML = html;
+      lastOrdersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderOrdersColumns();
     }, err => {
       console.error(err);
-      document.getElementById('ordersList').innerHTML = `<div class="state-msg">${dt('ordersLoadError')}</div>`;
+      document.getElementById('ordersColNew').innerHTML = `<div class="state-msg">${dt('ordersLoadError')}</div>`;
+      document.getElementById('ordersColPreparing').innerHTML = '';
     });
+
+  // Refresh just the elapsed-time text + urgency coloring every 30s,
+  // without waiting for a new order or status change to trigger a re-render.
+  if (!window._ordersTickInterval) {
+    window._ordersTickInterval = setInterval(renderOrdersColumns, 30000);
+  }
+}
+
+function formatElapsed(minutes) {
+  if (minutes < 1) return dt('justNow');
+  return `${minutes} ${dt('minutesAgo')}`;
+}
+
+function renderOrdersColumns() {
+  const newCol = document.getElementById('ordersColNew');
+  const prepCol = document.getElementById('ordersColPreparing');
+  if (!newCol || !prepCol) return;
+
+  const statusLabels = { pending: dt('statusNew'), preparing: dt('statusPreparing'), ready: dt('statusReady') };
+  const nextLabel = { pending: dt('startPreparingBtn'), preparing: dt('markReadyBtn') };
+  const now = Date.now();
+
+  const newOrders = lastOrdersData.filter(o => (o.status || 'pending') === 'pending');
+  const prepOrders = lastOrdersData.filter(o => (o.status || 'pending') === 'preparing');
+
+  function renderCard(order) {
+    const status = order.status || 'pending';
+    const itemsText = order.items.map(i => `${i.name} ×${i.qty}`).join('، ');
+    let elapsedMin = null;
+    if (order.createdAt && order.createdAt.toDate) {
+      elapsedMin = Math.floor((now - order.createdAt.toDate().getTime()) / 60000);
+    }
+    const isUrgent = elapsedMin !== null && elapsedMin >= 10;
+
+    return `
+      <div class="order-card ${isUrgent ? 'order-urgent' : ''}">
+        <div class="order-card-top">
+          <strong>${order.orderType === 'car' ? `🚗 ${order.carColor || ''} (${order.carNumber || ''})` : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
+          <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
+        </div>
+        ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
+        <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
+        ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
+        <div class="order-actions">
+          ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  newCol.innerHTML = newOrders.length
+    ? newOrders.map(renderCard).join('')
+    : `<div class="state-msg">${dt('noOrdersYet')}</div>`;
+
+  prepCol.innerHTML = prepOrders.length
+    ? prepOrders.map(renderCard).join('')
+    : `<div class="state-msg">${dt('noOrdersYet')}</div>`;
 }
 
 async function advanceOrder(orderId, newStatus) {
   await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({ status: newStatus });
 }
+
+// ===================== Keep screen awake while on the POS tab =====================
+let wakeLock = null;
+let activeTab = 'dashboard';
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch (err) {
+    console.error('Wake Lock request failed:', err);
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && activeTab === 'pos') {
+    requestWakeLock();
+  }
+});
 
 // Manual "counter" order (staff-entered, no QR needed)
 let posCart = {};
