@@ -53,13 +53,23 @@
         <input type="hidden" id="itemId">
 
         <div class="field">
-          <label for="itemName">اسم الصنف</label>
+          <label for="itemName">اسم الصنف (عربي)</label>
           <input type="text" id="itemName" placeholder="مثال: لاتيه">
         </div>
 
         <div class="field">
-          <label for="itemCategory">التصنيف</label>
+          <label for="itemNameEn">اسم الصنف (إنجليزي)</label>
+          <input type="text" id="itemNameEn" placeholder="e.g. Latte">
+        </div>
+
+        <div class="field">
+          <label for="itemCategory">التصنيف (عربي)</label>
           <input type="text" id="itemCategory" placeholder="مثال: مشروبات ساخنة">
+        </div>
+
+        <div class="field">
+          <label for="itemCategoryEn">التصنيف (إنجليزي)</label>
+          <input type="text" id="itemCategoryEn" placeholder="e.g. Hot Drinks">
         </div>
 
         <div class="field">
@@ -218,14 +228,6 @@
 
     <div class="card">
       <button class="btn btn-ghost" style="width:100%;" onclick="logout()">تسجيل خروج</button>
-    </div>
-
-    <div class="card" style="border-color:#E4B8AC;">
-      <h3 style="margin-bottom:10px; color:#B3441E;">منطقة الخطر</h3>
-      <p style="color:var(--stone); font-size:0.85rem; margin-bottom:14px;">
-        حذف حسابك يمسح قائمتك وطلباتك وكل بياناتك نهائياً. هذا الإجراء لا يمكن التراجع عنه.
-      </p>
-      <button class="btn btn-danger" style="width:100%; padding:11px;" onclick="deleteMyAccount()">حذف حسابي</button>
     </div>
 
   </div>
@@ -645,7 +647,7 @@ async function loadItems() {
           <div class="item-name">${item.name} — ${Number(item.price).toFixed(2)} ر.ع</div>
           <div class="item-desc">${item.category}${item.available === false ? ' · غير متاح' : ''}${isHidden ? ' · مخفي عن الزبائن' : ''}</div>
         </div>
-        <button class="icon-action-btn" title="${isHidden ? 'إظهار للزبائن' : 'إخفاء عن الزبائن'}" onclick='toggleHidden("${doc.id}", ${isHidden})'>${isHidden ? '🙈' : '👁️'}</button>
+        <button class="btn btn-ghost" style="padding:6px 10px; font-size:0.8rem;" title="${isHidden ? 'إظهار للزبائن' : 'إخفاء عن الزبائن'}" onclick='toggleHidden("${doc.id}", ${isHidden})'>${isHidden ? 'إظهار' : 'إخفاء'}</button>
         <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>تعديل</button>
         <button class="btn btn-danger" onclick='deleteItem("${doc.id}")'>حذف</button>
       </div>
@@ -687,7 +689,9 @@ async function saveItem() {
 
   const id = document.getElementById('itemId').value;
   const name = document.getElementById('itemName').value.trim();
+  const nameEn = document.getElementById('itemNameEn').value.trim();
   const category = document.getElementById('itemCategory').value.trim();
+  const categoryEn = document.getElementById('itemCategoryEn').value.trim();
   const description = document.getElementById('itemDesc').value.trim();
   const price = parseFloat(document.getElementById('itemPrice').value);
   const available = document.getElementById('itemAvailable').checked;
@@ -697,7 +701,7 @@ async function saveItem() {
     return;
   }
 
-  const itemData = { name, category, description, price, available };
+  const itemData = { name, nameEn, category, categoryEn, description, price, available };
   if (uploadedImageUrl) itemData.image = uploadedImageUrl;
 
   try {
@@ -723,7 +727,9 @@ async function editItem(id) {
 
   document.getElementById('itemId').value = id;
   document.getElementById('itemName').value = item.name || '';
+  document.getElementById('itemNameEn').value = item.nameEn || '';
   document.getElementById('itemCategory').value = item.category || '';
+  document.getElementById('itemCategoryEn').value = item.categoryEn || '';
   document.getElementById('itemDesc').value = item.description || '';
   document.getElementById('itemPrice').value = item.price || '';
   document.getElementById('itemAvailable').checked = item.available !== false;
@@ -751,7 +757,9 @@ async function deleteItem(id) {
 function resetForm() {
   document.getElementById('itemId').value = '';
   document.getElementById('itemName').value = '';
+  document.getElementById('itemNameEn').value = '';
   document.getElementById('itemCategory').value = '';
+  document.getElementById('itemCategoryEn').value = '';
   document.getElementById('itemDesc').value = '';
   document.getElementById('itemPrice').value = '';
   document.getElementById('itemAvailable').checked = true;
@@ -993,48 +1001,6 @@ async function loadSales(range, btnEl) {
     topEl.innerHTML = sorted.map(([name, qty]) => `
       <div class="top-item-row"><span>${name}</span><span>${qty} مبيعات</span></div>
     `).join('');
-  }
-}
-
-// ===================== Account: delete account =====================
-async function deleteMyAccount() {
-  if (!confirm('تحذير: سيتم حذف قائمتك وطلباتك وكل بياناتك نهائياً. متابعة؟')) return;
-  if (!confirm('تأكيد أخير: هل أنت متأكد فعلاً من حذف حسابك؟')) return;
-
-  try {
-    const menuSnap = await db.collection('shops').doc(currentShopId).collection('menu').get();
-    for (const d of menuSnap.docs) await d.ref.delete();
-
-    const ordersSnap = await db.collection('shops').doc(currentShopId).collection('orders').get();
-    for (const d of ordersSnap.docs) await d.ref.delete();
-
-    try {
-      const listRes = await storage.ref().child(`shops/${currentShopId}`).listAll();
-      for (const item of listRes.items) await item.delete();
-    } catch (e) {
-      console.error('Storage cleanup error:', e);
-    }
-
-    await db.collection('shops').doc(currentShopId).delete();
-    await auth.currentUser.delete();
-
-    alert('تم حذف حسابك بنجاح.');
-    window.location.href = 'login.html';
-  } catch (err) {
-    if (err.code === 'auth/requires-recent-login') {
-      const pwd = prompt('لأسباب أمنية، أدخل كلمة المرور مرة أخرى لتأكيد الحذف:');
-      if (!pwd) return;
-      try {
-        const cred = firebase.auth.EmailAuthProvider.credential(auth.currentUser.email, pwd);
-        await auth.currentUser.reauthenticateWithCredential(cred);
-        await deleteMyAccount();
-      } catch (reErr) {
-        alert('فشلت إعادة التحقق: ' + reErr.message);
-      }
-    } else {
-      console.error(err);
-      alert('حدث خطأ أثناء الحذف: ' + err.message);
-    }
   }
 }
 </script>
