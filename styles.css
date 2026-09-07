@@ -848,12 +848,13 @@ button, input, select {
 .stock-low { color: #B3441E; font-size: 0.78rem; margin-top:2px; }
 
 /* ---- Weekly opening hours editor (Google-style) ---- */
-.weekly-hours-editor { display: flex; flex-direction: column; gap: 8px; }
+.weekly-hours-editor { display: flex; flex-direction: column; gap: 6px; }
 
 .hours-day-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
 }
@@ -861,35 +862,43 @@ button, input, select {
 .hours-day-row:last-child { border-bottom: none; }
 
 .hours-day-name {
-  width: 70px;
+  width: 56px;
   flex-shrink: 0;
-  font-size: 0.88rem;
+  font-size: 0.78rem;
   font-weight: 500;
 }
 
 .hours-day-row input[type="time"] {
-  padding: 6px 8px;
+  padding: 4px 4px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 7px;
   font-family: inherit;
-  font-size: 0.85rem;
-  width: 110px;
+  font-size: 0.72rem;
+  width: 82px;
+  min-width: 0;
 }
 
 .hours-closed-label {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.8rem;
+  gap: 4px;
+  font-size: 0.72rem;
   color: var(--stone);
-  margin-right: auto;
+  margin-inline-start: auto;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.hours-closed-label input { width: auto; }
+.hours-closed-label input { width: 14px; height: 14px; }
 
-.hours-time-range { display: flex; align-items: center; gap: 6px; }
-.hours-time-range span { color: var(--stone); font-size: 0.8rem; }
+.hours-time-range { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.hours-time-range span { color: var(--stone); font-size: 0.72rem; flex-shrink: 0; }
+
+@media (max-width: 380px) {
+  .hours-day-row { justify-content: space-between; }
+  .hours-time-range { order: 3; width: 100%; justify-content: center; margin-top: 4px; }
+  .hours-closed-label { margin-inline-start: 0; }
+}
 
 /* ---- Subscription status banners (owner dashboard) ---- */
 .sub-banner {
