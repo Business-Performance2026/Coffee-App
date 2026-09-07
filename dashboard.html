@@ -268,6 +268,7 @@
     </div>
 
     <div class="card">
+      <div id="loggedInAsText" style="text-align:center; color:var(--stone); font-size:0.85rem; margin-bottom:14px;"></div>
       <button class="btn btn-ghost" style="width:100%;" onclick="logout()" data-i18n="logoutBtn">تسجيل خروج</button>
     </div>
 
@@ -303,6 +304,7 @@
 
 <script>
 let currentShopId = null;
+let currentUserEmail = null;
 let uploadedImageUrl = null;
 let uploadedLogoUrl = null;
 let uploadedCoverUrl = null;
@@ -333,6 +335,8 @@ auth.onAuthStateChanged(async user => {
   document.getElementById('app').style.display = 'block';
   document.getElementById('bottomNav').style.display = 'flex';
   applyDashLang();
+  currentUserEmail = user.email;
+  document.getElementById('loggedInAsText').textContent = `${dt('loggedInAs')}: ${currentUserEmail}`;
 
   await loadShopInfo();
   await loadItems();
@@ -440,6 +444,7 @@ const dashT = {
   prepTimeLbl: { ar: 'الوقت التقريبي للتحضير (دقائق)', en: 'Estimated prep time (minutes)' },
   saveChangesBtn: { ar: 'حفظ التغييرات', en: 'Save changes' },
   logoutBtn: { ar: 'تسجيل خروج', en: 'Log out' },
+  loggedInAs: { ar: 'داخل بحساب', en: 'Logged in as' },
   loadingGeneric: { ar: 'جاري التحميل...', en: 'Loading...' },
   noItemsYet: { ar: 'لا توجد أصناف بعد. أضف أول صنف بالأعلى.', en: 'No items yet. Add your first one above.' },
   editBtn: { ar: 'تعديل', en: 'Edit' },
@@ -503,6 +508,9 @@ function applyDashLang() {
   });
   document.getElementById('dashLangToggle').textContent = dashLang === 'ar' ? 'EN' : 'عربي';
   document.documentElement.dir = dashLang === 'ar' ? 'rtl' : 'ltr';
+  if (currentUserEmail) {
+    document.getElementById('loggedInAsText').textContent = `${dt('loggedInAs')}: ${currentUserEmail}`;
+  }
 }
 
 function toggleDashLang() {
