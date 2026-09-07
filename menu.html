@@ -42,6 +42,7 @@ let shopId = null;
 let shopInfo = {};
 let cart = {}; // { itemId: { name, price, qty } }
 let itemMeta = {}; // { itemId: { name, price } } — used to safely rebuild controls without re-escaping strings
+let suggestedItemIds = [];
 let currentLang = localStorage.getItem('menuLang') || 'ar';
 
 const translations = {
@@ -71,6 +72,13 @@ const translations = {
   etaText: { ar: 'الوقت المتوقع', en: 'Estimated time' },
   minuteWord: { ar: 'دقيقة', en: 'min' },
   orderPickedUp: { ar: 'طلب جاهز', en: 'Order picked up' },
+  rateOrderPrompt: { ar: 'وش رأيك بطلبك؟', en: 'How was your order?' },
+  skipRating: { ar: 'تخطي', en: 'Skip' },
+  addToCartBtn: { ar: 'أضف للسلة', en: 'Add to cart' },
+  openingHoursLbl: { ar: 'مواعيد العمل', en: 'Opening hours' },
+  searchPlaceholder: { ar: '🔍 دور على صنف...', en: '🔍 Search menu...' },
+  suggestAddTitle: { ar: '💡 حاب تضيف كمان؟', en: '💡 Want to add this too?' },
+  addBtn: { ar: 'إضافة', en: 'Add' },
   stepReceived: { ar: 'استلم طلبك', en: 'Order received' },
   stepPreparing: { ar: 'جاري التحضير', en: 'Preparing' },
   stepReady: { ar: 'الطلب جاهز', en: 'Ready' },
@@ -148,6 +156,7 @@ async function loadMenu() {
                               .get();
 
     const categories = {};
+    suggestedItemIds = [];
     menuSnap.forEach(doc => {
       const item = doc.data();
       if (item.hidden === true) return; // fully hidden from customers, skip entirely
@@ -165,6 +174,16 @@ async function loadMenu() {
         <div class="menu-hero-name display">${shopName}</div>
         ${(currentLang === 'en' && shopInfo.taglineEn) ? `<div class="menu-hero-tagline">${shopInfo.taglineEn}</div>` : (shopInfo.tagline ? `<div class="menu-hero-tagline">${shopInfo.tagline}</div>` : '')}
         ${shopInfo.location ? `<div class="menu-hero-location">${shopInfo.location}</div>` : ''}
+        ${shopInfo.openingHours ? `
+          <div class="hours-toggle" onclick="toggleHours()">
+            <span>🕐</span><span>${t('openingHoursLbl')}</span><span id="hoursArrow">⌄</span>
+          </div>
+          <div class="hours-content" id="hoursContent" style="display:none;">${shopInfo.openingHours}</div>
+        ` : ''}
+      </div>
+
+      <div class="menu-search-wrap">
+        <input type="text" id="menuSearchInput" class="menu-search-input" placeholder="${t('searchPlaceholder')}" oninput="filterMenuSearch(this.value)">
       </div>
     `;
 
@@ -187,17 +206,19 @@ async function loadMenu() {
       items.forEach(item => {
         const unavailable = item.available === false;
         const itemName = (currentLang === 'en' && item.nameEn) ? item.nameEn : item.name;
-        itemMeta[item.id] = { name: itemName, price: item.price };
+        const itemDesc = item.description || '';
+        itemMeta[item.id] = { name: itemName, price: item.price, image: item.image || '', description: itemDesc };
+        if (item.suggested === true && item.available !== false) suggestedItemIds.push(item.id);
         html += `
-          <div class="grid-card ${unavailable ? 'unavailable' : ''}">
-            <div class="grid-card-img-wrap">
+          <div class="grid-card ${unavailable ? 'unavailable' : ''}" data-search="${(itemName + ' ' + itemDesc).toLowerCase()}">
+            <div class="grid-card-img-wrap" onclick="openItemDetail('${item.id}')">
               ${item.image ? `<img src="${item.image}" class="grid-card-img" alt="">` : ''}
               ${item.bestSeller ? `<div class="best-seller-badge">⭐ ${t('bestSellerTag')}</div>` : ''}
               ${unavailable ? `<div class="grid-unavailable-tag">${t('unavailableTag')}</div>` : `
                 <div class="grid-qty-container" id="qtyctrl-${item.id}">${renderQtyControl(item.id, 0)}</div>
               `}
             </div>
-            <div class="grid-card-body">
+            <div class="grid-card-body" onclick="openItemDetail('${item.id}')">
               <div class="grid-card-name">${itemName}</div>
               <div class="grid-card-price">${Number(item.price).toFixed(2)} ${t('currency')}</div>
             </div>
@@ -226,6 +247,51 @@ function escapeStr(str) {
   return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
+function toggleHours() {
+  const content = document.getElementById('hoursContent');
+  const arrow = document.getElementById('hoursArrow');
+  const isOpen = content.style.display === 'block';
+  content.style.display = isOpen ? 'none' : 'block';
+  arrow.textContent = isOpen ? '⌄' : '⌃';
+}
+
+function filterMenuSearch(query) {
+  const q = query.trim().toLowerCase();
+  document.querySelectorAll('.grid-card').forEach(card => {
+    const matches = !q || (card.dataset.search || '').includes(q);
+    card.style.display = matches ? '' : 'none';
+  });
+  // Hide category titles/pills sections that end up with zero visible items
+  document.querySelectorAll('.menu-grid').forEach(grid => {
+    const anyVisible = Array.from(grid.children).some(c => c.style.display !== 'none');
+    grid.style.display = anyVisible ? '' : 'none';
+    const title = grid.previousElementSibling;
+    if (title && title.classList.contains('category-title')) {
+      title.style.display = anyVisible ? '' : 'none';
+    }
+  });
+}
+
+function openItemDetail(itemId) {
+  const meta = itemMeta[itemId];
+  if (!meta) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'detailOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="document.getElementById('detailOverlay').remove()">×</button>
+      ${meta.image ? `<img src="${meta.image}" style="width:100%; border-radius:12px; margin-bottom:16px; max-height:260px; object-fit:cover;">` : ''}
+      <h3 style="margin-bottom:8px;">${meta.name}</h3>
+      <div class="item-price" style="margin-bottom:12px;">${Number(meta.price).toFixed(2)} ${t('currency')}</div>
+      ${meta.description ? `<p style="color:var(--stone); line-height:1.6;">${meta.description}</p>` : ''}
+      <button class="btn" style="width:100%; margin-top:16px;" onclick='document.getElementById("detailOverlay").remove(); changeQty("${itemId}", 1);'>+ ${t('addToCartBtn')}</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
 function scrollToCategory(catId, pillEl) {
   document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
   pillEl.classList.add('active');
@@ -239,10 +305,10 @@ function scrollToCategory(catId, pillEl) {
 // ---- Cart logic ----
 function renderQtyControl(itemId, qty) {
   if (qty <= 0) {
-    return `<button class="grid-add-btn" onclick='changeQty("${itemId}", 1)'>+</button>`;
+    return `<button class="grid-add-btn" onclick='event.stopPropagation(); changeQty("${itemId}", 1)'>+</button>`;
   }
   return `
-    <div class="grid-qty-stepper">
+    <div class="grid-qty-stepper" onclick="event.stopPropagation()">
       <button onclick='changeQty("${itemId}", -1)'>−</button>
       <span class="grid-qty-num">${qty}</span>
       <button onclick='changeQty("${itemId}", 1)'>+</button>
@@ -279,6 +345,12 @@ function updateCartBar() {
   document.getElementById('cartTotal').textContent = `${totalPrice.toFixed(2)} ${t('currency')}`;
 }
 
+function addSuggestedToCart(itemId) {
+  changeQty(itemId, 1);
+  closeCartModal();
+  openCartModal();
+}
+
 function openCartModal() {
   const items = Object.entries(cart);
   if (items.length === 0) return;
@@ -299,15 +371,34 @@ function openCartModal() {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'cartOverlay';
+
+  const suggestions = suggestedItemIds.filter(id => !cart[id] && itemMeta[id]);
+  let suggestHtml = '';
+  if (suggestions.length > 0) {
+    suggestHtml = `
+      <div class="cart-suggest-box">
+        <div class="cart-suggest-label">${t('suggestAddTitle')}</div>
+        ${suggestions.map(id => `
+          <div class="cart-suggest-item">
+            ${itemMeta[id].image ? `<img src="${itemMeta[id].image}">` : ''}
+            <span class="grow">${itemMeta[id].name} — ${Number(itemMeta[id].price).toFixed(2)} ${t('currency')}</span>
+            <button class="btn" style="padding:6px 14px; font-size:0.85rem;" onclick='addSuggestedToCart("${id}")'>+ ${t('addBtn')}</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   overlay.innerHTML = `
     <div class="modal-sheet">
       <button class="close-x" onclick="closeCartModal()">×</button>
       <h3 style="margin:8px 0 16px;">${t('reviewOrder')}</h3>
-      ${linesHtml}
-      <div class="cart-total-line">
+      <div id="cartLinesContainer">${linesHtml}</div>
+      <div class="cart-total-line" id="cartTotalLine">
         <span>${t('total')}</span>
         <span>${total.toFixed(2)} ${t('currency')}</span>
       </div>
+      ${suggestHtml}
 
       <div class="order-type-toggle">
         <button class="order-type-btn active" id="typeTableBtn" onclick="setOrderType('table')">
@@ -475,6 +566,38 @@ function clearOrderTracking() {
   closeCartModal();
 }
 
+// Shown when the customer taps "طلب جاهز" — quick 1-5 star rating before
+// the order tracker closes. Rating is optional; skipping still clears tracking.
+function showRatingPrompt() {
+  const container = document.getElementById('trackerContainer');
+  if (!container) { clearOrderTracking(); return; }
+
+  let starsHtml = '';
+  for (let i = 1; i <= 5; i++) {
+    starsHtml += `<span class="rating-star" data-star="${i}" onclick="submitRating(${i})">☆</span>`;
+  }
+
+  container.innerHTML = `
+    <div style="text-align:center; padding:10px 0;">
+      <div style="margin-bottom:12px; font-weight:500;">${t('rateOrderPrompt')}</div>
+      <div class="rating-stars">${starsHtml}</div>
+      <button class="btn btn-ghost" style="margin-top:18px;" onclick="clearOrderTracking()">${t('skipRating')}</button>
+    </div>
+  `;
+}
+
+async function submitRating(stars) {
+  document.querySelectorAll('.rating-star').forEach((el, i) => {
+    el.textContent = i < stars ? '★' : '☆';
+  });
+  try {
+    await db.collection('shops').doc(shopId).collection('orders').doc(activeOrderId).update({ rating: stars });
+  } catch (err) {
+    console.error('Rating submit failed:', err);
+  }
+  setTimeout(clearOrderTracking, 500);
+}
+
 function renderTracker(status) {
   const stepIndex = statusSteps.indexOf(status);
 
@@ -499,7 +622,7 @@ function renderTracker(status) {
 
   let doneBtnHtml = '';
   if (status === 'ready') {
-    doneBtnHtml = `<button class="btn" style="width:100%; margin-top:20px;" onclick="clearOrderTracking()">${t('orderPickedUp')}</button>`;
+    doneBtnHtml = `<button class="btn" style="width:100%; margin-top:20px;" onclick="showRatingPrompt()">${t('orderPickedUp')}</button>`;
   }
 
   return `<div class="order-track">${barHtml}${labelsHtml}${etaHtml}${doneBtnHtml}</div>`;

@@ -124,6 +124,11 @@
           <label for="itemAvailable" style="margin:0;" data-i18n="itemAvailableLbl">متاح حالياً</label>
         </div>
 
+        <div class="field" style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="itemSuggested" style="width:auto;">
+          <label for="itemSuggested" style="margin:0;" data-i18n="itemSuggestedLbl">اقترحه كإضافة بالسلة</label>
+        </div>
+
         <button class="btn" onclick="saveItem()" data-i18n="saveItemBtn">حفظ الصنف</button>
         <button class="btn btn-ghost" onclick="resetForm()" style="margin-right:8px;" data-i18n="cancelBtn">إلغاء</button>
         <div id="formError" class="error-msg"></div>
@@ -181,6 +186,10 @@
       <div class="sales-summary-box">
         <span class="big-num" id="salesCount">0</span>
         <span class="label" data-i18n="orderCountLbl">عدد الطلبات</span>
+      </div>
+      <div class="sales-summary-box">
+        <span class="big-num" id="avgRating">—</span>
+        <span class="label" data-i18n="avgRatingLbl">متوسط التقييم</span>
       </div>
     </div>
 
@@ -252,6 +261,16 @@
       <div class="field">
         <label for="shopLocationInput" data-i18n="locationLbl">الموقع</label>
         <input type="text" id="shopLocationInput">
+      </div>
+
+      <div class="field">
+        <label for="shopHoursInput" data-i18n="hoursLbl">ساعات العمل</label>
+        <input type="text" id="shopHoursInput" placeholder="مثال: يومياً 8ص - 11م">
+      </div>
+
+      <div class="field">
+        <label for="shopHoursInput" data-i18n="hoursLbl">ساعات العمل</label>
+        <input type="text" id="shopHoursInput" placeholder="مثال: يومياً 7ص - 11م">
       </div>
 
       <div class="field">
@@ -525,7 +544,10 @@ const dashT = {
   exportLibError: { ar: 'مكتبة Excel ما تحمّلت.', en: 'Excel library failed to load.' },
   exportPreparing: { ar: 'جاري تجهيز الملف...', en: 'Preparing the file...' },
   exportDone: { ar: 'تم تحميل الملف ✓', en: 'File downloaded ✓' },
-  exportGenericError: { ar: 'حدث خطأ أثناء التصدير', en: 'An error occurred while exporting' }
+  exportGenericError: { ar: 'حدث خطأ أثناء التصدير', en: 'An error occurred while exporting' },
+  hoursLbl: { ar: 'ساعات العمل', en: 'Opening hours' },
+  itemSuggestedLbl: { ar: 'اقترحه كإضافة بالسلة', en: 'Suggest as a cart add-on' },
+  avgRatingLbl: { ar: 'متوسط التقييم', en: 'Average rating' }
 };
 
 function dt(key) {
@@ -677,6 +699,7 @@ async function loadShopInfo() {
     document.getElementById('shopTaglineInput').value = info.tagline || '';
     document.getElementById('shopTaglineEnInput').value = info.taglineEn || '';
     document.getElementById('shopLocationInput').value = info.location || '';
+    document.getElementById('shopHoursInput').value = info.openingHours || '';
     document.getElementById('shopPhoneInput').value = info.phone || '';
     document.getElementById('shopWhatsappInput').value = info.whatsapp || '';
     document.getElementById('shopEmailInput').value = info.email || '';
@@ -926,6 +949,7 @@ async function saveShopInfo() {
   const tagline = document.getElementById('shopTaglineInput').value.trim();
   const taglineEn = document.getElementById('shopTaglineEnInput').value.trim();
   const location = document.getElementById('shopLocationInput').value.trim();
+  const openingHours = document.getElementById('shopHoursInput').value.trim();
   const phone = document.getElementById('shopPhoneInput').value.trim();
   const whatsapp = document.getElementById('shopWhatsappInput').value.trim();
   const email = document.getElementById('shopEmailInput').value.trim();
@@ -944,6 +968,7 @@ async function saveShopInfo() {
       'info.tagline': tagline,
       'info.taglineEn': taglineEn,
       'info.location': location,
+      'info.openingHours': openingHours,
       'info.phone': phone,
       'info.whatsapp': whatsapp,
       'info.email': email,
@@ -1054,13 +1079,14 @@ async function saveItem() {
   const description = document.getElementById('itemDesc').value.trim();
   const price = parseFloat(document.getElementById('itemPrice').value);
   const available = document.getElementById('itemAvailable').checked;
+  const suggested = document.getElementById('itemSuggested').checked;
 
   if (!name || !category || isNaN(price)) {
     errorEl.textContent = dt('fillRequiredError');
     return;
   }
 
-  const itemData = { name, nameEn, category, categoryEn, description, price, available };
+  const itemData = { name, nameEn, category, categoryEn, description, price, available, suggested };
   if (uploadedImageUrl) itemData.image = uploadedImageUrl;
 
   try {
@@ -1092,6 +1118,7 @@ async function editItem(id) {
   document.getElementById('itemDesc').value = item.description || '';
   document.getElementById('itemPrice').value = item.price || '';
   document.getElementById('itemAvailable').checked = item.available !== false;
+  document.getElementById('itemSuggested').checked = item.suggested === true;
   document.getElementById('formTitle').textContent = dt('editItemTitle');
   uploadedImageUrl = item.image || null;
 
@@ -1127,6 +1154,7 @@ function resetForm() {
   document.getElementById('itemDesc').value = '';
   document.getElementById('itemPrice').value = '';
   document.getElementById('itemAvailable').checked = true;
+  document.getElementById('itemSuggested').checked = false;
   document.getElementById('itemImage').value = '';
   document.getElementById('itemImagePreview').style.display = 'none';
   document.getElementById('uploadStatus').textContent = '';
@@ -1556,6 +1584,8 @@ async function loadSales(range, btnEl) {
 
   let total = 0;
   const itemCounts = {};
+  let ratingSum = 0;
+  let ratingCount = 0;
 
   snap.forEach(doc => {
     const order = doc.data();
@@ -1563,10 +1593,17 @@ async function loadSales(range, btnEl) {
     (order.items || []).forEach(i => {
       itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty;
     });
+    if (typeof order.rating === 'number') {
+      ratingSum += order.rating;
+      ratingCount++;
+    }
   });
 
   document.getElementById('salesTotal').textContent = total.toFixed(2);
   document.getElementById('salesCount').textContent = snap.size;
+  document.getElementById('avgRating').textContent = ratingCount > 0
+    ? `${(ratingSum / ratingCount).toFixed(1)} ⭐`
+    : '—';
 
   const sorted = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topEl = document.getElementById('topItemsList');

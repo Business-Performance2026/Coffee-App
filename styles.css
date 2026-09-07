@@ -484,6 +484,53 @@ button, input, select {
   margin-top: 4px;
 }
 
+/* ---- Opening hours (collapsible, inside hero) ---- */
+.hours-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 14px;
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 999px;
+  color: white;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.hours-content {
+  margin-top: 10px;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 10px;
+  color: white;
+  font-size: 0.82rem;
+  white-space: pre-line;
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---- Menu search box ---- */
+.menu-search-wrap {
+  padding: 14px 0 4px;
+}
+
+.menu-search-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+.menu-search-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* ---- Sticky category pill nav ---- */
 .category-pills {
   position: sticky;
@@ -655,6 +702,57 @@ button, input, select {
   align-items: center;
   gap: 3px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* ---- Post-pickup star rating ---- */
+.rating-stars {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.rating-star {
+  font-size: 2.2rem;
+  color: #D9C79E;
+  cursor: pointer;
+  line-height: 1;
+  transition: transform 0.1s ease;
+}
+
+.rating-star:hover { transform: scale(1.15); }
+
+/* ---- Cart upsell suggestion ---- */
+.cart-suggest-box {
+  background: var(--paper-dim);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 16px 0;
+}
+
+.cart-suggest-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.cart-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.cart-suggest-item img {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.cart-suggest-item span.grow {
+  flex: 1;
+  font-size: 0.88rem;
 }
 
 .grid-card-body {
