@@ -15,7 +15,10 @@
   <div id="subscriptionBanner"></div>
 
   <div class="top-bar">
-    <div class="shop-name display" id="shopNameHeader">لوحة التحكم</div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <img src="logo-app.png" alt="Cafeoman.app" style="width:34px; height:34px; border-radius:9px; object-fit:cover; flex-shrink:0;">
+      <div class="shop-name display" id="shopNameHeader">لوحة التحكم</div>
+    </div>
     <div style="display:flex; align-items:center; gap:12px;">
       <button class="lang-toggle" id="dashLangToggle" onclick="toggleDashLang()" style="position:static; box-shadow:none; padding:6px 12px;">EN</button>
       <div class="bell-wrap" onclick="switchTab('pos')">
@@ -341,7 +344,7 @@ function resendVerification() {
     .catch(err => { console.error(err); });
 }
 
-// One-time: activate a 7-day free trial the first time the owner logs in
+// One-time: activate a 14-day free trial the first time the owner logs in
 // with a verified email, if they haven't already had a trial or subscription.
 async function maybeActivateTrial() {
   const doc = await db.collection('shops').doc(currentShopId).get();
@@ -350,7 +353,7 @@ async function maybeActivateTrial() {
 
   if (info.subscriptionStatus === 'pending' && !info.trialActivated) {
     const end = new Date();
-    end.setDate(end.getDate() + 7);
+    end.setDate(end.getDate() + 14);
     const endStr = end.toISOString().split('T')[0];
 
     await db.collection('shops').doc(currentShopId).update({
