@@ -39,6 +39,7 @@
 
 <script>
 let shopId = null;
+let shopRooms = [];
 let shopInfo = {};
 let cart = {}; // { itemId: { name, price, qty } }
 let itemMeta = {}; // { itemId: { name, price } } — used to safely rebuild controls without re-escaping strings
@@ -74,6 +75,16 @@ const translations = {
   orderPickedUp: { ar: 'طلب جاهز', en: 'Order picked up' },
   rateOrderPrompt: { ar: 'وش رأيك بطلبك؟', en: 'How was your order?' },
   ratingsWord: { ar: 'تقييم', en: 'ratings' },
+  reserveRoomBtn: { ar: 'احجز قاعة', en: 'Reserve a room' },
+  roomFieldLbl: { ar: 'القاعة', en: 'Room' },
+  dateFieldLbl: { ar: 'التاريخ', en: 'Date' },
+  timeFieldLbl: { ar: 'الوقت', en: 'Time' },
+  guestsFieldLbl: { ar: 'عدد الأشخاص', en: 'Number of guests' },
+  phoneFieldLbl: { ar: 'رقم الهاتف', en: 'Phone number' },
+  confirmReservationBtn: { ar: 'تأكيد الحجز', en: 'Confirm reservation' },
+  reserveNameRequired: { ar: 'الرجاء إدخال اسمك ورقم هاتفك.', en: 'Please enter your name and phone number.' },
+  reservationConfirmed: { ar: 'تم تأكيد حجزك ✓', en: 'Your reservation is confirmed ✓' },
+  slotTakenError: { ar: 'عذراً، هذا الوقت محجوز بالفعل. اختر وقت ثاني.', en: 'Sorry, that time slot is already booked. Please choose another.' },
   skipRating: { ar: 'تخطي', en: 'Skip' },
   addToCartBtn: { ar: 'أضف للسلة', en: 'Add to cart' },
   openingHoursLbl: { ar: 'مواعيد العمل', en: 'Opening hours' },
@@ -156,6 +167,9 @@ async function loadMenu() {
                               .orderBy('category')
                               .get();
 
+    const roomsSnap = await db.collection('shops').doc(shopId).collection('rooms').get();
+    shopRooms = roomsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
     const categories = {};
     suggestedItemIds = [];
     menuSnap.forEach(doc => {
@@ -176,6 +190,7 @@ async function loadMenu() {
         ${(currentLang === 'en' && shopInfo.taglineEn) ? `<div class="menu-hero-tagline">${shopInfo.taglineEn}</div>` : (shopInfo.tagline ? `<div class="menu-hero-tagline">${shopInfo.tagline}</div>` : '')}
         ${shopInfo.location ? `<div class="menu-hero-location">${shopInfo.location}</div>` : ''}
         ${(shopInfo.showRatingPublicly && shopInfo.avgRating) ? `<div class="menu-hero-rating">⭐ ${shopInfo.avgRating} (${shopInfo.ratingCount} ${t('ratingsWord')})</div>` : ''}
+        ${shopRooms.length > 0 ? `<button class="reserve-room-btn" onclick="openReserveModal()">🏛️ ${t('reserveRoomBtn')}</button>` : ''}
         ${shopInfo.openingHours ? `
           <div class="hours-toggle" onclick="toggleHours()">
             <span>🕐</span><span>${t('openingHoursLbl')}</span><span id="hoursArrow">⌄</span>
@@ -351,6 +366,120 @@ function addSuggestedToCart(itemId) {
   changeQty(itemId, 1);
   closeCartModal();
   openCartModal();
+}
+
+// ===================== Room reservations =====================
+const reservationTimeSlots = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
+
+function openReserveModal() {
+  const today = new Date().toISOString().split('T')[0];
+
+  const roomOptions = shopRooms.map(r => {
+    const label = (currentLang === 'en' && r.nameEn) ? r.nameEn : r.name;
+    return `<option value="${r.id}">${label}${r.capacity ? ` (${r.capacity} ${t('guestsWord')})` : ''}</option>`;
+  }).join('');
+
+  const timeOptions = reservationTimeSlots.map(tm => `<option value="${tm}">${tm}</option>`).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'reserveOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="document.getElementById('reserveOverlay').remove()">×</button>
+      <h3 style="margin:8px 0 16px;">${t('reserveRoomBtn')}</h3>
+
+      <div class="field">
+        <label for="resRoom">${t('roomFieldLbl')}</label>
+        <select id="resRoom">${roomOptions}</select>
+      </div>
+      <div class="field">
+        <label for="resDate">${t('dateFieldLbl')}</label>
+        <input type="date" id="resDate" min="${today}" value="${today}">
+      </div>
+      <div class="field">
+        <label for="resTime">${t('timeFieldLbl')}</label>
+        <select id="resTime">${timeOptions}</select>
+      </div>
+      <div class="field">
+        <label for="resGuests">${t('guestsFieldLbl')}</label>
+        <input type="number" id="resGuests" min="1" value="2">
+      </div>
+      <div class="field">
+        <label for="resName">${t('yourName')}</label>
+        <input type="text" id="resName" placeholder="${t('namePlaceholder')}">
+      </div>
+      <div class="field">
+        <label for="resPhone">${t('phoneFieldLbl')}</label>
+        <input type="tel" id="resPhone" placeholder="9xxxxxxx">
+      </div>
+      <div class="field">
+        <label for="resNotes">${t('notesLabel')}</label>
+        <input type="text" id="resNotes">
+      </div>
+
+      <button class="btn" style="width:100%;" onclick="submitReservation()">${t('confirmReservationBtn')}</button>
+      <div id="reserveError" class="error-msg"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+async function submitReservation() {
+  const errorEl = document.getElementById('reserveError');
+  errorEl.textContent = '';
+
+  const roomId = document.getElementById('resRoom').value;
+  const date = document.getElementById('resDate').value;
+  const time = document.getElementById('resTime').value;
+  const guests = parseInt(document.getElementById('resGuests').value) || 1;
+  const name = document.getElementById('resName').value.trim();
+  const phone = document.getElementById('resPhone').value.trim();
+  const notes = document.getElementById('resNotes').value.trim();
+
+  if (!name || !phone) {
+    errorEl.textContent = t('reserveNameRequired');
+    return;
+  }
+
+  const room = shopRooms.find(r => r.id === roomId);
+  const roomName = room ? room.name : '';
+  const slotId = `${roomId}_${date}_${time}`;
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const slotRef = db.collection('shops').doc(shopId).collection('bookedSlots').doc(slotId);
+      const slotDoc = await tx.get(slotRef);
+      if (slotDoc.exists) {
+        throw new Error('SLOT_TAKEN');
+      }
+      tx.set(slotRef, { roomId, date, time, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+      const resRef = db.collection('shops').doc(shopId).collection('reservations').doc();
+      tx.set(resRef, {
+        roomId, roomName, date, time, guests, notes: notes || null,
+        customerName: name, phone,
+        status: 'confirmed',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    document.querySelector('#reserveOverlay .modal-sheet').innerHTML = `
+      <div style="text-align:center; padding:20px 10px;">
+        <div style="font-size:2.5rem; margin-bottom:10px;">✅</div>
+        <h3>${t('reservationConfirmed')}</h3>
+        <p style="color:var(--stone);">${roomName} — ${date} ${time}</p>
+        <button class="btn" style="margin-top:16px;" onclick="document.getElementById('reserveOverlay').remove()">${t('close')}</button>
+      </div>
+    `;
+  } catch (err) {
+    if (err.message === 'SLOT_TAKEN') {
+      errorEl.textContent = t('slotTakenError');
+    } else {
+      console.error(err);
+      errorEl.textContent = t('orderSendError');
+    }
+  }
 }
 
 function openCartModal() {

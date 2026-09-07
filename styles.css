@@ -491,6 +491,18 @@ button, input, select {
   margin-top: 6px;
 }
 
+.reserve-room-btn {
+  margin-top: 12px;
+  padding: 9px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.15);
+  color: white;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
 /* ---- Opening hours (collapsible, inside hero) ---- */
 .hours-toggle {
   display: inline-flex;
@@ -1136,6 +1148,7 @@ button, input, select {
 .icon-subnav-btn[data-sub="qr"] .icon-subnav-icon { background: #D6E0F0; color: #3E5C8A; }
 .icon-subnav-btn[data-sub="add"] .icon-subnav-icon { background: #D7ECD9; color: #3D7A47; }
 .icon-subnav-btn[data-sub="list"] .icon-subnav-icon { background: #F3DFC7; color: #8A5A28; }
+.icon-subnav-btn[data-sub="reservations"] .icon-subnav-icon { background: #EAD3DC; color: #8A4A63; }
 
 .icon-subnav-label { font-size: 0.75rem; }
 
