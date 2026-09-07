@@ -56,6 +56,7 @@
         <canvas id="myQrCanvas"></canvas>
         <div id="myMenuUrl" style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:10px 0;"></div>
         <button class="btn btn-ghost" onclick="downloadMyQr()" data-i18n="downloadQr">تحميل الباركود</button>
+        <button class="btn" style="margin-top:8px;" onclick="downloadTableTent()" data-i18n="downloadTentBtn">تحميل تصميم الطاولة</button>
       </div>
     </div>
 
@@ -322,6 +323,7 @@ auth.onAuthStateChanged(async user => {
   await loadShopInfo();
   await loadItems();
   listenToOrders();
+  updateBestSellerFlag();
 });
 
 function showVerifyEmailScreen(user) {
@@ -471,7 +473,9 @@ const dashT = {
   colNew: { ar: 'جديد', en: 'New' },
   colPreparing: { ar: 'قيد التحضير', en: 'Preparing' },
   justNow: { ar: 'الآن', en: 'just now' },
-  minutesAgo: { ar: 'دقيقة مضت', en: 'min ago' }
+  minutesAgo: { ar: 'دقيقة مضت', en: 'min ago' },
+  downloadTentBtn: { ar: 'تحميل تصميم الطاولة', en: 'Download table tent' },
+  scanAndOrder: { ar: 'امسح واطلب', en: 'Scan & Order' }
 };
 
 function dt(key) {
@@ -703,6 +707,101 @@ function downloadMyQr() {
   link.download = 'qr-code.png';
   link.href = canvas.toDataURL();
   link.click();
+}
+
+// Generates a printable "table tent" card: logo + shop name + QR + caption,
+// composited onto a single downloadable image sized for standard printing.
+async function downloadTableTent() {
+  const doc = await db.collection('shops').doc(currentShopId).get();
+  const info = doc.exists ? (doc.data().info || {}) : {};
+  const menuUrl = document.getElementById('myMenuUrl').textContent;
+  const accent = info.primaryColor || '#8B5A2B';
+
+  const W = 1000, H = 1500;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#FAF6EF';
+  ctx.fillRect(0, 0, W, H);
+
+  // Top accent band
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, 0, W, 90);
+
+  // Logo (best-effort — skipped silently if it can't be loaded due to CORS)
+  let logoBottom = 220;
+  if (info.logo) {
+    try {
+      const logoImg = await loadImageSafe(info.logo);
+      const size = 220;
+      const x = (W - size) / 2;
+      const y = 140;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(logoImg, x, y, size, size);
+      ctx.restore();
+      logoBottom = y + size + 40;
+    } catch (e) {
+      console.error('Logo could not be drawn on table tent:', e);
+    }
+  }
+
+  // Shop name
+  ctx.fillStyle = '#241B15';
+  ctx.textAlign = 'center';
+  ctx.font = '700 54px Georgia, serif';
+  ctx.fillText(info.name || '', W / 2, logoBottom + 20);
+
+  // Tagline
+  let nextY = logoBottom + 70;
+  if (info.tagline) {
+    ctx.fillStyle = '#8A7A68';
+    ctx.font = '28px Arial';
+    ctx.fillText(info.tagline, W / 2, nextY);
+    nextY += 50;
+  }
+
+  // QR code (drawn from the already-rendered on-page canvas — no CORS issue, same origin)
+  const qrSize = 460;
+  const qrSourceCanvas = document.getElementById('myQrCanvas');
+  const qrX = (W - qrSize) / 2;
+  const qrY = nextY + 30;
+  ctx.fillStyle = 'white';
+  ctx.fillRect(qrX - 20, qrY - 20, qrSize + 40, qrSize + 40);
+  ctx.strokeStyle = '#E4D9C6';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(qrX - 20, qrY - 20, qrSize + 40, qrSize + 40);
+  ctx.drawImage(qrSourceCanvas, qrX, qrY, qrSize, qrSize);
+
+  // Caption
+  ctx.fillStyle = '#241B15';
+  ctx.font = '700 40px Arial';
+  ctx.fillText(dt('scanAndOrder'), W / 2, qrY + qrSize + 70);
+
+  ctx.fillStyle = '#8A7A68';
+  ctx.font = '22px Arial';
+  ctx.fillText(menuUrl, W / 2, qrY + qrSize + 110);
+
+  const link = document.createElement('a');
+  link.download = 'table-tent.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function loadImageSafe(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
 }
 
 // ===================== Storage cleanup helper =====================
@@ -1225,6 +1324,46 @@ async function updateStock(itemId, value) {
 }
 
 // ===================== TAB 4: Sales analytics =====================
+// ===================== Auto "best seller" badge =====================
+// Runs quietly each time the dashboard loads: looks at the last 30 days of
+// orders, finds the top-selling item by name, and flags it (bestSeller: true)
+// so the customer menu can show a small "الأكثر طلباً" badge — no manual
+// button needed, it just stays current every time the owner opens the app.
+async function updateBestSellerFlag() {
+  try {
+    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const ordersSnap = await db.collection('shops').doc(currentShopId).collection('orders')
+      .where('createdAt', '>=', startDate).get();
+
+    const itemCounts = {};
+    ordersSnap.forEach(doc => {
+      (doc.data().items || []).forEach(i => {
+        itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty;
+      });
+    });
+
+    const sorted = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
+    const topName = sorted.length > 0 ? sorted[0][0] : null;
+
+    const menuSnap = await db.collection('shops').doc(currentShopId).collection('menu').get();
+    const batch = db.batch();
+    let changed = false;
+
+    menuSnap.forEach(doc => {
+      const item = doc.data();
+      const shouldBeBest = topName !== null && item.name === topName;
+      if (!!item.bestSeller !== shouldBeBest) {
+        batch.update(doc.ref, { bestSeller: shouldBeBest });
+        changed = true;
+      }
+    });
+
+    if (changed) await batch.commit();
+  } catch (err) {
+    console.error('Best seller update failed (non-blocking):', err);
+  }
+}
+
 async function loadSales(range, btnEl) {
   document.querySelectorAll('.range-tab').forEach(b => b.classList.remove('active'));
   if (btnEl) btnEl.classList.add('active');

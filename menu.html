@@ -83,7 +83,8 @@ const translations = {
   carNumberPlaceholder: { ar: 'مثال: 12345', en: 'e.g. 12345' },
   carColor: { ar: 'لون ونوع السيارة', en: 'Car color & model' },
   carColorPlaceholder: { ar: 'مثال: تويوتا بيضاء', en: 'e.g. White Toyota' },
-  carFieldsError: { ar: 'الرجاء إدخال رقم السيارة ولونها.', en: 'Please enter your car plate number and color.' }
+  carFieldsError: { ar: 'الرجاء إدخال رقم السيارة ولونها.', en: 'Please enter your car plate number and color.' },
+  bestSellerTag: { ar: 'الأكثر طلباً', en: 'Best seller' }
 };
 
 function t(key) {
@@ -191,6 +192,7 @@ async function loadMenu() {
           <div class="grid-card ${unavailable ? 'unavailable' : ''}">
             <div class="grid-card-img-wrap">
               ${item.image ? `<img src="${item.image}" class="grid-card-img" alt="">` : ''}
+              ${item.bestSeller ? `<div class="best-seller-badge">⭐ ${t('bestSellerTag')}</div>` : ''}
               ${unavailable ? `<div class="grid-unavailable-tag">${t('unavailableTag')}</div>` : `
                 <div class="grid-qty-container" id="qtyctrl-${item.id}">${renderQtyControl(item.id, 0)}</div>
               `}
