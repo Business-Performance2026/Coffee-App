@@ -484,6 +484,13 @@ button, input, select {
   margin-top: 4px;
 }
 
+.menu-hero-rating {
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: 6px;
+}
+
 /* ---- Opening hours (collapsible, inside hero) ---- */
 .hours-toggle {
   display: inline-flex;

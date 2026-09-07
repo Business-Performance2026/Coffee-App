@@ -302,6 +302,11 @@
         <input type="number" id="shopPrepTimeInput" min="1">
       </div>
 
+      <div class="field" style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="showRatingPublicly" style="width:auto;">
+        <label for="showRatingPublicly" style="margin:0;" data-i18n="showRatingLbl">إظهار متوسط تقييمي للعملاء بالقائمة</label>
+      </div>
+
       <button class="btn" onclick="saveShopInfo()" data-i18n="saveChangesBtn">حفظ التغييرات</button>
       <div id="shopInfoError" class="error-msg"></div>
       <div id="shopInfoSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
@@ -383,6 +388,7 @@ auth.onAuthStateChanged(async user => {
   await loadItems();
   listenToOrders();
   updateBestSellerFlag();
+  updatePublicRatingStats();
 });
 
 function showVerifyEmailScreen(user) {
@@ -551,6 +557,7 @@ const dashT = {
   emailLbl: { ar: 'البريد الإلكتروني', en: 'Email' },
   colorLbl: { ar: 'اللون المميز', en: 'Accent color' },
   prepTimeLbl: { ar: 'الوقت التقريبي للتحضير (دقائق)', en: 'Estimated prep time (minutes)' },
+  showRatingLbl: { ar: 'إظهار متوسط تقييمي للعملاء بالقائمة', en: 'Show my average rating to customers on the menu' },
   saveChangesBtn: { ar: 'حفظ التغييرات', en: 'Save changes' },
   logoutBtn: { ar: 'تسجيل خروج', en: 'Log out' },
   loggedInAs: { ar: 'داخل بحساب', en: 'Logged in as' },
@@ -780,6 +787,7 @@ async function loadShopInfo() {
     document.getElementById('shopEmailInput').value = info.email || '';
     document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
     document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
+    document.getElementById('showRatingPublicly').checked = info.showRatingPublicly === true;
 
     renderSubscriptionBanner(info);
 
@@ -1055,6 +1063,7 @@ async function saveShopInfo() {
   const email = document.getElementById('shopEmailInput').value.trim();
   const color = document.getElementById('shopColorInput').value;
   const prepTime = parseInt(document.getElementById('shopPrepTimeInput').value) || 10;
+  const showRatingPublicly = document.getElementById('showRatingPublicly').checked;
 
   if (!name) {
     errorEl.textContent = dt('shopNameRequiredError');
@@ -1074,7 +1083,8 @@ async function saveShopInfo() {
       'info.whatsapp': whatsapp,
       'info.email': email,
       'info.primaryColor': color,
-      'info.estimatedMinutes': prepTime
+      'info.estimatedMinutes': prepTime,
+      'info.showRatingPublicly': showRatingPublicly
     };
     if (uploadedLogoUrl) updateData['info.logo'] = uploadedLogoUrl;
     if (uploadedCoverUrl) updateData['info.coverImage'] = uploadedCoverUrl;
@@ -1511,6 +1521,33 @@ async function updateStock(itemId, value) {
 // orders, finds the top-selling item by name, and flags it (bestSeller: true)
 // so the customer menu can show a small "الأكثر طلباً" badge — no manual
 // button needed, it just stays current every time the owner opens the app.
+// ===================== Public rating stats (readable by customers) =====================
+// Orders aren't listable by customers (privacy), so we can't compute this live
+// on the menu page. Instead we compute it here (owner is authenticated) and
+// publish just the aggregate numbers onto the shop's public info — the owner
+// controls whether this is actually shown via the "showRatingPublicly" toggle.
+async function updatePublicRatingStats() {
+  try {
+    const snap = await db.collection('shops').doc(currentShopId).collection('orders')
+      .where('rating', '>=', 1).get();
+
+    let sum = 0, count = 0;
+    snap.forEach(doc => {
+      const r = doc.data().rating;
+      if (typeof r === 'number') { sum += r; count++; }
+    });
+
+    if (count > 0) {
+      await db.collection('shops').doc(currentShopId).update({
+        'info.avgRating': Math.round((sum / count) * 10) / 10,
+        'info.ratingCount': count
+      });
+    }
+  } catch (err) {
+    console.error('Public rating stats update failed (non-blocking):', err);
+  }
+}
+
 async function updateBestSellerFlag() {
   try {
     const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);

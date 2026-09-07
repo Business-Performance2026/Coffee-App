@@ -73,6 +73,7 @@ const translations = {
   minuteWord: { ar: 'دقيقة', en: 'min' },
   orderPickedUp: { ar: 'طلب جاهز', en: 'Order picked up' },
   rateOrderPrompt: { ar: 'وش رأيك بطلبك؟', en: 'How was your order?' },
+  ratingsWord: { ar: 'تقييم', en: 'ratings' },
   skipRating: { ar: 'تخطي', en: 'Skip' },
   addToCartBtn: { ar: 'أضف للسلة', en: 'Add to cart' },
   openingHoursLbl: { ar: 'مواعيد العمل', en: 'Opening hours' },
@@ -174,6 +175,7 @@ async function loadMenu() {
         <div class="menu-hero-name display">${shopName}</div>
         ${(currentLang === 'en' && shopInfo.taglineEn) ? `<div class="menu-hero-tagline">${shopInfo.taglineEn}</div>` : (shopInfo.tagline ? `<div class="menu-hero-tagline">${shopInfo.tagline}</div>` : '')}
         ${shopInfo.location ? `<div class="menu-hero-location">${shopInfo.location}</div>` : ''}
+        ${(shopInfo.showRatingPublicly && shopInfo.avgRating) ? `<div class="menu-hero-rating">⭐ ${shopInfo.avgRating} (${shopInfo.ratingCount} ${t('ratingsWord')})</div>` : ''}
         ${shopInfo.openingHours ? `
           <div class="hours-toggle" onclick="toggleHours()">
             <span>🕐</span><span>${t('openingHoursLbl')}</span><span id="hoursArrow">⌄</span>
