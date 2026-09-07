@@ -188,6 +188,23 @@
     <div class="card" id="topItemsList">
       <div class="state-msg">جاري التحميل...</div>
     </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:14px;" data-i18n="exportTitle">تصدير تقرير Excel</h3>
+      <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <div class="field" style="margin:0; flex:1;">
+          <label for="exportFrom" data-i18n="fromDateLbl">من تاريخ</label>
+          <input type="date" id="exportFrom">
+        </div>
+        <div class="field" style="margin:0; flex:1;">
+          <label for="exportTo" data-i18n="toDateLbl">إلى تاريخ</label>
+          <input type="date" id="exportTo">
+        </div>
+      </div>
+      <button class="btn" style="width:100%;" onclick="exportSalesExcel()" data-i18n="exportBtn">📥 تصدير Excel</button>
+      <div id="exportError" class="error-msg"></div>
+      <div id="exportStatus" style="font-size:0.85rem; color:#3D6B4F; margin-top:8px;"></div>
+    </div>
   </div>
 
   <!-- ===================== TAB 5: الحساب (Account) ===================== -->
@@ -296,6 +313,7 @@
 </div>
 
 <script src="qrcode.min.js"></script>
+<script src="xlsx.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
@@ -497,7 +515,17 @@ const dashT = {
   justNow: { ar: 'الآن', en: 'just now' },
   minutesAgo: { ar: 'دقيقة مضت', en: 'min ago' },
   downloadTentBtn: { ar: 'تحميل تصميم الطاولة', en: 'Download table tent' },
-  scanAndOrder: { ar: 'امسح واطلب', en: 'Scan & Order' }
+  scanAndOrder: { ar: 'امسح واطلب', en: 'Scan & Order' },
+  exportTitle: { ar: 'تصدير تقرير Excel', en: 'Export Excel report' },
+  fromDateLbl: { ar: 'من تاريخ', en: 'From date' },
+  toDateLbl: { ar: 'إلى تاريخ', en: 'To date' },
+  exportBtn: { ar: '📥 تصدير Excel', en: '📥 Export Excel' },
+  exportDatesRequired: { ar: 'اختر تاريخ البداية والنهاية.', en: 'Please choose both a start and end date.' },
+  exportDateOrderError: { ar: 'تاريخ البداية لازم يكون قبل تاريخ النهاية.', en: 'Start date must be before end date.' },
+  exportLibError: { ar: 'مكتبة Excel ما تحمّلت.', en: 'Excel library failed to load.' },
+  exportPreparing: { ar: 'جاري تجهيز الملف...', en: 'Preparing the file...' },
+  exportDone: { ar: 'تم تحميل الملف ✓', en: 'File downloaded ✓' },
+  exportGenericError: { ar: 'حدث خطأ أثناء التصدير', en: 'An error occurred while exporting' }
 };
 
 function dt(key) {
@@ -1386,6 +1414,125 @@ async function updateBestSellerFlag() {
     if (changed) await batch.commit();
   } catch (err) {
     console.error('Best seller update failed (non-blocking):', err);
+  }
+}
+
+// ===================== Excel export (custom date range, styled) =====================
+async function exportSalesExcel() {
+  const errorEl = document.getElementById('exportError');
+  const statusEl = document.getElementById('exportStatus');
+  errorEl.textContent = '';
+  statusEl.textContent = '';
+
+  const fromStr = document.getElementById('exportFrom').value;
+  const toStr = document.getElementById('exportTo').value;
+
+  if (!fromStr || !toStr) {
+    errorEl.textContent = dt('exportDatesRequired');
+    return;
+  }
+
+  const fromDate = new Date(fromStr + 'T00:00:00');
+  const toDate = new Date(toStr + 'T23:59:59');
+
+  if (fromDate > toDate) {
+    errorEl.textContent = dt('exportDateOrderError');
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    errorEl.textContent = dt('exportLibError');
+    return;
+  }
+
+  statusEl.textContent = dt('exportPreparing');
+
+  try {
+    const snap = await db.collection('shops').doc(currentShopId).collection('orders')
+      .where('createdAt', '>=', fromDate)
+      .where('createdAt', '<=', toDate)
+      .orderBy('createdAt', 'asc')
+      .get();
+
+    const shopDoc = await db.collection('shops').doc(currentShopId).get();
+    const shopName = shopDoc.exists ? (shopDoc.data().info || {}).name || '' : '';
+
+    let totalSales = 0;
+    const itemCounts = {};
+    const rows = [];
+
+    snap.forEach(doc => {
+      const o = doc.data();
+      totalSales += Number(o.total) || 0;
+      (o.items || []).forEach(i => { itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty; });
+
+      const created = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : null;
+      const typeLabel = o.orderType === 'car'
+        ? `🚗 ${o.carColor || ''} (${o.carNumber || ''})`
+        : `🍽️ طاولة ${o.tableNumber || '-'}`;
+      const itemsText = (o.items || []).map(i => `${i.name} ×${i.qty}`).join('، ');
+
+      rows.push([
+        created ? created.toLocaleDateString('ar-OM') : '',
+        created ? created.toLocaleTimeString('ar-OM', { hour: '2-digit', minute: '2-digit' }) : '',
+        typeLabel,
+        itemsText,
+        Number(o.total) || 0
+      ]);
+    });
+
+    const topItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    // ---- Build the worksheet as a 2D array first ----
+    const data = [];
+    data.push([shopName || 'تقرير المبيعات']);
+    data.push([`الفترة: ${fromStr} إلى ${toStr}`]);
+    data.push([]);
+    data.push(['إجمالي المبيعات (ر.ع)', totalSales.toFixed(2)]);
+    data.push(['عدد الطلبات', snap.size]);
+    data.push([]);
+    data.push(['الأكثر مبيعاً', 'الكمية']);
+    topItems.forEach(([name, qty]) => data.push([name, qty]));
+    data.push([]);
+    const headerRowIndex = data.length;
+    data.push(['التاريخ', 'الوقت', 'النوع', 'الأصناف', 'الإجمالي (ر.ع)']);
+    const firstDataRow = data.length;
+    rows.forEach(r => data.push(r));
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 22 }, { wch: 45 }, { wch: 14 }];
+
+    const brownFill = { fill: { fgColor: { rgb: '6B4226' } }, font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 } };
+    const goldFill = { fill: { fgColor: { rgb: 'C99A3E' } }, font: { bold: true, color: { rgb: 'FFFFFF' } } };
+    const tableHeaderStyle = { fill: { fgColor: { rgb: '3E5C8A' } }, font: { bold: true, color: { rgb: 'FFFFFF' } } };
+    const altRow = { fill: { fgColor: { rgb: 'F5EDE0' } } };
+
+    function setCell(r, c, style) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (ws[addr]) ws[addr].s = style;
+    }
+
+    setCell(0, 0, brownFill);
+    setCell(1, 0, { font: { italic: true, color: { rgb: '6B4226' } } });
+    setCell(3, 0, goldFill); setCell(3, 1, goldFill);
+    setCell(4, 0, goldFill); setCell(4, 1, goldFill);
+    setCell(6, 0, tableHeaderStyle); setCell(6, 1, tableHeaderStyle);
+
+    for (let c = 0; c < 5; c++) setCell(headerRowIndex, c, tableHeaderStyle);
+    for (let r = firstDataRow; r < data.length; r++) {
+      if ((r - firstDataRow) % 2 === 1) {
+        for (let c = 0; c < 5; c++) setCell(r, c, altRow);
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'المبيعات');
+    XLSX.writeFile(wb, `sales-report-${fromStr}-to-${toStr}.xlsx`);
+
+    statusEl.textContent = dt('exportDone');
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = dt('exportGenericError') + ': ' + err.message;
   }
 }
 
