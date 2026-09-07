@@ -356,6 +356,9 @@ function showVerifyEmailScreen(user) {
       <p style="color:var(--stone); font-size:0.9rem; margin-bottom:16px;">
         أرسلنا رابط تأكيد إلى <strong>${user.email}</strong>. اضغط الرابط، وبعدين حدّث هذي الصفحة.
       </p>
+      <p style="color:#B3441E; font-size:0.85rem; margin-bottom:16px;">
+        📩 لو ما لقيت الإيميل، تفقد مجلد "البريد غير المرغوب / Spam".
+      </p>
       <button class="btn" onclick="location.reload()">تحققت — حدّث الصفحة</button>
       <button class="btn btn-ghost" style="margin-top:10px;" onclick="resendVerification()">إعادة إرسال الرابط</button>
       <div id="resendMsg" style="font-size:0.85rem; color:#3D6B4F; margin-top:10px;"></div>
