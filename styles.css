@@ -203,9 +203,10 @@ button, input, select {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 18px 0;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--line);
+  padding: 18px 20px;
+  margin: 0 -20px 20px;
+  border-radius: 0 0 18px 18px;
+  background: linear-gradient(135deg, #FBF3E7 0%, #F5EDE0 100%);
 }
 
 .state-msg {
@@ -701,10 +702,28 @@ button, input, select {
   font-family: inherit;
 }
 
-.nav-item .nav-icon { font-size: 1.3rem; }
+.nav-item .nav-icon {
+  font-size: 1.15rem;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  transition: transform 0.15s ease;
+}
+
 .nav-item .nav-label { font-size: 0.68rem; font-weight: 500; }
 
-.nav-item.active { color: var(--accent); }
+.nav-item.active { color: var(--ink); font-weight: 600; }
+.nav-item.active .nav-icon { transform: scale(1.08); }
+
+/* Distinct color per tab — gives the bottom nav life instead of one flat tone */
+.nav-item[data-tab="dashboard"] .nav-icon { background: #F3DFC7; }
+.nav-item[data-tab="pos"] .nav-icon { background: #CFE8E1; }
+.nav-item[data-tab="inventory"] .nav-icon { background: #F6E2B8; }
+.nav-item[data-tab="sales"] .nav-icon { background: #D6E0F0; }
+.nav-item[data-tab="account"] .nav-icon { background: #EAD3DC; }
 
 .tab-view { display: none; }
 .tab-view.active { display: block; }
@@ -946,13 +965,26 @@ button, input, select {
   transition: box-shadow 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.icon-subnav-btn .icon-subnav-icon { font-size: 1.5rem; }
-.icon-subnav-btn .icon-subnav-label { font-size: 0.75rem; }
+.icon-subnav-btn .icon-subnav-icon {
+  font-size: 1.5rem;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+}
+
+.icon-subnav-btn[data-sub="qr"] .icon-subnav-icon { background: #D6E0F0; color: #3E5C8A; }
+.icon-subnav-btn[data-sub="add"] .icon-subnav-icon { background: #D7ECD9; color: #3D7A47; }
+.icon-subnav-btn[data-sub="list"] .icon-subnav-icon { background: #F3DFC7; color: #8A5A28; }
+
+.icon-subnav-label { font-size: 0.75rem; }
 
 .icon-subnav-btn.active {
   border-color: var(--accent);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, white);
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .sub-view { display: none; }
