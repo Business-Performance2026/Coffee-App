@@ -273,13 +273,8 @@
       </div>
 
       <div class="field">
-        <label for="shopHoursInput" data-i18n="hoursLbl">ساعات العمل</label>
-        <input type="text" id="shopHoursInput" placeholder="مثال: يومياً 8ص - 11م">
-      </div>
-
-      <div class="field">
-        <label for="shopHoursInput" data-i18n="hoursLbl">ساعات العمل</label>
-        <input type="text" id="shopHoursInput" placeholder="مثال: يومياً 7ص - 11م">
+        <label data-i18n="hoursLbl">ساعات العمل</label>
+        <div id="weeklyHoursEditor" class="weekly-hours-editor"></div>
       </div>
 
       <div class="field">
@@ -439,6 +434,71 @@ async function maybeActivateTrial() {
     });
   }
 }
+// ===================== Weekly opening hours (Google-style editor) =====================
+const weekDays = [
+  { key: 'sat', label: 'السبت' },
+  { key: 'sun', label: 'الأحد' },
+  { key: 'mon', label: 'الاثنين' },
+  { key: 'tue', label: 'الثلاثاء' },
+  { key: 'wed', label: 'الأربعاء' },
+  { key: 'thu', label: 'الخميس' },
+  { key: 'fri', label: 'الجمعة' }
+];
+
+function renderWeeklyHoursEditor(hoursData) {
+  const container = document.getElementById('weeklyHoursEditor');
+  container.innerHTML = weekDays.map(day => {
+    const d = hoursData[day.key] || { open: '08:00', close: '22:00', closed: false };
+    return `
+      <div class="hours-day-row">
+        <span class="hours-day-name">${day.label}</span>
+        <div class="hours-time-range" id="range-${day.key}" style="${d.closed ? 'display:none;' : ''}">
+          <input type="time" id="open-${day.key}" value="${d.open || '08:00'}">
+          <span>—</span>
+          <input type="time" id="close-${day.key}" value="${d.close || '22:00'}">
+        </div>
+        <label class="hours-closed-label">
+          <input type="checkbox" id="closed-${day.key}" ${d.closed ? 'checked' : ''} onchange="toggleDayClosed('${day.key}')">
+          <span>${dt('closedLbl')}</span>
+        </label>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleDayClosed(dayKey) {
+  const isClosed = document.getElementById(`closed-${dayKey}`).checked;
+  document.getElementById(`range-${dayKey}`).style.display = isClosed ? 'none' : 'flex';
+}
+
+function collectWeeklyHours() {
+  const hours = {};
+  weekDays.forEach(day => {
+    const closed = document.getElementById(`closed-${day.key}`).checked;
+    hours[day.key] = {
+      closed,
+      open: document.getElementById(`open-${day.key}`).value || '08:00',
+      close: document.getElementById(`close-${day.key}`).value || '22:00'
+    };
+  });
+  return hours;
+}
+
+function formatTime12h(time24) {
+  const [h, m] = time24.split(':').map(Number);
+  const period = h >= 12 ? 'م' : 'ص';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+function formatHoursForDisplay(hours) {
+  return weekDays.map(day => {
+    const d = hours[day.key];
+    if (!d || d.closed) return `${day.label}: مغلق`;
+    return `${day.label}: ${formatTime12h(d.open)} - ${formatTime12h(d.close)}`;
+  }).join('\n');
+}
+
 function logout() {
   auth.signOut().then(() => window.location.href = 'login.html');
 }
@@ -560,6 +620,7 @@ const dashT = {
   exportDone: { ar: 'تم تحميل الملف ✓', en: 'File downloaded ✓' },
   exportGenericError: { ar: 'حدث خطأ أثناء التصدير', en: 'An error occurred while exporting' },
   hoursLbl: { ar: 'ساعات العمل', en: 'Opening hours' },
+  closedLbl: { ar: 'مغلق', en: 'Closed' },
   itemSuggestedLbl: { ar: 'اقترحه كإضافة بالسلة', en: 'Suggest as a cart add-on' },
   avgRatingLbl: { ar: 'متوسط التقييم', en: 'Average rating' }
 };
@@ -713,7 +774,7 @@ async function loadShopInfo() {
     document.getElementById('shopTaglineInput').value = info.tagline || '';
     document.getElementById('shopTaglineEnInput').value = info.taglineEn || '';
     document.getElementById('shopLocationInput').value = info.location || '';
-    document.getElementById('shopHoursInput').value = info.openingHours || '';
+    renderWeeklyHoursEditor(info.hours || {});
     document.getElementById('shopPhoneInput').value = info.phone || '';
     document.getElementById('shopWhatsappInput').value = info.whatsapp || '';
     document.getElementById('shopEmailInput').value = info.email || '';
@@ -988,7 +1049,7 @@ async function saveShopInfo() {
   const tagline = document.getElementById('shopTaglineInput').value.trim();
   const taglineEn = document.getElementById('shopTaglineEnInput').value.trim();
   const location = document.getElementById('shopLocationInput').value.trim();
-  const openingHours = document.getElementById('shopHoursInput').value.trim();
+  const hours = collectWeeklyHours();
   const phone = document.getElementById('shopPhoneInput').value.trim();
   const whatsapp = document.getElementById('shopWhatsappInput').value.trim();
   const email = document.getElementById('shopEmailInput').value.trim();
@@ -1007,7 +1068,8 @@ async function saveShopInfo() {
       'info.tagline': tagline,
       'info.taglineEn': taglineEn,
       'info.location': location,
-      'info.openingHours': openingHours,
+      'info.hours': hours,
+      'info.openingHours': formatHoursForDisplay(hours),
       'info.phone': phone,
       'info.whatsapp': whatsapp,
       'info.email': email,
