@@ -401,15 +401,12 @@
         <input type="text" id="empName" placeholder="مثال: أحمد">
       </div>
       <div class="field">
-        <label for="empPhone" data-i18n="empPhoneLbl">رقم هاتفه</label>
-        <div style="display:flex; gap:8px;">
-          <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
-          <input type="tel" id="empPhone" placeholder="9xxxxxxx" style="flex:1;">
-        </div>
+        <label for="empEmail" data-i18n="empEmailLbl">البريد الإلكتروني</label>
+        <input type="email" id="empEmail" placeholder="employee@example.com">
       </div>
       <div class="field">
-        <label for="empPin" data-i18n="empPinLbl">رقم سري (6 أرقام على الأقل)</label>
-        <input type="password" id="empPin" inputmode="numeric" placeholder="••••••">
+        <label for="empPin" data-i18n="empPasswordLbl">كلمة المرور (6 أحرف على الأقل)</label>
+        <input type="password" id="empPin" placeholder="••••••">
       </div>
 
       <div class="field">
@@ -739,7 +736,7 @@ async function loadEmployees() {
     html += `
       <div class="dashboard-item">
         <div class="grow">
-          <div class="item-name">${e.name || ''} — ${e.phone || ''}</div>
+          <div class="item-name">${e.name || ''} — ${e.email || ''}</div>
           <div class="item-desc">${grantedList}</div>
         </div>
         <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editEmployeePerms("${doc.id}")'>${dt('editBtn')}</button>
@@ -785,10 +782,10 @@ async function saveEmployee() {
 
   // ---- Creating a brand new employee ----
   const name = document.getElementById('empName').value.trim();
-  const phone = document.getElementById('empPhone').value.trim().replace(/[\s-]/g, '');
+  const email = document.getElementById('empEmail').value.trim();
   const pin = document.getElementById('empPin').value;
 
-  if (!name || !/^[0-9]{7,9}$/.test(phone)) {
+  if (!name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errorEl.textContent = dt('empInvalidFields');
     return;
   }
@@ -801,17 +798,15 @@ async function saveEmployee() {
     return;
   }
 
-  const staffEmail = `staff_${phone}@staff.cafeoman.app`;
-
   try {
     // Create the employee's login using a SECONDARY app instance, so the
     // owner's own session here is never touched or signed out.
-    const cred = await secondaryEmpAuth.createUserWithEmailAndPassword(staffEmail, pin);
+    const cred = await secondaryEmpAuth.createUserWithEmailAndPassword(email, pin);
     const empUid = cred.user.uid;
     await secondaryEmpAuth.signOut();
 
     await db.collection('shops').doc(currentShopId).collection('employees').doc(empUid).set({
-      name, phone, permissions,
+      name, email, permissions,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     await db.collection('employeeIndex').doc(empUid).set({ shopId: currentShopId });
@@ -835,8 +830,8 @@ async function editEmployeePerms(empUid) {
 
   document.getElementById('empId').value = empUid;
   document.getElementById('empName').value = e.name || '';
-  document.getElementById('empPhone').value = e.phone || '';
-  document.getElementById('empPhone').disabled = true;
+  document.getElementById('empEmail').value = e.email || '';
+  document.getElementById('empEmail').disabled = true;
   document.getElementById('empPin').disabled = true;
   document.getElementById('empPin').placeholder = dt('pinLockedNote');
 
@@ -861,8 +856,8 @@ async function deleteEmployee(empUid) {
 function resetEmployeeForm() {
   document.getElementById('empId').value = '';
   document.getElementById('empName').value = '';
-  document.getElementById('empPhone').value = '';
-  document.getElementById('empPhone').disabled = false;
+  document.getElementById('empEmail').value = '';
+  document.getElementById('empEmail').disabled = false;
   document.getElementById('empPin').value = '';
   document.getElementById('empPin').disabled = false;
   document.getElementById('empPin').placeholder = '••••••';
@@ -931,18 +926,18 @@ const dashT = {
   loggedInAs: { ar: 'داخل بحساب', en: 'Logged in as' },
   employeesTitle: { ar: 'الموظفين', en: 'Staff' },
   empNameLbl: { ar: 'اسم الموظف', en: "Employee's name" },
-  empPhoneLbl: { ar: 'رقم هاتفه', en: 'Their phone number' },
-  empPinLbl: { ar: 'رقم سري (6 أرقام على الأقل)', en: 'PIN (6 digits minimum)' },
+  empEmailLbl: { ar: 'البريد الإلكتروني', en: 'Email' },
+  empPasswordLbl: { ar: 'كلمة المرور (6 أحرف على الأقل)', en: 'Password (6 characters minimum)' },
   empPermissionsLbl: { ar: 'الصلاحيات المسموحة', en: 'Allowed permissions' },
   posPrintNote: { ar: 'صلاحية "نقطة البيع" تشمل تلقائياً إمكانية طباعة الفواتير.', en: 'The "POS" permission automatically includes the ability to print receipts.' },
   addEmployeeBtn: { ar: 'إضافة موظف', en: 'Add employee' },
   currentEmployeesTitle: { ar: 'الموظفين الحاليين', en: 'Current staff' },
   noEmployeesYet: { ar: 'لا يوجد موظفين بعد.', en: 'No staff added yet.' },
   noPermissionsShort: { ar: 'بدون صلاحيات', en: 'No permissions' },
-  empInvalidFields: { ar: 'أدخل اسم صحيح ورقم هاتف صحيح (بدون رمز الدولة).', en: 'Enter a valid name and phone number (without country code).' },
-  empPinTooShort: { ar: 'الرقم السري لازم يكون 6 أرقام على الأقل.', en: 'PIN must be at least 6 digits.' },
+  empInvalidFields: { ar: 'أدخل اسم صحيح وبريد إلكتروني صحيح.', en: 'Enter a valid name and email address.' },
+  empPinTooShort: { ar: 'كلمة المرور لازم تكون 6 أحرف على الأقل.', en: 'Password must be at least 6 characters.' },
   atLeastOnePermissionError: { ar: 'فعّل صلاحية واحدة على الأقل للموظف.', en: 'Enable at least one permission for this employee.' },
-  empPhoneTaken: { ar: 'هذا الرقم مستخدم مسبقاً لموظف آخر.', en: 'This phone number is already used by another employee.' },
+  empPhoneTaken: { ar: 'هذا البريد الإلكتروني مستخدم مسبقاً لموظف آخر.', en: 'This email is already used by another employee.' },
   pinLockedNote: { ar: '(ما يتغير من هنا)', en: '(cannot be changed here)' },
   confirmDeleteEmployee: { ar: 'متأكد تبي تحذف هذا الموظف؟ بيفقد الوصول فوراً.', en: 'Are you sure you want to remove this employee? They will lose access immediately.' },
   noPermissionsMsg: { ar: 'ما عندك أي صلاحية مفعّلة حالياً. تواصل مع صاحب الكوفي.', en: "You don't have any permissions enabled. Please contact the shop owner." },
