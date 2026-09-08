@@ -719,7 +719,7 @@ function trackOrder(orderId) {
       bar.classList.toggle('status-bar-ready', status === 'ready');
 
       const trackerEl = document.getElementById('trackerContainer');
-      if (trackerEl) trackerEl.innerHTML = renderTracker(status);
+      if (trackerEl && !ratingInProgress) trackerEl.innerHTML = renderTracker(status);
     }, err => {
       console.error('Order tracking error:', err);
     });
@@ -728,6 +728,7 @@ function trackOrder(orderId) {
 // Called when the customer confirms they've received their order,
 // or when the order no longer exists in Firestore.
 function clearOrderTracking() {
+  ratingInProgress = false;
   if (activeOrderUnsub) activeOrderUnsub();
   activeOrderUnsub = null;
   activeOrderId = null;
@@ -740,11 +741,13 @@ function clearOrderTracking() {
 // Shown when the customer taps "طلب جاهز" — quick 1-5 star rating before
 // the order tracker closes. Rating is optional; skipping still clears tracking.
 let selectedRatingStars = 0;
+let ratingInProgress = false;
 
 function showRatingPrompt() {
   const container = document.getElementById('trackerContainer');
   if (!container) { clearOrderTracking(); return; }
 
+  ratingInProgress = true;
   selectedRatingStars = 0;
   let starsHtml = '';
   for (let i = 1; i <= 5; i++) {

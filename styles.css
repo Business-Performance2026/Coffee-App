@@ -882,6 +882,33 @@ button, input, select {
 
 .stock-low { color: #B3441E; font-size: 0.78rem; margin-top:2px; }
 
+/* ---- Thermal receipt printing (in-page, no popup window) ---- */
+#printReceiptArea {
+  display: none;
+}
+
+@media print {
+  body > *:not(#printReceiptArea) {
+    display: none !important;
+  }
+  #printReceiptArea {
+    display: block !important;
+    width: 76mm;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    color: #000;
+    margin: 0 auto;
+  }
+  #printReceiptArea h2 { text-align: center; margin: 4px 0; font-size: 15px; }
+  #printReceiptArea .receipt-line { border-top: 1px dashed #000; margin: 6px 0; }
+  #printReceiptArea table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #printReceiptArea td { padding: 2px 0; }
+  #printReceiptArea .receipt-total-row td { font-weight: bold; font-size: 14px; border-top: 1px solid #000; padding-top: 6px; }
+  #printReceiptArea .receipt-center { text-align: center; }
+  #printReceiptArea .receipt-small { font-size: 10px; color: #333; }
+  @page { margin: 4mm; }
+}
+
 /* ---- Weekly opening hours editor (Google-style) ---- */
 .weekly-hours-editor { display: flex; flex-direction: column; gap: 6px; }
 

@@ -15,6 +15,8 @@
 </head>
 <body>
 
+<div id="printReceiptArea"></div>
+
 <div id="loadingMsg" class="state-msg" data-i18n="checkingLogin">جاري التحقق من تسجيل الدخول...</div>
 
 <div class="wrap" id="app" style="display:none; padding-bottom:80px;">
@@ -1056,6 +1058,40 @@ function dt(key) {
   return (dashT[key] && dashT[key][dashLang]) || key;
 }
 
+// ===== Car color translation (typed freely by the customer in Arabic or
+// English) — translates common color words so staff always understand it
+// regardless of which language their dashboard is set to. =====
+const carColorDict = [
+  ['أحمر', 'Red'], ['احمر', 'Red'],
+  ['أزرق', 'Blue'], ['ازرق', 'Blue'],
+  ['أبيض', 'White'], ['ابيض', 'White'],
+  ['أسود', 'Black'], ['اسود', 'Black'],
+  ['رمادي', 'Gray'], ['رصاصي', 'Gray'],
+  ['أخضر', 'Green'], ['اخضر', 'Green'],
+  ['أصفر', 'Yellow'], ['اصفر', 'Yellow'],
+  ['بني', 'Brown'],
+  ['فضي', 'Silver'],
+  ['ذهبي', 'Gold'],
+  ['بنفسجي', 'Purple'],
+  ['برتقالي', 'Orange'],
+  ['وردي', 'Pink'], ['زهري', 'Pink'],
+  ['كحلي', 'Navy Blue'],
+  ['بيج', 'Beige']
+];
+
+function translateCarColor(text) {
+  if (!text) return text;
+  const trimmed = text.trim();
+
+  if (dashLang === 'en') {
+    const hit = carColorDict.find(([ar]) => trimmed === ar || trimmed.includes(ar));
+    return hit ? hit[1] : text;
+  } else {
+    const hit = carColorDict.find(([, en]) => trimmed.toLowerCase() === en.toLowerCase());
+    return hit ? hit[0] : text;
+  }
+}
+
 function applyDashLang() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
@@ -1942,7 +1978,7 @@ function renderOrdersColumns() {
     return `
       <div class="order-card ${isUrgent ? 'order-urgent' : ''}">
         <div class="order-card-top">
-          <strong>${order.orderType === 'car' ? `🚗 ${order.carColor || ''} (${order.carNumber || ''})` : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
+          <strong>${order.orderType === 'car' ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})` : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
           <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
         </div>
         ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
@@ -1974,7 +2010,7 @@ function printReceipt(orderId) {
   const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
   const paymentLabel = paymentLabels[order.paymentMethod] || '-';
   const typeLine = order.orderType === 'car'
-    ? `🚗 ${order.carColor || ''} (${order.carNumber || ''})`
+    ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
     : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '-'}`;
   const dateStr = order.createdAt && order.createdAt.toDate
     ? order.createdAt.toDate().toLocaleString('ar-OM')
@@ -1987,56 +2023,30 @@ function printReceipt(orderId) {
     </tr>
   `).join('');
 
-  const receiptHtml = `
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head>
-    <meta charset="UTF-8">
-    <title>${dt('receiptTitle')}</title>
-    <style>
-      @page { margin: 4mm; }
-      body {
-        width: 76mm;
-        font-family: Arial, sans-serif;
-        font-size: 12px;
-        color: #000;
-        margin: 0 auto;
-      }
-      h2 { text-align:center; margin:4px 0; font-size:15px; }
-      .line { border-top: 1px dashed #000; margin: 6px 0; }
-      table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      td { padding: 2px 0; }
-      .total-row td { font-weight: bold; font-size: 14px; border-top: 1px solid #000; padding-top: 6px; }
-      .center { text-align: center; }
-      .small { font-size: 10px; color: #333; }
-    </style>
-    </head>
-    <body>
-      <h2>${shopNameForReceipt}</h2>
-      <div class="center small">${dateStr}</div>
-      <div class="line"></div>
-      <div>${typeLine}</div>
-      <div class="line"></div>
-      <table>${itemsRows}</table>
-      <table>
-        <tr class="total-row">
-          <td>${dt('total')}</td>
-          <td style="text-align:left;">${Number(order.total).toFixed(2)} ${dt('currency')}</td>
-        </tr>
-      </table>
-      <div class="line"></div>
-      <div>${dt('paymentMethodLbl')}: ${paymentLabel}</div>
-      ${order.notes ? `<div>📝 ${order.notes}</div>` : ''}
-      <div class="line"></div>
-      <div class="center small">${dt('thankYouMsg')}</div>
-      <script>window.onload = () => { window.print(); }<\/script>
-    </body>
-    </html>
+  // Fills a hidden on-page area and prints IN PLACE — no new window/tab is
+  // ever opened, so there's nothing for mobile back-navigation to get stuck
+  // on or accidentally sign the owner out of.
+  document.getElementById('printReceiptArea').innerHTML = `
+    <h2>${shopNameForReceipt}</h2>
+    <div class="receipt-center receipt-small">${dateStr}</div>
+    <div class="receipt-line"></div>
+    <div>${typeLine}</div>
+    <div class="receipt-line"></div>
+    <table>${itemsRows}</table>
+    <table>
+      <tr class="receipt-total-row">
+        <td>${dt('total')}</td>
+        <td style="text-align:left;">${Number(order.total).toFixed(2)} ${dt('currency')}</td>
+      </tr>
+    </table>
+    <div class="receipt-line"></div>
+    <div>${dt('paymentMethodLbl')}: ${paymentLabel}</div>
+    ${order.notes ? `<div>📝 ${order.notes}</div>` : ''}
+    <div class="receipt-line"></div>
+    <div class="receipt-center receipt-small">${dt('thankYouMsg')}</div>
   `;
 
-  const printWindow = window.open('', '_blank', 'width=400,height=600');
-  printWindow.document.write(receiptHtml);
-  printWindow.document.close();
+  window.print();
 }
 
 async function advanceOrder(orderId, newStatus) {
