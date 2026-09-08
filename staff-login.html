@@ -25,7 +25,10 @@
     </div>
     <div class="field">
       <label for="staffPassword">كلمة المرور</label>
-      <input type="password" id="staffPassword" placeholder="••••••••">
+      <div style="display:flex; gap:6px;">
+        <input type="password" id="staffPassword" placeholder="••••••••" style="flex:1;">
+        <button type="button" onclick="toggleStaffPwVisibility()" class="btn btn-ghost" style="padding:8px 12px;">👁️</button>
+      </div>
     </div>
     <button class="btn" style="width:100%;" onclick="staffLogin()">دخول</button>
     <div id="error" class="error-msg"></div>
@@ -48,6 +51,11 @@
 auth.onAuthStateChanged(user => {
   if (user) window.location.href = 'dashboard.html';
 });
+
+function toggleStaffPwVisibility() {
+  const input = document.getElementById('staffPassword');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
 
 function staffLogin() {
   const email = document.getElementById('staffEmail').value.trim();

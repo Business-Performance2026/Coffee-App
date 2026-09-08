@@ -406,7 +406,10 @@
       </div>
       <div class="field">
         <label for="empPin" data-i18n="empPasswordLbl">كلمة المرور (6 أحرف على الأقل)</label>
-        <input type="password" id="empPin" placeholder="••••••">
+        <div style="display:flex; gap:6px;">
+          <input type="password" id="empPin" placeholder="••••••" style="flex:1;">
+          <button type="button" onclick="toggleEmpPwVisibility()" class="btn btn-ghost" style="padding:8px 12px;">👁️</button>
+        </div>
       </div>
 
       <div class="field">
@@ -755,6 +758,11 @@ function readPermsFromForm() {
     sales: document.getElementById('permSales').checked,
     account: document.getElementById('permAccount').checked
   };
+}
+
+function toggleEmpPwVisibility() {
+  const input = document.getElementById('empPin');
+  input.type = input.type === 'password' ? 'text' : 'password';
 }
 
 async function saveEmployee() {
