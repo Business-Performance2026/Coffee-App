@@ -90,6 +90,8 @@ const translations = {
   reservationConfirmed: { ar: 'تم تأكيد حجزك ✓', en: 'Your reservation is confirmed ✓' },
   slotTakenError: { ar: 'عذراً، هذا الوقت محجوز بالفعل. اختر وقت ثاني.', en: 'Sorry, that time slot is already booked. Please choose another.' },
   skipRating: { ar: 'تخطي', en: 'Skip' },
+  sendRatingBtn: { ar: 'إرسال التقييم', en: 'Submit rating' },
+  sendingMsg: { ar: 'جاري الإرسال...', en: 'Sending...' },
   addToCartBtn: { ar: 'أضف للسلة', en: 'Add to cart' },
   openingHoursLbl: { ar: 'مواعيد العمل', en: 'Opening hours' },
   searchPlaceholder: { ar: '🔍 دور على صنف...', en: '🔍 Search menu...' },
@@ -737,34 +739,49 @@ function clearOrderTracking() {
 
 // Shown when the customer taps "طلب جاهز" — quick 1-5 star rating before
 // the order tracker closes. Rating is optional; skipping still clears tracking.
+let selectedRatingStars = 0;
+
 function showRatingPrompt() {
   const container = document.getElementById('trackerContainer');
   if (!container) { clearOrderTracking(); return; }
 
+  selectedRatingStars = 0;
   let starsHtml = '';
   for (let i = 1; i <= 5; i++) {
-    starsHtml += `<span class="rating-star" data-star="${i}" onclick="submitRating(${i})">☆</span>`;
+    starsHtml += `<span class="rating-star" data-star="${i}" onclick="selectRatingStar(${i})">☆</span>`;
   }
 
   container.innerHTML = `
     <div style="text-align:center; padding:10px 0;">
       <div style="margin-bottom:12px; font-weight:500;">${t('rateOrderPrompt')}</div>
       <div class="rating-stars">${starsHtml}</div>
-      <button class="btn btn-ghost" style="margin-top:18px;" onclick="clearOrderTracking()">${t('skipRating')}</button>
+      <button class="btn" id="submitRatingBtn" style="margin-top:18px; width:100%; opacity:0.5;" disabled onclick="submitRating()">${t('sendRatingBtn')}</button>
+      <button class="btn btn-ghost" style="margin-top:10px;" onclick="clearOrderTracking()">${t('skipRating')}</button>
     </div>
   `;
 }
 
-async function submitRating(stars) {
+function selectRatingStar(stars) {
+  selectedRatingStars = stars;
   document.querySelectorAll('.rating-star').forEach((el, i) => {
     el.textContent = i < stars ? '★' : '☆';
   });
+  const btn = document.getElementById('submitRatingBtn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
+
+async function submitRating() {
+  if (!selectedRatingStars) return;
+  const btn = document.getElementById('submitRatingBtn');
+  if (btn) { btn.disabled = true; btn.textContent = t('sendingMsg'); }
+
   try {
-    await db.collection('shops').doc(shopId).collection('orders').doc(activeOrderId).update({ rating: stars });
+    await db.collection('shops').doc(shopId).collection('orders').doc(activeOrderId).update({ rating: selectedRatingStars });
   } catch (err) {
     console.error('Rating submit failed:', err);
   }
-  setTimeout(clearOrderTracking, 500);
+  clearOrderTracking();
 }
 
 function renderTracker(status) {
