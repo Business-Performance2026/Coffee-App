@@ -391,6 +391,62 @@
       <div id="shopInfoSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
     </div>
 
+    <!-- Staff management — visible only to the actual shop owner, never to an employee -->
+    <div class="card" id="employeesCard" style="display:none;">
+      <h3 style="margin-bottom:16px;" data-i18n="employeesTitle">الموظفين</h3>
+
+      <input type="hidden" id="empId">
+      <div class="field">
+        <label for="empName" data-i18n="empNameLbl">اسم الموظف</label>
+        <input type="text" id="empName" placeholder="مثال: أحمد">
+      </div>
+      <div class="field">
+        <label for="empPhone" data-i18n="empPhoneLbl">رقم هاتفه</label>
+        <div style="display:flex; gap:8px;">
+          <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
+          <input type="tel" id="empPhone" placeholder="9xxxxxxx" style="flex:1;">
+        </div>
+      </div>
+      <div class="field">
+        <label for="empPin" data-i18n="empPinLbl">رقم سري (6 أرقام على الأقل)</label>
+        <input type="password" id="empPin" inputmode="numeric" placeholder="••••••">
+      </div>
+
+      <div class="field">
+        <label data-i18n="empPermissionsLbl">الصلاحيات المسموحة</label>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="permDashboard" style="width:auto;">
+            <label for="permDashboard" style="margin:0;" data-i18n="navDashboard">لوحة التحكم</label>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="permPos" style="width:auto;">
+            <label for="permPos" style="margin:0;" data-i18n="navPos">نقطة البيع</label>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="permInventory" style="width:auto;">
+            <label for="permInventory" style="margin:0;" data-i18n="navInventory">المخزون</label>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="permSales" style="width:auto;">
+            <label for="permSales" style="margin:0;" data-i18n="navSales">المبيعات</label>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="permAccount" style="width:auto;">
+            <label for="permAccount" style="margin:0;" data-i18n="navAccount">الحساب</label>
+          </div>
+        </div>
+        <p style="color:var(--stone); font-size:0.78rem; margin-top:8px;" data-i18n="posPrintNote">صلاحية "نقطة البيع" تشمل تلقائياً إمكانية طباعة الفواتير.</p>
+      </div>
+
+      <button class="btn" onclick="saveEmployee()" id="saveEmpBtn" data-i18n="addEmployeeBtn">إضافة موظف</button>
+      <button class="btn btn-ghost" onclick="resetEmployeeForm()" style="margin-right:8px;" data-i18n="cancelBtn">إلغاء</button>
+      <div id="empFormError" class="error-msg"></div>
+
+      <h4 style="margin:20px 0 10px;" data-i18n="currentEmployeesTitle">الموظفين الحاليين</h4>
+      <div id="employeesList"><div class="state-msg">جاري التحميل...</div></div>
+    </div>
+
     <div class="card">
       <div id="loggedInAsText" style="text-align:center; color:var(--stone); font-size:0.85rem; margin-bottom:14px;"></div>
       <button class="btn btn-ghost" style="width:100%;" onclick="logout()" data-i18n="logoutBtn">تسجيل خروج</button>
@@ -434,6 +490,10 @@ let shopNameForReceipt = '';
 let uploadedImageUrl = null;
 let uploadedLogoUrl = null;
 let uploadedCoverUrl = null;
+let isEmployee = false;
+let employeePermissions = null;
+const secondaryEmpApp = firebase.initializeApp(firebase.app().options, "SecondaryEmp");
+const secondaryEmpAuth = secondaryEmpApp.auth();
 
 // ===================== Auth guard =====================
 auth.onAuthStateChanged(async user => {
@@ -441,39 +501,110 @@ auth.onAuthStateChanged(async user => {
     window.location.href = 'login.html';
     return;
   }
-  currentShopId = user.uid;
 
-  const shopDoc = await db.collection('shops').doc(currentShopId).get();
-  const info = shopDoc.exists ? (shopDoc.data().info || {}) : {};
+  const ownerShopDoc = await db.collection('shops').doc(user.uid).get();
 
-  // The email-verification gate only applies while the shop is still
-  // "pending" (self-signup, awaiting the automatic trial). If an admin has
-  // already manually activated (or suspended) the shop from admin.html,
-  // that decision overrides the requirement — the owner can log in right away.
-  if (info.selfSignup && info.subscriptionStatus === 'pending') {
-    // Refresh emailVerified status in case they just clicked the link in another tab
-    await user.reload();
-    if (!user.emailVerified) {
-      document.getElementById('loadingMsg').style.display = 'none';
-      showVerifyEmailScreen(user);
+  if (ownerShopDoc.exists) {
+    // ============================================================
+    // EXISTING OWNER FLOW — completely unchanged from before.
+    // ============================================================
+    currentShopId = user.uid;
+    isEmployee = false;
+    employeePermissions = null;
+
+    const shopDoc = ownerShopDoc;
+    const info = shopDoc.exists ? (shopDoc.data().info || {}) : {};
+
+    // The email-verification gate only applies while the shop is still
+    // "pending" (self-signup, awaiting the automatic trial). If an admin has
+    // already manually activated (or suspended) the shop from admin.html,
+    // that decision overrides the requirement — the owner can log in right away.
+    if (info.selfSignup && info.subscriptionStatus === 'pending') {
+      // Refresh emailVerified status in case they just clicked the link in another tab
+      await user.reload();
+      if (!user.emailVerified) {
+        document.getElementById('loadingMsg').style.display = 'none';
+        showVerifyEmailScreen(user);
+        return;
+      }
+      await maybeActivateTrial();
+    }
+
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('bottomNav').style.display = 'flex';
+    document.getElementById('employeesCard').style.display = 'block';
+    applyDashLang();
+    currentUserEmail = user.email;
+    document.getElementById('loggedInAsText').textContent = `${dt('loggedInAs')}: ${currentUserEmail}`;
+
+    await loadShopInfo();
+    await loadItems();
+    listenToOrders();
+    updateBestSellerFlag();
+    updatePublicRatingStats();
+    loadEmployees();
+
+  } else {
+    // ============================================================
+    // NEW: employee flow. Only reached if this UID does NOT own a
+    // shop directly — never interferes with the owner path above.
+    // ============================================================
+    const idxDoc = await db.collection('employeeIndex').doc(user.uid).get().catch(() => null);
+    const shopIdForEmp = idxDoc && idxDoc.exists ? idxDoc.data().shopId : null;
+    const empDoc = shopIdForEmp
+      ? await db.collection('shops').doc(shopIdForEmp).collection('employees').doc(user.uid).get().catch(() => null)
+      : null;
+
+    if (!empDoc || !empDoc.exists) {
+      // Not a recognized owner or employee account — sign out safely.
+      await auth.signOut();
+      window.location.href = 'staff-login.html';
       return;
     }
-    await maybeActivateTrial();
+
+    currentShopId = shopIdForEmp;
+    isEmployee = true;
+    employeePermissions = empDoc.data().permissions || {};
+
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('bottomNav').style.display = 'flex';
+    document.getElementById('employeesCard').style.display = 'none';
+    applyDashLang();
+    currentUserEmail = empDoc.data().name || '';
+    document.getElementById('loggedInAsText').textContent = `${dt('loggedInAs')}: ${currentUserEmail}`;
+
+    applyEmployeePermissionsUI();
+
+    await loadShopInfo();
+    if (employeePermissions.dashboard || employeePermissions.inventory) await loadItems();
+    if (employeePermissions.pos || employeePermissions.sales) listenToOrders();
   }
-
-  document.getElementById('loadingMsg').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.getElementById('bottomNav').style.display = 'flex';
-  applyDashLang();
-  currentUserEmail = user.email;
-  document.getElementById('loggedInAsText').textContent = `${dt('loggedInAs')}: ${currentUserEmail}`;
-
-  await loadShopInfo();
-  await loadItems();
-  listenToOrders();
-  updateBestSellerFlag();
-  updatePublicRatingStats();
 });
+
+// Hides bottom-nav tabs (and the icon-subnav is naturally inside the
+// "لوحة التحكم" tab, so hiding that whole tab covers it) that this
+// employee wasn't granted. Also jumps to their first allowed tab.
+function applyEmployeePermissionsUI() {
+  const tabPermMap = { dashboard: 'dashboard', pos: 'pos', inventory: 'inventory', sales: 'sales', account: 'account' };
+  let firstAllowed = null;
+
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    const tab = btn.getAttribute('data-tab');
+    const allowed = employeePermissions[tabPermMap[tab]] === true;
+    btn.style.display = allowed ? '' : 'none';
+    if (allowed && !firstAllowed) firstAllowed = tab;
+  });
+
+  if (!employeePermissions.dashboard && firstAllowed) {
+    switchTab(firstAllowed);
+  } else if (!firstAllowed) {
+    // Employee has no permissions at all — shouldn't normally happen, but
+    // avoid leaving them on a totally blank screen.
+    document.getElementById('app').innerHTML = `<div class="state-msg" style="padding-top:60px;">${dt('noPermissionsMsg')}</div>`;
+  }
+}
 
 function showVerifyEmailScreen(user) {
   const wrap = document.createElement('div');
@@ -589,6 +720,159 @@ function formatHoursForDisplay(hours) {
   }).join('\n');
 }
 
+// ===================== Staff / employees management (owner only) =====================
+async function loadEmployees() {
+  const listEl = document.getElementById('employeesList');
+  const snap = await db.collection('shops').doc(currentShopId).collection('employees').get();
+
+  if (snap.empty) {
+    listEl.innerHTML = `<div class="state-msg">${dt('noEmployeesYet')}</div>`;
+    return;
+  }
+
+  const permLabels = { dashboard: dt('navDashboard'), pos: dt('navPos'), inventory: dt('navInventory'), sales: dt('navSales'), account: dt('navAccount') };
+
+  let html = '';
+  snap.forEach(doc => {
+    const e = doc.data();
+    const grantedList = Object.keys(permLabels).filter(k => e.permissions && e.permissions[k]).map(k => permLabels[k]).join('، ') || dt('noPermissionsShort');
+    html += `
+      <div class="dashboard-item">
+        <div class="grow">
+          <div class="item-name">${e.name || ''} — ${e.phone || ''}</div>
+          <div class="item-desc">${grantedList}</div>
+        </div>
+        <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editEmployeePerms("${doc.id}")'>${dt('editBtn')}</button>
+        <button class="btn btn-danger" onclick='deleteEmployee("${doc.id}")'>${dt('deleteBtn')}</button>
+      </div>
+    `;
+  });
+  listEl.innerHTML = html;
+}
+
+function readPermsFromForm() {
+  return {
+    dashboard: document.getElementById('permDashboard').checked,
+    pos: document.getElementById('permPos').checked,
+    inventory: document.getElementById('permInventory').checked,
+    sales: document.getElementById('permSales').checked,
+    account: document.getElementById('permAccount').checked
+  };
+}
+
+async function saveEmployee() {
+  const errorEl = document.getElementById('empFormError');
+  errorEl.textContent = '';
+
+  const editingId = document.getElementById('empId').value;
+  const permissions = readPermsFromForm();
+
+  // ---- Editing an existing employee: only permissions/name can change here ----
+  if (editingId) {
+    const name = document.getElementById('empName').value.trim();
+    try {
+      await db.collection('shops').doc(currentShopId).collection('employees').doc(editingId).update({
+        name, permissions
+      });
+      resetEmployeeForm();
+      await loadEmployees();
+    } catch (err) {
+      console.error(err);
+      errorEl.textContent = dt('saveErrorGeneric');
+    }
+    return;
+  }
+
+  // ---- Creating a brand new employee ----
+  const name = document.getElementById('empName').value.trim();
+  const phone = document.getElementById('empPhone').value.trim().replace(/[\s-]/g, '');
+  const pin = document.getElementById('empPin').value;
+
+  if (!name || !/^[0-9]{7,9}$/.test(phone)) {
+    errorEl.textContent = dt('empInvalidFields');
+    return;
+  }
+  if (!pin || pin.length < 6) {
+    errorEl.textContent = dt('empPinTooShort');
+    return;
+  }
+  if (!permissions.dashboard && !permissions.pos && !permissions.inventory && !permissions.sales && !permissions.account) {
+    errorEl.textContent = dt('atLeastOnePermissionError');
+    return;
+  }
+
+  const staffEmail = `staff_${phone}@staff.cafeoman.app`;
+
+  try {
+    // Create the employee's login using a SECONDARY app instance, so the
+    // owner's own session here is never touched or signed out.
+    const cred = await secondaryEmpAuth.createUserWithEmailAndPassword(staffEmail, pin);
+    const empUid = cred.user.uid;
+    await secondaryEmpAuth.signOut();
+
+    await db.collection('shops').doc(currentShopId).collection('employees').doc(empUid).set({
+      name, phone, permissions,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await db.collection('employeeIndex').doc(empUid).set({ shopId: currentShopId });
+
+    resetEmployeeForm();
+    await loadEmployees();
+  } catch (err) {
+    console.error(err);
+    if (err.code === 'auth/email-already-in-use') {
+      errorEl.textContent = dt('empPhoneTaken');
+    } else {
+      errorEl.textContent = dt('saveErrorGeneric');
+    }
+  }
+}
+
+async function editEmployeePerms(empUid) {
+  const doc = await db.collection('shops').doc(currentShopId).collection('employees').doc(empUid).get();
+  if (!doc.exists) return;
+  const e = doc.data();
+
+  document.getElementById('empId').value = empUid;
+  document.getElementById('empName').value = e.name || '';
+  document.getElementById('empPhone').value = e.phone || '';
+  document.getElementById('empPhone').disabled = true;
+  document.getElementById('empPin').disabled = true;
+  document.getElementById('empPin').placeholder = dt('pinLockedNote');
+
+  const p = e.permissions || {};
+  document.getElementById('permDashboard').checked = !!p.dashboard;
+  document.getElementById('permPos').checked = !!p.pos;
+  document.getElementById('permInventory').checked = !!p.inventory;
+  document.getElementById('permSales').checked = !!p.sales;
+  document.getElementById('permAccount').checked = !!p.account;
+
+  document.getElementById('saveEmpBtn').textContent = dt('saveChangesBtn');
+  window.scrollTo({ top: document.getElementById('employeesCard').offsetTop, behavior: 'smooth' });
+}
+
+async function deleteEmployee(empUid) {
+  if (!confirm(dt('confirmDeleteEmployee'))) return;
+  await db.collection('shops').doc(currentShopId).collection('employees').doc(empUid).delete();
+  await db.collection('employeeIndex').doc(empUid).delete().catch(() => {});
+  await loadEmployees();
+}
+
+function resetEmployeeForm() {
+  document.getElementById('empId').value = '';
+  document.getElementById('empName').value = '';
+  document.getElementById('empPhone').value = '';
+  document.getElementById('empPhone').disabled = false;
+  document.getElementById('empPin').value = '';
+  document.getElementById('empPin').disabled = false;
+  document.getElementById('empPin').placeholder = '••••••';
+  ['permDashboard', 'permPos', 'permInventory', 'permSales', 'permAccount'].forEach(id => {
+    document.getElementById(id).checked = false;
+  });
+  document.getElementById('saveEmpBtn').textContent = dt('addEmployeeBtn');
+  document.getElementById('empFormError').textContent = '';
+}
+
 function logout() {
   auth.signOut().then(() => window.location.href = 'login.html');
 }
@@ -645,6 +929,23 @@ const dashT = {
   saveChangesBtn: { ar: 'حفظ التغييرات', en: 'Save changes' },
   logoutBtn: { ar: 'تسجيل خروج', en: 'Log out' },
   loggedInAs: { ar: 'داخل بحساب', en: 'Logged in as' },
+  employeesTitle: { ar: 'الموظفين', en: 'Staff' },
+  empNameLbl: { ar: 'اسم الموظف', en: "Employee's name" },
+  empPhoneLbl: { ar: 'رقم هاتفه', en: 'Their phone number' },
+  empPinLbl: { ar: 'رقم سري (6 أرقام على الأقل)', en: 'PIN (6 digits minimum)' },
+  empPermissionsLbl: { ar: 'الصلاحيات المسموحة', en: 'Allowed permissions' },
+  posPrintNote: { ar: 'صلاحية "نقطة البيع" تشمل تلقائياً إمكانية طباعة الفواتير.', en: 'The "POS" permission automatically includes the ability to print receipts.' },
+  addEmployeeBtn: { ar: 'إضافة موظف', en: 'Add employee' },
+  currentEmployeesTitle: { ar: 'الموظفين الحاليين', en: 'Current staff' },
+  noEmployeesYet: { ar: 'لا يوجد موظفين بعد.', en: 'No staff added yet.' },
+  noPermissionsShort: { ar: 'بدون صلاحيات', en: 'No permissions' },
+  empInvalidFields: { ar: 'أدخل اسم صحيح ورقم هاتف صحيح (بدون رمز الدولة).', en: 'Enter a valid name and phone number (without country code).' },
+  empPinTooShort: { ar: 'الرقم السري لازم يكون 6 أرقام على الأقل.', en: 'PIN must be at least 6 digits.' },
+  atLeastOnePermissionError: { ar: 'فعّل صلاحية واحدة على الأقل للموظف.', en: 'Enable at least one permission for this employee.' },
+  empPhoneTaken: { ar: 'هذا الرقم مستخدم مسبقاً لموظف آخر.', en: 'This phone number is already used by another employee.' },
+  pinLockedNote: { ar: '(ما يتغير من هنا)', en: '(cannot be changed here)' },
+  confirmDeleteEmployee: { ar: 'متأكد تبي تحذف هذا الموظف؟ بيفقد الوصول فوراً.', en: 'Are you sure you want to remove this employee? They will lose access immediately.' },
+  noPermissionsMsg: { ar: 'ما عندك أي صلاحية مفعّلة حالياً. تواصل مع صاحب الكوفي.', en: "You don't have any permissions enabled. Please contact the shop owner." },
   loadingGeneric: { ar: 'جاري التحميل...', en: 'Loading...' },
   noItemsYet: { ar: 'لا توجد أصناف بعد. أضف أول صنف بالأعلى.', en: 'No items yet. Add your first one above.' },
   editBtn: { ar: 'تعديل', en: 'Edit' },
@@ -821,6 +1122,12 @@ function resizeImage(file, maxDimension = 900, quality = 0.82) {
 
 // ===================== Tab switching =====================
 function switchTab(name) {
+  // Defense in depth: even if a hidden nav button were somehow triggered,
+  // an employee can never switch into a tab they weren't granted.
+  if (isEmployee && employeePermissions && employeePermissions[name] !== true) {
+    return;
+  }
+
   document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`view-${name}`).classList.add('active');

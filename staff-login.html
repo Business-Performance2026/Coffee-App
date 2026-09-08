@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cafeoman">
+<meta name="theme-color" content="#6B4226">
+<script src="pwa-install.js" defer></script>
+
+<title>دخول الموظفين</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap" style="max-width:400px; padding-top:60px;">
+  <div class="shop-name display" style="text-align:center; margin-bottom:30px;">دخول الموظفين</div>
+
+  <div class="card">
+    <div class="field">
+      <label for="staffPhone">رقم الهاتف</label>
+      <div style="display:flex; gap:8px;">
+        <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
+        <input type="tel" id="staffPhone" placeholder="9xxxxxxx" style="flex:1;">
+      </div>
+    </div>
+    <div class="field">
+      <label for="staffPin">الرقم السري</label>
+      <input type="password" id="staffPin" placeholder="••••••" inputmode="numeric">
+    </div>
+    <button class="btn" style="width:100%;" onclick="staffLogin()">دخول</button>
+    <div id="error" class="error-msg"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+// If already logged in, go straight to dashboard (dashboard.html detects
+// automatically whether this is an owner or a staff account).
+auth.onAuthStateChanged(user => {
+  if (user) window.location.href = 'dashboard.html';
+});
+
+function staffLogin() {
+  const phone = document.getElementById('staffPhone').value.trim().replace(/[\s-]/g, '');
+  const pin = document.getElementById('staffPin').value;
+  const errorEl = document.getElementById('error');
+  errorEl.textContent = '';
+
+  if (!/^[0-9]{7,9}$/.test(phone)) {
+    errorEl.textContent = 'رقم الهاتف غير صحيح. اكتبه بدون رمز الدولة (مثال: 91234567).';
+    return;
+  }
+  if (!pin) {
+    errorEl.textContent = 'الرجاء إدخال الرقم السري.';
+    return;
+  }
+
+  // Staff accounts don't use real email — we build a stable, unique
+  // "fake" email internally so Firebase Auth's normal email/password
+  // sign-in can be reused without needing SMS verification.
+  const staffEmail = `staff_${phone}@staff.cafeoman.app`;
+
+  auth.signInWithEmailAndPassword(staffEmail, pin)
+    .then(() => { window.location.href = 'dashboard.html'; })
+    .catch(err => {
+      console.error(err);
+      errorEl.textContent = 'رقم الهاتف أو الرقم السري غير صحيح.';
+    });
+}
+
+document.getElementById('staffPin').addEventListener('keydown', e => {
+  if (e.key === 'Enter') staffLogin();
+});
+</script>
+
+</body>
+</html>
