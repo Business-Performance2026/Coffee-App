@@ -408,7 +408,11 @@ auth.onAuthStateChanged(async user => {
   const shopDoc = await db.collection('shops').doc(currentShopId).get();
   const info = shopDoc.exists ? (shopDoc.data().info || {}) : {};
 
-  if (info.selfSignup) {
+  // The email-verification gate only applies while the shop is still
+  // "pending" (self-signup, awaiting the automatic trial). If an admin has
+  // already manually activated (or suspended) the shop from admin.html,
+  // that decision overrides the requirement — the owner can log in right away.
+  if (info.selfSignup && info.subscriptionStatus === 'pending') {
     // Refresh emailVerified status in case they just clicked the link in another tab
     await user.reload();
     if (!user.emailVerified) {
