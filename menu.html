@@ -63,6 +63,10 @@ const translations = {
   tableNumber: { ar: 'رقم الطاولة (اختياري)', en: 'Table number (optional)' },
   tablePlaceholder: { ar: 'مثال: 5', en: 'e.g. 5' },
   notesLabel: { ar: 'ملاحظات (اختياري)', en: 'Notes (optional)' },
+  paymentMethodLbl: { ar: 'طريقة الدفع', en: 'Payment method' },
+  payCash: { ar: '💵 نقداً', en: '💵 Cash' },
+  payTransfer: { ar: '🏦 تحويل بنكي', en: '🏦 Bank transfer' },
+  payCard: { ar: '💳 فيزا / بطاقة', en: '💳 Visa / Card' },
   notesPlaceholder: { ar: 'مثال: بدون سكر', en: 'e.g. no sugar' },
   sendOrder: { ar: 'إرسال الطلب', en: 'Send order' },
   enterNameError: { ar: 'الرجاء إدخال اسمك.', en: 'Please enter your name.' },
@@ -558,6 +562,15 @@ function openCartModal() {
         </div>
       </div>
 
+      <div class="field">
+        <label for="paymentMethod">${t('paymentMethodLbl')}</label>
+        <select id="paymentMethod">
+          <option value="cash">${t('payCash')}</option>
+          <option value="transfer">${t('payTransfer')}</option>
+          <option value="card">${t('payCard')}</option>
+        </select>
+      </div>
+
       <div class="field" style="margin-top:16px;">
         <label for="orderNotes">${t('notesLabel')}</label>
         <input type="text" id="orderNotes" placeholder="${t('notesPlaceholder')}">
@@ -588,6 +601,7 @@ function closeCartModal() {
 async function submitOrder() {
   const errorEl = document.getElementById('orderError');
   const notes = document.getElementById('orderNotes').value.trim();
+  const paymentMethod = document.getElementById('paymentMethod').value;
 
   let table = null, carNumber = null, carColor = null;
 
@@ -612,6 +626,7 @@ async function submitOrder() {
       carNumber: carNumber || null,
       carColor: carColor || null,
       notes: notes || null,
+      paymentMethod,
       items,
       total,
       status: 'pending',

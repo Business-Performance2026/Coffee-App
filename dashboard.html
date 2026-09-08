@@ -393,6 +393,7 @@
 <script>
 let currentShopId = null;
 let currentUserEmail = null;
+let shopNameForReceipt = '';
 let uploadedImageUrl = null;
 let uploadedLogoUrl = null;
 let uploadedCoverUrl = null;
@@ -628,6 +629,13 @@ const dashT = {
   startPreparingBtn: { ar: 'ابدأ التحضير', en: 'Start preparing' },
   markReadyBtn: { ar: 'تم — جاهز', en: 'Done — ready' },
   tableLabel: { ar: 'طاولة', en: 'Table' },
+  payCash: { ar: '💵 نقداً', en: '💵 Cash' },
+  payTransfer: { ar: '🏦 تحويل بنكي', en: '🏦 Bank transfer' },
+  payCard: { ar: '💳 فيزا / بطاقة', en: '💳 Visa / Card' },
+  paymentMethodLbl: { ar: 'طريقة الدفع', en: 'Payment method' },
+  printReceiptBtn: { ar: 'طباعة الفاتورة', en: 'Print receipt' },
+  receiptTitle: { ar: 'فاتورة', en: 'Receipt' },
+  thankYouMsg: { ar: 'شكراً لزيارتكم ☕', en: 'Thank you for visiting ☕' },
   addOneItemError: { ar: 'أضف صنف واحد على الأقل.', en: 'Add at least one item.' },
   orderSendErrorGeneric: { ar: 'حدث خطأ أثناء إرسال الطلب.', en: 'An error occurred while sending the order.' },
   counterCustomer: { ar: 'عميل الكاونتر', en: 'Counter customer' },
@@ -844,6 +852,7 @@ async function loadShopInfo() {
   if (doc.exists) {
     const info = doc.data().info || {};
     document.getElementById('shopNameHeader').textContent = info.name || 'لوحة التحكم';
+    shopNameForReceipt = info.name || '';
 
     document.getElementById('shopNameInput').value = info.name || '';
     document.getElementById('shopNameEnInput').value = info.nameEn || '';
@@ -1543,6 +1552,9 @@ function renderOrdersColumns() {
     }
     const isUrgent = elapsedMin !== null && elapsedMin >= 10;
 
+    const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
+    const paymentLabel = paymentLabels[order.paymentMethod] || '';
+
     return `
       <div class="order-card ${isUrgent ? 'order-urgent' : ''}">
         <div class="order-card-top">
@@ -1551,9 +1563,11 @@ function renderOrdersColumns() {
         </div>
         ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
         <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
+        ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
         ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
         <div class="order-actions">
           ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
+          <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
         </div>
       </div>
     `;
@@ -1566,6 +1580,79 @@ function renderOrdersColumns() {
   prepCol.innerHTML = prepOrders.length
     ? prepOrders.map(renderCard).join('')
     : `<div class="state-msg">${dt('noOrdersYet')}</div>`;
+}
+
+// ===================== Thermal receipt printing =====================
+function printReceipt(orderId) {
+  const order = lastOrdersData.find(o => o.id === orderId);
+  if (!order) return;
+
+  const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
+  const paymentLabel = paymentLabels[order.paymentMethod] || '-';
+  const typeLine = order.orderType === 'car'
+    ? `🚗 ${order.carColor || ''} (${order.carNumber || ''})`
+    : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '-'}`;
+  const dateStr = order.createdAt && order.createdAt.toDate
+    ? order.createdAt.toDate().toLocaleString('ar-OM')
+    : new Date().toLocaleString('ar-OM');
+
+  const itemsRows = (order.items || []).map(i => `
+    <tr>
+      <td style="text-align:right;">${i.name} × ${i.qty}</td>
+      <td style="text-align:left;">${(i.price * i.qty).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  const receiptHtml = `
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+    <meta charset="UTF-8">
+    <title>${dt('receiptTitle')}</title>
+    <style>
+      @page { margin: 4mm; }
+      body {
+        width: 76mm;
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        color: #000;
+        margin: 0 auto;
+      }
+      h2 { text-align:center; margin:4px 0; font-size:15px; }
+      .line { border-top: 1px dashed #000; margin: 6px 0; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      td { padding: 2px 0; }
+      .total-row td { font-weight: bold; font-size: 14px; border-top: 1px solid #000; padding-top: 6px; }
+      .center { text-align: center; }
+      .small { font-size: 10px; color: #333; }
+    </style>
+    </head>
+    <body>
+      <h2>${shopNameForReceipt}</h2>
+      <div class="center small">${dateStr}</div>
+      <div class="line"></div>
+      <div>${typeLine}</div>
+      <div class="line"></div>
+      <table>${itemsRows}</table>
+      <table>
+        <tr class="total-row">
+          <td>${dt('total')}</td>
+          <td style="text-align:left;">${Number(order.total).toFixed(2)} ${dt('currency')}</td>
+        </tr>
+      </table>
+      <div class="line"></div>
+      <div>${dt('paymentMethodLbl')}: ${paymentLabel}</div>
+      ${order.notes ? `<div>📝 ${order.notes}</div>` : ''}
+      <div class="line"></div>
+      <div class="center small">${dt('thankYouMsg')}</div>
+      <script>window.onload = () => { window.print(); }<\/script>
+    </body>
+    </html>
+  `;
+
+  const printWindow = window.open('', '_blank', 'width=400,height=600');
+  printWindow.document.write(receiptHtml);
+  printWindow.document.close();
 }
 
 async function advanceOrder(orderId, newStatus) {
