@@ -244,6 +244,11 @@
       </div>
     </div>
 
+    <h3 style="margin:0 0 12px;" data-i18n="paymentBreakdownTitle">حسب طريقة الدفع</h3>
+    <div class="card" id="paymentBreakdown">
+      <div class="state-msg">جاري التحميل...</div>
+    </div>
+
     <h3 style="margin:0 0 12px;" data-i18n="topSellingTitle">الأكثر مبيعاً</h3>
     <div class="card" id="topItemsList">
       <div class="state-msg">جاري التحميل...</div>
@@ -347,6 +352,38 @@
       <div class="field" style="display:flex; align-items:center; gap:8px;">
         <input type="checkbox" id="showRatingPublicly" style="width:auto;">
         <label for="showRatingPublicly" style="margin:0;" data-i18n="showRatingLbl">إظهار متوسط تقييمي للعملاء بالقائمة</label>
+      </div>
+
+      <div class="field">
+        <label data-i18n="paymentOptionsLbl">طرق الدفع المتاحة للعميل</label>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="payCashEnabled" style="width:auto;" checked>
+            <label for="payCashEnabled" style="margin:0;" data-i18n="payCash">💵 نقداً</label>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="payTransferEnabled" style="width:auto;" checked>
+            <label for="payTransferEnabled" style="margin:0;" data-i18n="payTransfer">🏦 تحويل بنكي</label>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="payCardEnabled" style="width:auto;" checked>
+            <label for="payCardEnabled" style="margin:0;" data-i18n="payCard">💳 فيزا / بطاقة</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="orderTypesLbl">أنواع الطلب المتاحة للعميل</label>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="orderTypeTableEnabled" style="width:auto;" checked>
+            <label for="orderTypeTableEnabled" style="margin:0;" data-i18n="orderFromTable">🍽️ طلب من الطاولة</label>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="orderTypeCarEnabled" style="width:auto;" checked>
+            <label for="orderTypeCarEnabled" style="margin:0;" data-i18n="orderFromCar">🚗 طلب من السيارة</label>
+          </div>
+        </div>
       </div>
 
       <button class="btn" onclick="saveShopInfo()" data-i18n="saveChangesBtn">حفظ التغييرات</button>
@@ -636,6 +673,13 @@ const dashT = {
   printReceiptBtn: { ar: 'طباعة الفاتورة', en: 'Print receipt' },
   receiptTitle: { ar: 'فاتورة', en: 'Receipt' },
   thankYouMsg: { ar: 'شكراً لزيارتكم ☕', en: 'Thank you for visiting ☕' },
+  paymentOptionsLbl: { ar: 'طرق الدفع المتاحة للعميل', en: 'Payment methods available to customers' },
+  orderTypesLbl: { ar: 'أنواع الطلب المتاحة للعميل', en: 'Order types available to customers' },
+  orderFromTable: { ar: '🍽️ طلب من الطاولة', en: '🍽️ Order from table' },
+  orderFromCar: { ar: '🚗 طلب من السيارة', en: '🚗 Order from car' },
+  atLeastOnePaymentError: { ar: 'لازم تفعّل طريقة دفع واحدة على الأقل.', en: 'Please enable at least one payment method.' },
+  atLeastOneOrderTypeError: { ar: 'لازم تفعّل نوع طلب واحد على الأقل.', en: 'Please enable at least one order type.' },
+  paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
   addOneItemError: { ar: 'أضف صنف واحد على الأقل.', en: 'Add at least one item.' },
   orderSendErrorGeneric: { ar: 'حدث خطأ أثناء إرسال الطلب.', en: 'An error occurred while sending the order.' },
   counterCustomer: { ar: 'عميل الكاونتر', en: 'Counter customer' },
@@ -866,6 +910,15 @@ async function loadShopInfo() {
     document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
     document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
     document.getElementById('showRatingPublicly').checked = info.showRatingPublicly === true;
+
+    const pm = info.paymentMethods || {};
+    document.getElementById('payCashEnabled').checked = pm.cash !== false;
+    document.getElementById('payTransferEnabled').checked = pm.transfer !== false;
+    document.getElementById('payCardEnabled').checked = pm.card !== false;
+
+    const ot = info.orderTypes || {};
+    document.getElementById('orderTypeTableEnabled').checked = ot.table !== false;
+    document.getElementById('orderTypeCarEnabled').checked = ot.car !== false;
 
     renderSubscriptionBanner(info);
 
@@ -1143,6 +1196,25 @@ async function saveShopInfo() {
   const prepTime = parseInt(document.getElementById('shopPrepTimeInput').value) || 10;
   const showRatingPublicly = document.getElementById('showRatingPublicly').checked;
 
+  const paymentMethods = {
+    cash: document.getElementById('payCashEnabled').checked,
+    transfer: document.getElementById('payTransferEnabled').checked,
+    card: document.getElementById('payCardEnabled').checked
+  };
+  const orderTypes = {
+    table: document.getElementById('orderTypeTableEnabled').checked,
+    car: document.getElementById('orderTypeCarEnabled').checked
+  };
+
+  if (!paymentMethods.cash && !paymentMethods.transfer && !paymentMethods.card) {
+    errorEl.textContent = dt('atLeastOnePaymentError');
+    return;
+  }
+  if (!orderTypes.table && !orderTypes.car) {
+    errorEl.textContent = dt('atLeastOneOrderTypeError');
+    return;
+  }
+
   if (!name) {
     errorEl.textContent = dt('shopNameRequiredError');
     return;
@@ -1162,7 +1234,9 @@ async function saveShopInfo() {
       'info.email': email,
       'info.primaryColor': color,
       'info.estimatedMinutes': prepTime,
-      'info.showRatingPublicly': showRatingPublicly
+      'info.showRatingPublicly': showRatingPublicly,
+      'info.paymentMethods': paymentMethods,
+      'info.orderTypes': orderTypes
     };
     if (uploadedLogoUrl) updateData['info.logo'] = uploadedLogoUrl;
     if (uploadedCoverUrl) updateData['info.coverImage'] = uploadedCoverUrl;
@@ -1919,12 +1993,15 @@ async function exportSalesExcel() {
         ? `🚗 ${o.carColor || ''} (${o.carNumber || ''})`
         : `🍽️ طاولة ${o.tableNumber || '-'}`;
       const itemsText = (o.items || []).map(i => `${i.name} ×${i.qty}`).join('، ');
+      const paymentLabels = { cash: 'نقداً', transfer: 'تحويل بنكي', card: 'فيزا/بطاقة' };
+      const paymentText = paymentLabels[o.paymentMethod] || '-';
 
       rows.push([
         created ? created.toLocaleDateString('ar-OM') : '',
         created ? created.toLocaleTimeString('ar-OM', { hour: '2-digit', minute: '2-digit' }) : '',
         typeLabel,
         itemsText,
+        paymentText,
         Number(o.total) || 0
       ]);
     });
@@ -1943,12 +2020,12 @@ async function exportSalesExcel() {
     topItems.forEach(([name, qty]) => data.push([name, qty]));
     data.push([]);
     const headerRowIndex = data.length;
-    data.push(['التاريخ', 'الوقت', 'النوع', 'الأصناف', 'الإجمالي (ر.ع)']);
+    data.push(['التاريخ', 'الوقت', 'النوع', 'الأصناف', 'طريقة الدفع', 'الإجمالي (ر.ع)']);
     const firstDataRow = data.length;
     rows.forEach(r => data.push(r));
 
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 22 }, { wch: 45 }, { wch: 14 }];
+    ws['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 22 }, { wch: 45 }, { wch: 16 }, { wch: 14 }];
 
     const brownFill = { fill: { fgColor: { rgb: '6B4226' } }, font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 } };
     const goldFill = { fill: { fgColor: { rgb: 'C99A3E' } }, font: { bold: true, color: { rgb: 'FFFFFF' } } };
@@ -1966,10 +2043,10 @@ async function exportSalesExcel() {
     setCell(4, 0, goldFill); setCell(4, 1, goldFill);
     setCell(6, 0, tableHeaderStyle); setCell(6, 1, tableHeaderStyle);
 
-    for (let c = 0; c < 5; c++) setCell(headerRowIndex, c, tableHeaderStyle);
+    for (let c = 0; c < 6; c++) setCell(headerRowIndex, c, tableHeaderStyle);
     for (let r = firstDataRow; r < data.length; r++) {
       if ((r - firstDataRow) % 2 === 1) {
-        for (let c = 0; c < 5; c++) setCell(r, c, altRow);
+        for (let c = 0; c < 6; c++) setCell(r, c, altRow);
       }
     }
 
@@ -2004,6 +2081,7 @@ async function loadSales(range, btnEl) {
 
   let total = 0;
   const itemCounts = {};
+  const paymentTotals = { cash: 0, transfer: 0, card: 0 };
   let ratingSum = 0;
   let ratingCount = 0;
 
@@ -2017,6 +2095,10 @@ async function loadSales(range, btnEl) {
       ratingSum += order.rating;
       ratingCount++;
     }
+    const pm = order.paymentMethod;
+    if (pm && paymentTotals.hasOwnProperty(pm)) {
+      paymentTotals[pm] += Number(order.total) || 0;
+    }
   });
 
   document.getElementById('salesTotal').textContent = total.toFixed(2);
@@ -2024,6 +2106,15 @@ async function loadSales(range, btnEl) {
   document.getElementById('avgRating').textContent = ratingCount > 0
     ? `${(ratingSum / ratingCount).toFixed(1)} ⭐`
     : '—';
+
+  const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
+  const paymentEl = document.getElementById('paymentBreakdown');
+  if (paymentEl) {
+    paymentEl.innerHTML = Object.entries(paymentTotals)
+      .filter(([, amt]) => amt > 0)
+      .map(([key, amt]) => `<div class="top-item-row"><span>${paymentLabels[key]}</span><span>${amt.toFixed(2)} ${dt('currency')}</span></div>`)
+      .join('') || `<div class="state-msg">${dt('noSalesPeriod')}</div>`;
+  }
 
   const sorted = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topEl = document.getElementById('topItemsList');

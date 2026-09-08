@@ -490,7 +490,41 @@ function openCartModal() {
   const items = Object.entries(cart);
   if (items.length === 0) return;
 
-  selectedOrderType = 'table';
+  const orderTypesEnabled = {
+    table: (shopInfo.orderTypes ? shopInfo.orderTypes.table !== false : true),
+    car: (shopInfo.orderTypes ? shopInfo.orderTypes.car !== false : true)
+  };
+  // If both got disabled somehow, fall back to table so ordering still works
+  if (!orderTypesEnabled.table && !orderTypesEnabled.car) orderTypesEnabled.table = true;
+
+  selectedOrderType = orderTypesEnabled.table ? 'table' : 'car';
+
+  let orderTypeHtml = '';
+  if (orderTypesEnabled.table && orderTypesEnabled.car) {
+    orderTypeHtml = `
+      <div class="order-type-toggle">
+        <button class="order-type-btn active" id="typeTableBtn" onclick="setOrderType('table')">
+          <span class="order-type-icon">🍽️</span><span>${t('orderFromTable')}</span>
+        </button>
+        <button class="order-type-btn" id="typeCarBtn" onclick="setOrderType('car')">
+          <span class="order-type-icon">🚗</span><span>${t('orderFromCar')}</span>
+        </button>
+      </div>
+    `;
+  }
+
+  const paymentMethodsEnabled = shopInfo.paymentMethods || { cash: true, transfer: true, card: true };
+  const paymentOptionDefs = [
+    { key: 'cash', label: t('payCash') },
+    { key: 'transfer', label: t('payTransfer') },
+    { key: 'card', label: t('payCard') }
+  ];
+  let paymentOptionsHtml = paymentOptionDefs
+    .filter(p => paymentMethodsEnabled[p.key] !== false)
+    .map(p => `<option value="${p.key}">${p.label}</option>`)
+    .join('');
+  if (!paymentOptionsHtml) paymentOptionsHtml = `<option value="cash">${t('payCash')}</option>`;
+
   const total = items.reduce((sum, [, i]) => sum + i.qty * i.price, 0);
 
   let linesHtml = '';
@@ -535,23 +569,16 @@ function openCartModal() {
       </div>
       ${suggestHtml}
 
-      <div class="order-type-toggle">
-        <button class="order-type-btn active" id="typeTableBtn" onclick="setOrderType('table')">
-          <span class="order-type-icon">🍽️</span><span>${t('orderFromTable')}</span>
-        </button>
-        <button class="order-type-btn" id="typeCarBtn" onclick="setOrderType('car')">
-          <span class="order-type-icon">🚗</span><span>${t('orderFromCar')}</span>
-        </button>
-      </div>
+      ${orderTypeHtml}
 
-      <div id="tableFields">
+      <div id="tableFields" style="display:${orderTypesEnabled.table ? 'block' : 'none'};">
         <div class="field">
           <label for="tableNum">${t('tableNumber')}</label>
           <input type="text" id="tableNum" placeholder="${t('tablePlaceholder')}">
         </div>
       </div>
 
-      <div id="carFields" style="display:none;">
+      <div id="carFields" style="display:${(orderTypesEnabled.car && !orderTypesEnabled.table) ? 'block' : 'none'};">
         <div class="field">
           <label for="carNumber">${t('carNumber')}</label>
           <input type="text" id="carNumber" placeholder="${t('carNumberPlaceholder')}">
@@ -564,11 +591,7 @@ function openCartModal() {
 
       <div class="field">
         <label for="paymentMethod">${t('paymentMethodLbl')}</label>
-        <select id="paymentMethod">
-          <option value="cash">${t('payCash')}</option>
-          <option value="transfer">${t('payTransfer')}</option>
-          <option value="card">${t('payCard')}</option>
-        </select>
+        <select id="paymentMethod">${paymentOptionsHtml}</select>
       </div>
 
       <div class="field" style="margin-top:16px;">
