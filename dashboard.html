@@ -1588,10 +1588,15 @@ document.getElementById('shopLogoInput').addEventListener('change', async (e) =>
   statusEl.textContent = dt('logoUploading');
   try {
     const oldUrl = uploadedLogoUrl;
-    const resizedBlob = await resizeImage(file, 500, 0.85);
+    let uploadBlob = file;
+    try {
+      uploadBlob = await resizeImage(file, 500, 0.85);
+    } catch (resizeErr) {
+      console.error('Resize failed, uploading original file instead:', resizeErr);
+    }
     const path = `shops/${currentShopId}/logo_${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
-    await ref.put(resizedBlob);
+    await ref.put(uploadBlob);
     uploadedLogoUrl = await ref.getDownloadURL();
     deleteOldImage(oldUrl);
     const preview = document.getElementById('logoPreview');
@@ -1611,10 +1616,15 @@ document.getElementById('shopCoverInput').addEventListener('change', async (e) =
   statusEl.textContent = dt('coverUploading');
   try {
     const oldUrl = uploadedCoverUrl;
-    const resizedBlob = await resizeImage(file, 1200, 0.82);
+    let uploadBlob = file;
+    try {
+      uploadBlob = await resizeImage(file, 1200, 0.82);
+    } catch (resizeErr) {
+      console.error('Resize failed, uploading original file instead:', resizeErr);
+    }
     const path = `shops/${currentShopId}/cover_${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
-    await ref.put(resizedBlob);
+    await ref.put(uploadBlob);
     uploadedCoverUrl = await ref.getDownloadURL();
     deleteOldImage(oldUrl);
     const preview = document.getElementById('coverPreview');
@@ -2001,10 +2011,15 @@ document.getElementById('itemImage').addEventListener('change', async (e) => {
   statusEl.textContent = dt('itemImageUploading');
   try {
     const oldUrl = uploadedImageUrl;
-    const resizedBlob = await resizeImage(file, 900, 0.82);
+    let uploadBlob = file;
+    try {
+      uploadBlob = await resizeImage(file, 900, 0.82);
+    } catch (resizeErr) {
+      console.error('Resize failed, uploading original file instead:', resizeErr);
+    }
     const path = `shops/${currentShopId}/${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
-    await ref.put(resizedBlob);
+    await ref.put(uploadBlob);
     uploadedImageUrl = await ref.getDownloadURL();
     deleteOldImage(oldUrl);
 

@@ -433,6 +433,14 @@ function openEditModal(shopId) {
         <input type="text" id="editLocation" value="${(info.location || '').replace(/"/g, '&quot;')}">
       </div>
       <div class="field">
+        <label>شعار نصي قصير (عربي)</label>
+        <input type="text" id="editTagline" value="${(info.tagline || '').replace(/"/g, '&quot;')}">
+      </div>
+      <div class="field">
+        <label>شعار نصي قصير (إنجليزي)</label>
+        <input type="text" id="editTaglineEn" value="${(info.taglineEn || '').replace(/"/g, '&quot;')}">
+      </div>
+      <div class="field">
         <label>رقم الواتساب</label>
         <input type="tel" id="editWhatsapp" value="${(info.whatsapp || '').replace(/"/g, '&quot;')}">
       </div>
@@ -455,9 +463,42 @@ function openEditModal(shopId) {
 
       <button class="btn" style="width:100%;" onclick="saveEditedShop('${shopId}')">حفظ التعديلات</button>
       <div id="editError" class="error-msg"></div>
+
+      <div style="border-top:1px solid var(--line); margin-top:20px; padding-top:16px;">
+        <button class="btn btn-ghost" style="width:100%;" onclick="resetOwnerPassword('${(info.email || '').replace(/'/g, "\\'")}')">✉️ إرسال رابط إعادة تعيين كلمة المرور له</button>
+        <div id="resetPwStatus" style="font-size:0.85rem; margin-top:8px;"></div>
+      </div>
+
+      <div style="border-top:1px solid var(--line); margin-top:16px; padding-top:16px; text-align:center;">
+        <div style="font-size:0.85rem; color:var(--stone); margin-bottom:10px;">باركود قائمته</div>
+        <canvas id="adminEditQrCanvas"></canvas>
+      </div>
     </div>
   `;
   document.body.appendChild(overlay);
+
+  const menuUrl = info.menuUrl || (window.location.href.replace('admin.html', '') + 'menu.html?shop=' + shopId);
+  if (typeof QRCode !== 'undefined') {
+    QRCode.toCanvas(document.getElementById('adminEditQrCanvas'), menuUrl, { width: 160 }).catch(err => console.error(err));
+  }
+}
+
+async function resetOwnerPassword(email) {
+  const statusEl = document.getElementById('resetPwStatus');
+  if (!email) {
+    statusEl.style.color = '#B3441E';
+    statusEl.textContent = 'ما فيه إيميل مسجّل لهذا الكوفي.';
+    return;
+  }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    statusEl.style.color = '#3D6B4F';
+    statusEl.textContent = `تم إرسال رابط إعادة التعيين إلى ${email} ✓`;
+  } catch (err) {
+    console.error(err);
+    statusEl.style.color = '#B3441E';
+    statusEl.textContent = 'تعذر إرسال الرابط. تأكد من صحة الإيميل.';
+  }
 }
 
 async function saveEditedShop(shopId) {
@@ -474,6 +515,8 @@ async function saveEditedShop(shopId) {
       'info.name': name,
       'info.nameEn': document.getElementById('editNameEn').value.trim(),
       'info.location': document.getElementById('editLocation').value.trim(),
+      'info.tagline': document.getElementById('editTagline').value.trim(),
+      'info.taglineEn': document.getElementById('editTaglineEn').value.trim(),
       'info.whatsapp': document.getElementById('editWhatsapp').value.trim(),
       'info.phone': document.getElementById('editPhone').value.trim(),
       'info.email': document.getElementById('editEmail').value.trim(),
