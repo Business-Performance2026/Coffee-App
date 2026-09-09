@@ -217,7 +217,7 @@ async function loadMenu() {
     } else if (categoryNames.length > 1) {
       html += '<div class="category-pills" id="categoryPills">';
       categoryNames.forEach((cat, i) => {
-        html += `<button class="pill ${i === 0 ? 'active' : ''}" data-cat="cat-${i}" onclick="scrollToCategory('cat-${i}', this)">${cat}</button>`;
+        html += `<button class="pill ${i === 0 ? 'active' : ''}" data-cat="cat-${i}" onclick="scrollToCategory('cat-${i}', this)"><span class="pill-icon">${getCategoryIcon(cat)}</span><span class="pill-label">${cat}</span></button>`;
       });
       html += '</div>';
     }
@@ -268,6 +268,27 @@ async function loadMenu() {
 
 function escapeStr(str) {
   return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// Picks a fitting icon for a category based on common keywords (Arabic or
+// English) in its name, with a generic fallback for anything unmatched.
+function getCategoryIcon(categoryName) {
+  const n = (categoryName || '').toLowerCase();
+  const rules = [
+    { keys: ['قهوة', 'كوفي', 'اسبريسو', 'إسبريسو', 'coffee', 'espresso', 'latte', 'كابتشينو'], icon: '☕' },
+    { keys: ['شاي', 'tea'], icon: '🍵' },
+    { keys: ['بارد', 'عصير', 'cold', 'juice', 'موهيتو', 'smoothie', 'سموذي'], icon: '🥤' },
+    { keys: ['ايس كريم', 'آيس كريم', 'ice cream', 'جيلاتو', 'gelato', 'دوندورما'], icon: '🍦' },
+    { keys: ['حلا', 'حلويات', 'كيك', 'dessert', 'cake', 'sweet', 'حلى'], icon: '🍰' },
+    { keys: ['مخبوزات', 'خبز', 'كرواسون', 'bakery', 'bread', 'croissant', 'pastry', 'معجنات'], icon: '🥐' },
+    { keys: ['ساندويش', 'sandwich', 'برجر', 'burger', 'طوست'], icon: '🥪' },
+    { keys: ['فطور', 'إفطار', 'breakfast'], icon: '🍳' },
+    { keys: ['سناك', 'snack', 'مقبلات', 'appetizer', 'بطاطس'], icon: '🍟' }
+  ];
+  for (const rule of rules) {
+    if (rule.keys.some(k => n.includes(k))) return rule.icon;
+  }
+  return '🍽️';
 }
 
 function toggleHours() {

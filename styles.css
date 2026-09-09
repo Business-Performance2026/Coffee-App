@@ -564,9 +564,9 @@ button, input, select {
   top: 0;
   z-index: 8;
   display: flex;
-  gap: 8px;
+  gap: 14px;
   overflow-x: auto;
-  padding: 12px 20px;
+  padding: 14px 20px 12px;
   margin: 0 -20px 8px;
   background: var(--paper);
   border-bottom: 1px solid var(--line);
@@ -577,22 +577,46 @@ button, input, select {
 
 .pill {
   flex-shrink: 0;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: white;
-  color: var(--ink);
-  font-size: 0.85rem;
-  font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 2px 2px;
   cursor: pointer;
+  font-family: inherit;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.pill.active {
+.pill-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
   background: var(--accent);
-  color: var(--accent-ink);
-  border-color: var(--accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  opacity: 0.5;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.pill-label {
+  font-size: 0.72rem;
+  color: var(--stone);
+  transition: color 0.15s ease;
+}
+
+.pill.active .pill-icon {
+  opacity: 1;
+  transform: scale(1.06);
+}
+
+.pill.active .pill-label {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 /* ---- Menu grid (customer-facing item cards) ---- */
