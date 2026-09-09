@@ -2016,6 +2016,34 @@ function printReceipt(orderId) {
     ? order.createdAt.toDate().toLocaleString('ar-OM')
     : new Date().toLocaleString('ar-OM');
 
+  // iOS blocks window.print() entirely when the app is installed as a
+  // home-screen PWA (Apple limitation, not something we can bypass in-page).
+  // For that specific case, open a real new Safari tab with a small
+  // dedicated print page instead — printing works fine there.
+  const isIOSStandalone = window.navigator.standalone === true;
+
+  if (isIOSStandalone) {
+    const receiptData = {
+      shopName: shopNameForReceipt,
+      dateStr,
+      typeLine,
+      items: (order.items || []).map(i => ({ name: i.name, qty: i.qty, lineTotal: (i.price * i.qty).toFixed(2) })),
+      totalLabel: dt('total'),
+      totalValue: `${Number(order.total).toFixed(2)} ${dt('currency')}`,
+      paymentLine: `${dt('paymentMethodLbl')}: ${paymentLabel}`,
+      notesLine: order.notes ? `📝 ${order.notes}` : '',
+      thankYou: dt('thankYouMsg')
+    };
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(receiptData))));
+    const link = document.createElement('a');
+    link.href = `receipt-print.html?data=${encoded}`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return;
+  }
+
   const itemsRows = (order.items || []).map(i => `
     <tr>
       <td style="text-align:right;">${i.name} × ${i.qty}</td>
