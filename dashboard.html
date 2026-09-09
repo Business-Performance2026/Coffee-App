@@ -677,13 +677,13 @@ async function maybeActivateTrial() {
 }
 // ===================== Weekly opening hours (Google-style editor) =====================
 const weekDays = [
-  { key: 'sat', label: 'السبت' },
-  { key: 'sun', label: 'الأحد' },
-  { key: 'mon', label: 'الاثنين' },
-  { key: 'tue', label: 'الثلاثاء' },
-  { key: 'wed', label: 'الأربعاء' },
-  { key: 'thu', label: 'الخميس' },
-  { key: 'fri', label: 'الجمعة' }
+  { key: 'sat', label: 'السبت', labelEn: 'Saturday' },
+  { key: 'sun', label: 'الأحد', labelEn: 'Sunday' },
+  { key: 'mon', label: 'الاثنين', labelEn: 'Monday' },
+  { key: 'tue', label: 'الثلاثاء', labelEn: 'Tuesday' },
+  { key: 'wed', label: 'الأربعاء', labelEn: 'Wednesday' },
+  { key: 'thu', label: 'الخميس', labelEn: 'Thursday' },
+  { key: 'fri', label: 'الجمعة', labelEn: 'Friday' }
 ];
 
 function renderWeeklyHoursEditor(hoursData) {
@@ -693,7 +693,7 @@ function renderWeeklyHoursEditor(hoursData) {
     return `
       <div class="hours-day-row">
         <div class="hours-day-row-top">
-          <span class="hours-day-name">${day.label}</span>
+          <span class="hours-day-name">${dashLang === 'en' ? day.labelEn : day.label}</span>
           <label class="hours-closed-label">
             <input type="checkbox" id="closed-${day.key}" ${d.closed ? 'checked' : ''} onchange="toggleDayClosed('${day.key}')">
             <span>${dt('closedLbl')}</span>
@@ -1046,6 +1046,7 @@ const dashT = {
   customerNameOptional: { ar: 'اسم العميل (اختياري)', en: 'Customer name (optional)' },
   addFirstItemsHint: { ar: 'أضف أصناف بالقائمة أولاً من تبويب "لوحة التحكم".', en: 'Add items to your menu first from the Dashboard tab.' },
   lowStockWarning: { ar: '⚠️ كمية منخفضة', en: '⚠️ Low stock' },
+  unlimitedPlaceholder: { ar: 'غير محدود', en: 'Unlimited' },
   noSalesPeriod: { ar: 'لا توجد مبيعات بهذي الفترة.', en: 'No sales in this period.' },
   salesUnit: { ar: 'مبيعات', en: 'sold' },
   qrLibraryError: { ar: 'مكتبة QR ما تحمّلت من الإنترنت', en: 'QR library failed to load' },
@@ -1176,6 +1177,14 @@ function toggleDashLang() {
   if (document.getElementById('view-inventory').classList.contains('active')) loadInventory();
   if (document.getElementById('view-sales').classList.contains('active')) {
     loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
+  }
+
+  // Re-render the hours editor with the SAME values the owner already has
+  // on screen (collected first, not re-fetched) — just relabels days/buttons
+  // into the new language without discarding any unsaved edits.
+  const hoursContainer = document.getElementById('weeklyHoursEditor');
+  if (hoursContainer && hoursContainer.children.length > 0) {
+    renderWeeklyHoursEditor(collectWeeklyHours());
   }
 }
 
@@ -2259,15 +2268,16 @@ async function loadInventory() {
   let html = '';
   snap.forEach(doc => {
     const item = doc.data();
+    const displayName = (dashLang === 'en' && item.nameEn) ? item.nameEn : item.name;
     const stock = item.stock;
     const isLow = typeof stock === 'number' && stock <= 3;
     html += `
       <div class="inventory-row">
         <div class="grow">
-          <div class="item-name">${item.name}</div>
+          <div class="item-name">${displayName}</div>
           ${isLow ? `<div class="stock-low">${dt('lowStockWarning')}</div>` : ''}
         </div>
-        <input type="number" min="0" placeholder="غير محدود" value="${stock !== undefined && stock !== null ? stock : ''}"
+        <input type="number" min="0" placeholder="${dt('unlimitedPlaceholder')}" value="${stock !== undefined && stock !== null ? stock : ''}"
                onchange="updateStock('${doc.id}', this.value)">
       </div>
     `;
