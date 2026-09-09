@@ -33,6 +33,7 @@
       <div class="bell-wrap" onclick="switchTab('pos')">
         🔔<span class="bell-badge" id="bellBadge" style="display:none;">0</span>
       </div>
+      <button onclick="logout()" title="تسجيل خروج" style="background:none; border:none; font-size:1.2rem; cursor:pointer; padding:4px;">🚪</button>
     </div>
   </div>
 
@@ -2167,10 +2168,8 @@ let posCart = {};
 let posMenuItems = [];
 
 async function openNewOrderModal() {
-  if (posMenuItems.length === 0) {
-    const snap = await db.collection('shops').doc(currentShopId).collection('menu').where('available', '!=', false).get();
-    posMenuItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  }
+  const snap = await db.collection('shops').doc(currentShopId).collection('menu').where('available', '!=', false).get();
+  posMenuItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   posCart = {};
 
   const overlay = document.createElement('div');
