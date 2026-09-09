@@ -1798,12 +1798,14 @@ async function loadItems() {
   snap.forEach(doc => {
     const item = doc.data();
     const isHidden = item.hidden === true;
+    const displayName = (dashLang === 'en' && item.nameEn) ? item.nameEn : item.name;
+    const displayCategory = (dashLang === 'en' && item.categoryEn) ? item.categoryEn : item.category;
     html += `
       <div class="dashboard-item ${isHidden ? 'item-hidden' : ''}">
         ${item.image ? `<img src="${item.image}">` : '<div class="item-photo"></div>'}
         <div class="grow">
-          <div class="item-name">${item.name} — ${Number(item.price).toFixed(2)} ر.ع</div>
-          <div class="item-desc">${item.category}${item.available === false ? ' · ' + dt('unavailableTag') : ''}${isHidden ? ' · ' + dt('hiddenTag') : ''}</div>
+          <div class="item-name">${displayName} — ${Number(item.price).toFixed(2)} ${dt('currency')}</div>
+          <div class="item-desc">${displayCategory}${item.available === false ? ' · ' + dt('unavailableTag') : ''}${isHidden ? ' · ' + dt('hiddenTag') : ''}</div>
         </div>
         <button class="btn btn-ghost" style="padding:6px 10px; font-size:0.8rem;" onclick='toggleHidden("${doc.id}", ${isHidden})'>${isHidden ? dt('showBtn') : dt('hideBtn')}</button>
         <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>${dt('editBtn')}</button>
@@ -2156,11 +2158,13 @@ async function openNewOrderModal() {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'posOverlay';
-  let itemsHtml = posMenuItems.map(item => `
+  let itemsHtml = posMenuItems.map(item => {
+    const displayName = (dashLang === 'en' && item.nameEn) ? item.nameEn : item.name;
+    return `
     <div class="item-row">
       <div class="item-info">
-        <div class="item-name">${item.name}</div>
-        <div class="item-price">${Number(item.price).toFixed(2)} ر.ع</div>
+        <div class="item-name">${displayName}</div>
+        <div class="item-price">${Number(item.price).toFixed(2)} ${dt('currency')}</div>
       </div>
       <div class="qty-control">
         <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", ${item.price}, -1)'>−</button>
@@ -2168,7 +2172,8 @@ async function openNewOrderModal() {
         <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", ${item.price}, 1)'>+</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   overlay.innerHTML = `
     <div class="modal-sheet">
