@@ -251,6 +251,11 @@
       <div class="state-msg">جاري التحميل...</div>
     </div>
 
+    <h3 style="margin:0 0 12px;" data-i18n="staffBreakdownTitle">حسب البائع</h3>
+    <div class="card" id="staffBreakdown">
+      <div class="state-msg">جاري التحميل...</div>
+    </div>
+
     <h3 style="margin:0 0 12px;" data-i18n="topSellingTitle">الأكثر مبيعاً</h3>
     <div class="card" id="topItemsList">
       <div class="state-msg">جاري التحميل...</div>
@@ -986,6 +991,9 @@ const dashT = {
   atLeastOnePaymentError: { ar: 'لازم تفعّل طريقة دفع واحدة على الأقل.', en: 'Please enable at least one payment method.' },
   atLeastOneOrderTypeError: { ar: 'لازم تفعّل نوع طلب واحد على الأقل.', en: 'Please enable at least one order type.' },
   paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
+  staffBreakdownTitle: { ar: 'حسب البائع', en: 'By staff member' },
+  shopOwnerLabel: { ar: 'صاحب الكوفي', en: 'Shop owner' },
+  noCounterSalesYet: { ar: 'لا توجد مبيعات كاونتر بهذي الفترة.', en: 'No counter sales in this period.' },
   addOneItemError: { ar: 'أضف صنف واحد على الأقل.', en: 'Add at least one item.' },
   orderSendErrorGeneric: { ar: 'حدث خطأ أثناء إرسال الطلب.', en: 'An error occurred while sending the order.' },
   counterCustomer: { ar: 'عميل الكاونتر', en: 'Counter customer' },
@@ -2162,6 +2170,7 @@ async function submitPosOrder() {
   }
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
   const name = document.getElementById('posCustomerName').value.trim() || dt('counterCustomer');
+  const soldBy = isEmployee ? currentUserEmail : dt('shopOwnerLabel');
 
   try {
     await db.collection('shops').doc(currentShopId).collection('orders').add({
@@ -2170,6 +2179,7 @@ async function submitPosOrder() {
       notes: null,
       items,
       total,
+      soldBy,
       status: 'pending',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -2430,6 +2440,7 @@ async function loadSales(range, btnEl) {
   let total = 0;
   const itemCounts = {};
   const paymentTotals = { cash: 0, transfer: 0, card: 0 };
+  const staffTotals = {};
   let ratingSum = 0;
   let ratingCount = 0;
 
@@ -2447,6 +2458,9 @@ async function loadSales(range, btnEl) {
     if (pm && paymentTotals.hasOwnProperty(pm)) {
       paymentTotals[pm] += Number(order.total) || 0;
     }
+    if (order.soldBy) {
+      staffTotals[order.soldBy] = (staffTotals[order.soldBy] || 0) + (Number(order.total) || 0);
+    }
   });
 
   document.getElementById('salesTotal').textContent = total.toFixed(2);
@@ -2462,6 +2476,14 @@ async function loadSales(range, btnEl) {
       .filter(([, amt]) => amt > 0)
       .map(([key, amt]) => `<div class="top-item-row"><span>${paymentLabels[key]}</span><span>${amt.toFixed(2)} ${dt('currency')}</span></div>`)
       .join('') || `<div class="state-msg">${dt('noSalesPeriod')}</div>`;
+  }
+
+  const staffEl = document.getElementById('staffBreakdown');
+  if (staffEl) {
+    staffEl.innerHTML = Object.entries(staffTotals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, amt]) => `<div class="top-item-row"><span>${name}</span><span>${amt.toFixed(2)} ${dt('currency')}</span></div>`)
+      .join('') || `<div class="state-msg">${dt('noCounterSalesYet')}</div>`;
   }
 
   const sorted = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);

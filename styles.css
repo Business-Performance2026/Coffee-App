@@ -1097,17 +1097,41 @@ button, input, select {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+  position: relative;
+}
+
+.pos-columns > div:first-child {
+  border-inline-end: 2px dashed var(--line);
+  padding-inline-end: 14px;
 }
 
 @media (max-width: 480px) {
   .pos-columns { grid-template-columns: 1fr; }
+  .pos-columns > div:first-child {
+    border-inline-end: none;
+    padding-inline-end: 0;
+    border-bottom: 2px dashed var(--line);
+    padding-bottom: 16px;
+    margin-bottom: 6px;
+  }
 }
 
 .pos-column-title {
-  font-size: 0.95rem;
-  color: var(--stone);
-  margin-bottom: 10px;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: white;
+  text-align: center;
+  padding: 10px 8px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+.pos-columns > div:first-child .pos-column-title {
+  background: #C0392B;
+}
+
+.pos-columns > div:last-child .pos-column-title {
+  background: #2A5C8A;
 }
 
 .order-card {
