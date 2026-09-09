@@ -74,17 +74,9 @@
       <div class="card" style="text-align:center;">
         <h3 style="margin-bottom:12px;" data-i18n="qrTitle">باركود قائمتك</h3>
         <canvas id="myQrCanvas"></canvas>
-        <div id="myMenuUrl" style="font-size:0.8rem; color:var(--stone); word-break:break-all; margin:10px 0;"></div>
+        <div id="myMenuUrl" style="display:none;"></div>
         <button class="btn btn-ghost" onclick="downloadMyQr()" data-i18n="downloadQr">تحميل الباركود</button>
-        <button class="btn" style="margin-top:8px;" onclick="downloadTableTent()" data-i18n="downloadTentBtn">تحميل تصميم الطاولة</button>
-      </div>
-
-      <div class="card" style="text-align:center;">
-        <h3 style="margin-bottom:10px;" data-i18n="shareLinkTitle">رابط قائمتك</h3>
-        <p style="color:var(--stone); font-size:0.85rem; margin-bottom:14px;" data-i18n="shareLinkHint">
-          انسخ هذا الرابط وضيفه ببايو انستقرام، تويتر، أو أي حساب سوشيال ميديا
-        </p>
-        <button class="btn" style="width:100%;" onclick="copyMenuLink()" data-i18n="copyLinkBtn">📋 نسخ الرابط</button>
+        <button class="btn" style="margin-top:8px; width:100%;" onclick="copyMenuLink()" data-i18n="copyLinkBtn">📋 نسخ الرابط</button>
         <div id="copyLinkStatus" style="font-size:0.85rem; color:#3D6B4F; margin-top:8px;"></div>
       </div>
     </div>
