@@ -1162,6 +1162,12 @@ function toggleDashLang() {
   localStorage.setItem('dashLang', dashLang);
   applyDashLang();
 
+  // Close the counter-order popup if it's open — its content was drawn once
+  // at open time and won't update live, so the cleanest fix is to have the
+  // owner/employee reopen it fresh in the new language.
+  const posOverlay = document.getElementById('posOverlay');
+  if (posOverlay) posOverlay.remove();
+
   // Re-render dynamic lists so they pick up the new language too
   loadItems();
   if (ordersUnsub) ordersUnsub();
