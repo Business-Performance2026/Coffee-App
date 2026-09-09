@@ -909,34 +909,41 @@ button, input, select {
   @page { margin: 4mm; }
 }
 
-/* ---- Weekly opening hours editor (Google-style) ---- */
-.weekly-hours-editor { display: flex; flex-direction: column; gap: 6px; }
+/* ---- Weekly opening hours editor (Google-style, supports 2 periods/day) ---- */
+.weekly-hours-editor { display: flex; flex-direction: column; gap: 4px; }
 
 .hours-day-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
 
 .hours-day-row:last-child { border-bottom: none; }
 
+.hours-day-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .hours-day-name {
-  width: 56px;
-  flex-shrink: 0;
-  font-size: 0.78rem;
-  font-weight: 500;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.hours-ranges-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .hours-day-row input[type="time"] {
-  padding: 4px 4px;
+  padding: 5px 5px;
   border: 1px solid var(--line);
   border-radius: 7px;
   font-family: inherit;
-  font-size: 0.72rem;
-  width: 82px;
+  font-size: 0.75rem;
+  width: 88px;
   min-width: 0;
 }
 
@@ -944,22 +951,47 @@ button, input, select {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--stone);
-  margin-inline-start: auto;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .hours-closed-label input { width: 14px; height: 14px; }
 
-.hours-time-range { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.hours-time-range span { color: var(--stone); font-size: 0.72rem; flex-shrink: 0; }
+.hours-time-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hours-time-range span { color: var(--stone); font-size: 0.75rem; flex-shrink: 0; }
+
+.hours-remove-range {
+  background: none;
+  border: none;
+  color: var(--stone);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.hours-add-range {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
 
 @media (max-width: 380px) {
-  .hours-day-row { justify-content: space-between; }
-  .hours-time-range { order: 3; width: 100%; justify-content: center; margin-top: 4px; }
-  .hours-closed-label { margin-inline-start: 0; }
+  .hours-time-range { flex-wrap: wrap; }
 }
 
 /* ---- Subscription status banners (owner dashboard) ---- */

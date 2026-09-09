@@ -676,19 +676,35 @@ const weekDays = [
 function renderWeeklyHoursEditor(hoursData) {
   const container = document.getElementById('weeklyHoursEditor');
   container.innerHTML = weekDays.map(day => {
-    const d = hoursData[day.key] || { open: '08:00', close: '22:00', closed: false };
+    const d = hoursData[day.key] || { open: '08:00', close: '13:00', hasSecond: false, open2: '16:00', close2: '22:00', closed: false };
     return `
       <div class="hours-day-row">
-        <span class="hours-day-name">${day.label}</span>
-        <div class="hours-time-range" id="range-${day.key}" style="${d.closed ? 'display:none;' : ''}">
-          <input type="time" id="open-${day.key}" value="${d.open || '08:00'}">
-          <span>—</span>
-          <input type="time" id="close-${day.key}" value="${d.close || '22:00'}">
+        <div class="hours-day-row-top">
+          <span class="hours-day-name">${day.label}</span>
+          <label class="hours-closed-label">
+            <input type="checkbox" id="closed-${day.key}" ${d.closed ? 'checked' : ''} onchange="toggleDayClosed('${day.key}')">
+            <span>${dt('closedLbl')}</span>
+          </label>
         </div>
-        <label class="hours-closed-label">
-          <input type="checkbox" id="closed-${day.key}" ${d.closed ? 'checked' : ''} onchange="toggleDayClosed('${day.key}')">
-          <span>${dt('closedLbl')}</span>
-        </label>
+
+        <div class="hours-ranges-wrap" id="rangesWrap-${day.key}" style="${d.closed ? 'display:none;' : ''}">
+          <div class="hours-time-range">
+            <input type="time" id="open-${day.key}" value="${d.open || '08:00'}">
+            <span>—</span>
+            <input type="time" id="close-${day.key}" value="${d.close || '13:00'}">
+          </div>
+
+          <div class="hours-time-range" id="range2-${day.key}" style="${d.hasSecond ? '' : 'display:none;'}">
+            <input type="time" id="open2-${day.key}" value="${d.open2 || '16:00'}">
+            <span>—</span>
+            <input type="time" id="close2-${day.key}" value="${d.close2 || '22:00'}">
+            <button type="button" class="hours-remove-range" onclick="removeSecondRange('${day.key}')">✕</button>
+          </div>
+
+          <button type="button" class="hours-add-range" id="addRangeBtn-${day.key}" style="${d.hasSecond ? 'display:none;' : ''}" onclick="addSecondRange('${day.key}')">
+            + ${dt('addSecondPeriod')}
+          </button>
+        </div>
       </div>
     `;
   }).join('');
@@ -696,17 +712,31 @@ function renderWeeklyHoursEditor(hoursData) {
 
 function toggleDayClosed(dayKey) {
   const isClosed = document.getElementById(`closed-${dayKey}`).checked;
-  document.getElementById(`range-${dayKey}`).style.display = isClosed ? 'none' : 'flex';
+  document.getElementById(`rangesWrap-${dayKey}`).style.display = isClosed ? 'none' : 'block';
+}
+
+function addSecondRange(dayKey) {
+  document.getElementById(`range2-${dayKey}`).style.display = 'flex';
+  document.getElementById(`addRangeBtn-${dayKey}`).style.display = 'none';
+}
+
+function removeSecondRange(dayKey) {
+  document.getElementById(`range2-${dayKey}`).style.display = 'none';
+  document.getElementById(`addRangeBtn-${dayKey}`).style.display = 'block';
 }
 
 function collectWeeklyHours() {
   const hours = {};
   weekDays.forEach(day => {
     const closed = document.getElementById(`closed-${day.key}`).checked;
+    const hasSecond = document.getElementById(`range2-${day.key}`).style.display !== 'none';
     hours[day.key] = {
       closed,
       open: document.getElementById(`open-${day.key}`).value || '08:00',
-      close: document.getElementById(`close-${day.key}`).value || '22:00'
+      close: document.getElementById(`close-${day.key}`).value || '13:00',
+      hasSecond,
+      open2: document.getElementById(`open2-${day.key}`).value || '16:00',
+      close2: document.getElementById(`close2-${day.key}`).value || '22:00'
     };
   });
   return hours;
@@ -723,7 +753,9 @@ function formatHoursForDisplay(hours) {
   return weekDays.map(day => {
     const d = hours[day.key];
     if (!d || d.closed) return `${day.label}: مغلق`;
-    return `${day.label}: ${formatTime12h(d.open)} - ${formatTime12h(d.close)}`;
+    let line = `${day.label}: ${formatTime12h(d.open)} - ${formatTime12h(d.close)}`;
+    if (d.hasSecond) line += `، ${formatTime12h(d.open2)} - ${formatTime12h(d.close2)}`;
+    return line;
   }).join('\n');
 }
 
@@ -1058,6 +1090,7 @@ const dashT = {
   cancelReservationBtn: { ar: 'إلغاء الحجز', en: 'Cancel reservation' },
   confirmCancelReservation: { ar: 'متأكد تبي تلغي هذا الحجز؟', en: 'Are you sure you want to cancel this reservation?' },
   closedLbl: { ar: 'مغلق', en: 'Closed' },
+  addSecondPeriod: { ar: 'إضافة فترة ثانية', en: 'Add second period' },
   itemSuggestedLbl: { ar: 'اقترحه كإضافة بالسلة', en: 'Suggest as a cart add-on' },
   avgRatingLbl: { ar: 'متوسط التقييم', en: 'Average rating' }
 };
