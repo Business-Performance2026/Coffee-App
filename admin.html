@@ -120,6 +120,14 @@
 <script src="firebase-config.js"></script>
 
 <script>
+// Fixes the "login screen flashes then disappears" issue when using the
+// phone/browser back button — see dashboard.html for full explanation.
+window.addEventListener('pageshow', function (event) {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+
 // Secondary Firebase app instance — lets us create new shop-owner accounts
 // WITHOUT logging the admin out of their own session.
 const secondaryApp = firebase.initializeApp(firebase.app().options, "Secondary");

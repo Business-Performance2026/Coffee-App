@@ -491,6 +491,18 @@
 <script src="firebase-config.js"></script>
 
 <script>
+// Fixes the "login screen flashes then disappears" issue when using the
+// phone/browser back button: browsers sometimes restore this page from a
+// cached snapshot (bfcache) instead of loading it fresh, and in that cached
+// snapshot Firebase hasn't re-confirmed the login state yet. Forcing one
+// clean reload in that specific case guarantees the auth check always runs
+// properly instead of briefly showing a wrong/stale screen.
+window.addEventListener('pageshow', function (event) {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+
 let currentShopId = null;
 let currentUserEmail = null;
 let shopNameForReceipt = '';
