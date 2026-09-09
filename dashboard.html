@@ -134,6 +134,11 @@
       <div class="card" id="itemsList">
         <div class="state-msg">جاري التحميل...</div>
       </div>
+
+      <h3 style="margin:24px 0 12px;" data-i18n="categoryManagerTitle">إدارة التصنيفات</h3>
+      <div class="card" id="categoryManagerList">
+        <div class="state-msg">جاري التحميل...</div>
+      </div>
     </div>
 
     <!-- Sub-view: Reservations (rooms + incoming bookings) -->
@@ -560,6 +565,7 @@ auth.onAuthStateChanged(async user => {
 
     await loadShopInfo();
     await loadItems();
+    loadCategoryManager();
     listenToOrders();
     listenToCompletedOrders();
     updateBestSellerFlag();
@@ -600,6 +606,7 @@ auth.onAuthStateChanged(async user => {
 
     await loadShopInfo();
     if (employeePermissions.dashboard || employeePermissions.inventory) await loadItems();
+    loadCategoryManager();
     if (employeePermissions.pos || employeePermissions.sales) {
       listenToOrders();
       listenToCompletedOrders();
@@ -1010,6 +1017,12 @@ const dashT = {
   noPermissionsMsg: { ar: 'ما عندك أي صلاحية مفعّلة حالياً. تواصل مع صاحب الكوفي.', en: "You don't have any permissions enabled. Please contact the shop owner." },
   loadingGeneric: { ar: 'جاري التحميل...', en: 'Loading...' },
   noItemsYet: { ar: 'لا توجد أصناف بعد. أضف أول صنف بالأعلى.', en: 'No items yet. Add your first one above.' },
+  categoryManagerTitle: { ar: 'إدارة التصنيفات', en: 'Manage categories' },
+  noCategoriesYet: { ar: 'لا توجد تصنيفات بعد.', en: 'No categories yet.' },
+  itemsInCategoryWord: { ar: 'صنف', en: 'items' },
+  renameCategoryTitle: { ar: 'تعديل التصنيف', en: 'Edit category' },
+  confirmDeleteCategory: { ar: 'متأكد تبي تحذف هذا التصنيف؟ الأصناف بداخله بتصير بدون تصنيف، بس ما بتنحذف.', en: 'Delete this category? Its items will become uncategorized, but will NOT be deleted.' },
+  uncategorizedLabel: { ar: 'بدون تصنيف', en: 'Uncategorized' },
   editBtn: { ar: 'تعديل', en: 'Edit' },
   deleteBtn: { ar: 'حذف', en: 'Delete' },
   hideBtn: { ar: 'إخفاء', en: 'Hide' },
@@ -1182,6 +1195,7 @@ function toggleDashLang() {
 
   // Re-render dynamic lists so they pick up the new language too
   loadItems();
+  loadCategoryManager();
   if (ordersUnsub) ordersUnsub();
   listenToOrders();
   renderCompletedOrders();
@@ -1823,6 +1837,115 @@ async function cancelReservation(resId, roomId, date, time) {
   await loadReservations();
 }
 
+// ===================== Category management (independent from loadItems) =====================
+// Runs its own fetch so it never has to touch/modify loadItems() above.
+async function loadCategoryManager() {
+  const el = document.getElementById('categoryManagerList');
+  if (!el) return;
+
+  const snap = await db.collection('shops').doc(currentShopId).collection('menu').get();
+  const categories = {}; // { arName: { en: '', count: 0 } }
+
+  snap.forEach(doc => {
+    const item = doc.data();
+    if (!item.category) return;
+    if (!categories[item.category]) categories[item.category] = { en: item.categoryEn || '', count: 0 };
+    categories[item.category].count++;
+  });
+
+  const names = Object.keys(categories);
+  if (names.length === 0) {
+    el.innerHTML = `<div class="state-msg">${dt('noCategoriesYet')}</div>`;
+    return;
+  }
+
+  el.innerHTML = names.map(name => `
+    <div class="dashboard-item">
+      <div class="grow">
+        <div class="item-name">${name}${categories[name].en ? ' / ' + categories[name].en : ''}</div>
+        <div class="item-desc">${categories[name].count} ${dt('itemsInCategoryWord')}</div>
+      </div>
+      <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='openRenameCategoryModal("${escapeStrJs(name)}", "${escapeStrJs(categories[name].en)}")'>${dt('editBtn')}</button>
+      <button class="btn btn-danger" onclick='deleteCategoryConfirm("${escapeStrJs(name)}")'>${dt('deleteBtn')}</button>
+    </div>
+  `).join('');
+}
+
+function escapeStrJs(str) {
+  return String(str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function openRenameCategoryModal(oldName, oldNameEn) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'renameCategoryOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="document.getElementById('renameCategoryOverlay').remove()">×</button>
+      <h3 style="margin:8px 0 16px;">${dt('renameCategoryTitle')}</h3>
+      <div class="field">
+        <label>${dt('itemCatAr')}</label>
+        <input type="text" id="renameCatArInput" value="${oldName.replace(/"/g, '&quot;')}">
+      </div>
+      <div class="field">
+        <label>${dt('itemCatEn')}</label>
+        <input type="text" id="renameCatEnInput" value="${(oldNameEn || '').replace(/"/g, '&quot;')}">
+      </div>
+      <button class="btn" style="width:100%;" onclick='saveRenamedCategory("${escapeStrJs(oldName)}")'>${dt('saveChangesBtn')}</button>
+      <div id="renameCategoryError" class="error-msg"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+async function saveRenamedCategory(oldName) {
+  const errorEl = document.getElementById('renameCategoryError');
+  const newName = document.getElementById('renameCatArInput').value.trim();
+  const newNameEn = document.getElementById('renameCatEnInput').value.trim();
+
+  if (!newName) {
+    errorEl.textContent = dt('roomNameRequired');
+    return;
+  }
+
+  try {
+    const snap = await db.collection('shops').doc(currentShopId).collection('menu')
+      .where('category', '==', oldName).get();
+
+    const batch = db.batch();
+    snap.forEach(doc => {
+      batch.update(doc.ref, { category: newName, categoryEn: newNameEn });
+    });
+    await batch.commit();
+
+    document.getElementById('renameCategoryOverlay').remove();
+    await loadCategoryManager();
+    await loadItems();
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = dt('saveErrorGeneric');
+  }
+}
+
+async function deleteCategoryConfirm(name) {
+  if (!confirm(dt('confirmDeleteCategory'))) return;
+
+  const snap = await db.collection('shops').doc(currentShopId).collection('menu')
+    .where('category', '==', name).get();
+
+  const batch = db.batch();
+  snap.forEach(doc => {
+    batch.update(doc.ref, {
+      category: dt('uncategorizedLabel'),
+      categoryEn: firebase.firestore.FieldValue.delete()
+    });
+  });
+  await batch.commit();
+
+  await loadCategoryManager();
+  await loadItems();
+}
+
 async function loadItems() {
   const listEl = document.getElementById('itemsList');
   const snap = await db.collection('shops').doc(currentShopId).collection('menu').orderBy('category').get();
@@ -1868,6 +1991,7 @@ async function loadItems() {
 async function toggleHidden(id, currentlyHidden) {
   await db.collection('shops').doc(currentShopId).collection('menu').doc(id).update({ hidden: !currentlyHidden });
   await loadItems();
+    loadCategoryManager();
 }
 
 document.getElementById('itemImage').addEventListener('change', async (e) => {
@@ -1925,6 +2049,7 @@ async function saveItem() {
     }
     resetForm();
     await loadItems();
+    loadCategoryManager();
     switchSubView('list');
   } catch (err) {
     console.error(err);
@@ -1970,6 +2095,7 @@ async function deleteItem(id) {
   }
   await ref.delete();
   await loadItems();
+    loadCategoryManager();
 }
 
 function resetForm() {
