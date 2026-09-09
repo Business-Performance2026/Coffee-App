@@ -501,19 +501,22 @@ function openCartModal() {
 
   selectedOrderType = orderTypesEnabled.table ? 'table' : 'car';
 
-  let orderTypeHtml = '';
-  if (orderTypesEnabled.table && orderTypesEnabled.car) {
-    orderTypeHtml = `
-      <div class="order-type-toggle">
-        <button class="order-type-btn active" id="typeTableBtn" onclick="setOrderType('table')">
-          <span class="order-type-icon">🍽️</span><span>${t('orderFromTable')}</span>
-        </button>
-        <button class="order-type-btn" id="typeCarBtn" onclick="setOrderType('car')">
-          <span class="order-type-icon">🚗</span><span>${t('orderFromCar')}</span>
-        </button>
-      </div>
+  let orderTypeHtml = '<div class="order-type-toggle">';
+  if (orderTypesEnabled.table) {
+    orderTypeHtml += `
+      <button class="order-type-btn ${selectedOrderType === 'table' ? 'active' : ''}" id="typeTableBtn" onclick="setOrderType('table')">
+        <span class="order-type-icon">🍽️</span><span>${t('orderFromTable')}</span>
+      </button>
     `;
   }
+  if (orderTypesEnabled.car) {
+    orderTypeHtml += `
+      <button class="order-type-btn ${selectedOrderType === 'car' ? 'active' : ''}" id="typeCarBtn" onclick="setOrderType('car')">
+        <span class="order-type-icon">🚗</span><span>${t('orderFromCar')}</span>
+      </button>
+    `;
+  }
+  orderTypeHtml += '</div>';
 
   const paymentMethodsEnabled = shopInfo.paymentMethods || { cash: true, transfer: true, card: true };
   const paymentOptionDefs = [
@@ -612,8 +615,10 @@ let selectedOrderType = 'table';
 
 function setOrderType(type) {
   selectedOrderType = type;
-  document.getElementById('typeTableBtn').classList.toggle('active', type === 'table');
-  document.getElementById('typeCarBtn').classList.toggle('active', type === 'car');
+  const tableBtn = document.getElementById('typeTableBtn');
+  const carBtn = document.getElementById('typeCarBtn');
+  if (tableBtn) tableBtn.classList.toggle('active', type === 'table');
+  if (carBtn) carBtn.classList.toggle('active', type === 'car');
   document.getElementById('tableFields').style.display = type === 'table' ? 'block' : 'none';
   document.getElementById('carFields').style.display = type === 'car' ? 'block' : 'none';
 }
