@@ -1257,8 +1257,40 @@ button, input, select {
   font-weight: 600;
 }
 
+/* ---- Account tab's own icon sub-nav — fully separate from the one above,
+   so switching one never affects the other's active-button state ---- */
+.acc-icon-subnav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 6px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  color: var(--stone);
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(36,27,21,0.04);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.acc-icon-subnav-btn[data-accsub="info"] .icon-subnav-icon { background: #F3DFC7; color: #8A5A28; }
+.acc-icon-subnav-btn[data-accsub="staff"] .icon-subnav-icon { background: #EAD3DC; color: #8A4A63; }
+.acc-icon-subnav-btn[data-accsub="session"] .icon-subnav-icon { background: #D6E0F0; color: #3E5C8A; }
+
+.acc-icon-subnav-btn.active {
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .sub-view { display: none; }
 .sub-view.active { display: block; }
+
+.acc-sub-view { display: none; }
+.acc-sub-view.active { display: block; }
 
 .dashboard-item.item-hidden {
   opacity: 0.5;

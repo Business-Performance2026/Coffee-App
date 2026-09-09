@@ -212,6 +212,9 @@
         <div id="ordersColPreparing"><div class="state-msg">جاري التحميل...</div></div>
       </div>
     </div>
+
+    <h3 style="margin:24px 0 12px;" data-i18n="completedOrdersTitle">الطلبات المكتملة</h3>
+    <div id="completedOrdersList"><div class="state-msg">جاري التحميل...</div></div>
   </div>
 
   <!-- ===================== TAB 3: المخزون (Inventory) ===================== -->
@@ -283,6 +286,19 @@
   <!-- ===================== TAB 5: الحساب (Account) ===================== -->
   <div id="view-account" class="tab-view">
 
+    <div class="icon-subnav">
+      <button class="acc-icon-subnav-btn active" data-accsub="info" onclick="switchAccountSub('info')">
+        <span class="icon-subnav-icon">🏪</span><span class="icon-subnav-label" data-i18n="accSubInfo">معلومات الكوفي</span>
+      </button>
+      <button class="acc-icon-subnav-btn" data-accsub="staff" onclick="switchAccountSub('staff')">
+        <span class="icon-subnav-icon">👥</span><span class="icon-subnav-label" data-i18n="accSubStaff">الموظفين</span>
+      </button>
+      <button class="acc-icon-subnav-btn" data-accsub="session" onclick="switchAccountSub('session')">
+        <span class="icon-subnav-icon">🔑</span><span class="icon-subnav-label" data-i18n="accSubSession">الجلسة</span>
+      </button>
+    </div>
+
+    <div id="acc-sub-info" class="acc-sub-view active">
     <div class="card">
       <h3 style="margin-bottom:16px;" data-i18n="shopInfoTitle">معلومات الكوفي</h3>
 
@@ -398,7 +414,9 @@
       <div id="shopInfoError" class="error-msg"></div>
       <div id="shopInfoSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
     </div>
+    </div>
 
+    <div id="acc-sub-staff" class="acc-sub-view">
     <!-- Staff management — visible only to the actual shop owner, never to an employee -->
     <div class="card" id="employeesCard" style="display:none;">
       <h3 style="margin-bottom:16px;" data-i18n="employeesTitle">الموظفين</h3>
@@ -454,10 +472,13 @@
       <h4 style="margin:20px 0 10px;" data-i18n="currentEmployeesTitle">الموظفين الحاليين</h4>
       <div id="employeesList"><div class="state-msg">جاري التحميل...</div></div>
     </div>
+    </div>
 
+    <div id="acc-sub-session" class="acc-sub-view">
     <div class="card">
       <div id="loggedInAsText" style="text-align:center; color:var(--stone); font-size:0.85rem; margin-bottom:14px;"></div>
       <button class="btn btn-ghost" style="width:100%;" onclick="logout()" data-i18n="logoutBtn">تسجيل خروج</button>
+    </div>
     </div>
 
   </div>
@@ -561,6 +582,7 @@ auth.onAuthStateChanged(async user => {
     await loadShopInfo();
     await loadItems();
     listenToOrders();
+    listenToCompletedOrders();
     updateBestSellerFlag();
     updatePublicRatingStats();
     loadEmployees();
@@ -599,7 +621,10 @@ auth.onAuthStateChanged(async user => {
 
     await loadShopInfo();
     if (employeePermissions.dashboard || employeePermissions.inventory) await loadItems();
-    if (employeePermissions.pos || employeePermissions.sales) listenToOrders();
+    if (employeePermissions.pos || employeePermissions.sales) {
+      listenToOrders();
+      listenToCompletedOrders();
+    }
   }
 });
 
@@ -968,6 +993,9 @@ const dashT = {
   orderCountLbl: { ar: 'عدد الطلبات', en: 'Number of orders' },
   topSellingTitle: { ar: 'الأكثر مبيعاً', en: 'Top selling' },
   shopInfoTitle: { ar: 'معلومات الكوفي', en: 'Shop info' },
+  accSubInfo: { ar: 'معلومات الكوفي', en: 'Shop info' },
+  accSubStaff: { ar: 'الموظفين', en: 'Staff' },
+  accSubSession: { ar: 'الجلسة', en: 'Session' },
   logoLbl: { ar: 'شعار الكوفي', en: 'Shop logo' },
   coverLbl: { ar: 'صورة الغلاف', en: 'Cover photo' },
   shopNameArLbl: { ar: 'اسم المحل (عربي)', en: 'Shop name (Arabic)' },
@@ -1015,6 +1043,9 @@ const dashT = {
   saveErrorGeneric: { ar: 'حدث خطأ أثناء الحفظ. حاول مرة أخرى.', en: 'An error occurred while saving. Please try again.' },
   confirmDeleteItem: { ar: 'متأكد تبي تحذف هذا الصنف؟', en: 'Are you sure you want to delete this item?' },
   noOrdersYet: { ar: 'لا توجد طلبات حالياً.', en: 'No orders right now.' },
+  completedOrdersTitle: { ar: 'الطلبات المكتملة', en: 'Completed orders' },
+  noCompletedOrdersYet: { ar: 'لا توجد طلبات مكتملة بعد.', en: 'No completed orders yet.' },
+  printNowPrompt: { ar: 'الطلب جاهز! هل تبي تطبع الفاتورة الآن؟', en: 'Order ready! Do you want to print the receipt now?' },
   ordersLoadError: { ar: 'تعذر تحميل الطلبات.', en: 'Could not load orders.' },
   statusNew: { ar: 'جديد', en: 'New' },
   statusPreparing: { ar: 'قيد التحضير', en: 'Preparing' },
@@ -1174,6 +1205,7 @@ function toggleDashLang() {
   loadItems();
   if (ordersUnsub) ordersUnsub();
   listenToOrders();
+  renderCompletedOrders();
   if (document.getElementById('view-inventory').classList.contains('active')) loadInventory();
   if (document.getElementById('view-sales').classList.contains('active')) {
     loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
@@ -1265,6 +1297,16 @@ function switchSubView(name) {
     loadRooms();
     loadReservations();
   }
+}
+
+// Completely separate from switchSubView above — uses its own class names
+// (.acc-sub-view / .acc-icon-subnav-btn) so the two subnavs never interfere
+// with each other's active-button state, regardless of which tab is open.
+function switchAccountSub(name) {
+  document.querySelectorAll('.acc-sub-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.acc-icon-subnav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`acc-sub-${name}`).classList.add('active');
+  document.querySelector(`.acc-icon-subnav-btn[data-accsub="${name}"]`).classList.add('active');
 }
 
 // ===================== Sound alert system: "ding-ding" x3 =====================
@@ -1975,6 +2017,8 @@ const nextStatus = { pending: 'preparing', preparing: 'ready' };
 let isFirstOrdersLoad = true;
 let ordersUnsub = null;
 let lastOrdersData = [];
+let completedOrdersData = [];
+let completedOrdersUnsub = null;
 
 function listenToOrders() {
   ordersUnsub = db.collection('shops').doc(currentShopId).collection('orders')
@@ -2075,9 +2119,14 @@ function renderOrdersColumns() {
 
 // ===================== Thermal receipt printing =====================
 function printReceipt(orderId) {
-  const order = lastOrdersData.find(o => o.id === orderId);
+  // Looks in both the live (pending/preparing) cache and the completed-orders
+  // cache, so the print button works from either list.
+  const order = lastOrdersData.find(o => o.id === orderId) || completedOrdersData.find(o => o.id === orderId);
   if (!order) return;
+  printReceiptFromOrder(order);
+}
 
+function printReceiptFromOrder(order) {
   const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
   const paymentLabel = paymentLabels[order.paymentMethod] || '-';
   const typeLine = order.orderType === 'car'
@@ -2148,8 +2197,64 @@ function printReceipt(orderId) {
   window.print();
 }
 
+// ===================== Completed orders (with reprint access) =====================
+function listenToCompletedOrders() {
+  completedOrdersUnsub = db.collection('shops').doc(currentShopId).collection('orders')
+    .where('status', '==', 'ready')
+    .orderBy('createdAt', 'desc')
+    .limit(20)
+    .onSnapshot(snap => {
+      completedOrdersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderCompletedOrders();
+    }, err => {
+      console.error(err);
+      const el = document.getElementById('completedOrdersList');
+      if (el) el.innerHTML = `<div class="state-msg">${dt('ordersLoadError')}</div>`;
+    });
+}
+
+function renderCompletedOrders() {
+  const el = document.getElementById('completedOrdersList');
+  if (!el) return;
+
+  if (completedOrdersData.length === 0) {
+    el.innerHTML = `<div class="state-msg">${dt('noCompletedOrdersYet')}</div>`;
+    return;
+  }
+
+  el.innerHTML = completedOrdersData.map(order => {
+    const itemsText = order.items.map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
+    const typeLabel = order.orderType === 'car'
+      ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
+      : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '—'}`;
+    return `
+      <div class="order-card">
+        <div class="order-card-top">
+          <strong>${typeLabel}</strong>
+          <span class="order-status status-ready">${dt('statusReady')}</span>
+        </div>
+        <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
+        <div class="order-actions">
+          <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 async function advanceOrder(orderId, newStatus) {
+  // Grab the order's data BEFORE updating — once it becomes "ready" it will
+  // disappear from the live pending/preparing columns, so this is our only
+  // chance to have it in hand for an immediate print if the user wants one.
+  const orderBeforeUpdate = lastOrdersData.find(o => o.id === orderId);
+
   await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({ status: newStatus });
+
+  if (newStatus === 'ready' && orderBeforeUpdate) {
+    if (confirm(dt('printNowPrompt'))) {
+      printReceiptFromOrder(orderBeforeUpdate);
+    }
+  }
 }
 
 // ===================== Keep screen awake while on the POS tab =====================
