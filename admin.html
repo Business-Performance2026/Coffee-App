@@ -642,6 +642,7 @@ async function loadCategoryIcons() {
         <div class="grow">
           <div class="item-desc">${(d.keywords || []).join('، ')}</div>
         </div>
+        <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editCategoryIcon("${doc.id}")'>تعديل</button>
         <button class="btn btn-danger" onclick='deleteCategoryIcon("${doc.id}")'>حذف</button>
       </div>
     `;
@@ -652,7 +653,9 @@ async function saveCategoryIcon() {
   const errorEl = document.getElementById('catIconError');
   errorEl.textContent = '';
 
+  const editingId = document.getElementById('catIconId').value;
   const keywordsRaw = document.getElementById('catIconKeywords').value.trim();
+
   if (!uploadedCatIconUrl) {
     errorEl.textContent = 'ارفع صورة الأيقونة أولاً.';
     return;
@@ -665,17 +668,39 @@ async function saveCategoryIcon() {
   const keywords = keywordsRaw.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
 
   try {
-    await db.collection('categoryIcons').add({
-      imageUrl: uploadedCatIconUrl,
-      keywords,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    if (editingId) {
+      await db.collection('categoryIcons').doc(editingId).update({
+        imageUrl: uploadedCatIconUrl,
+        keywords
+      });
+    } else {
+      await db.collection('categoryIcons').add({
+        imageUrl: uploadedCatIconUrl,
+        keywords,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
     resetCategoryIconForm();
     await loadCategoryIcons();
   } catch (err) {
     console.error(err);
     errorEl.textContent = 'حدث خطأ أثناء الحفظ.';
   }
+}
+
+async function editCategoryIcon(id) {
+  const doc = await db.collection('categoryIcons').doc(id).get();
+  if (!doc.exists) return;
+  const d = doc.data();
+
+  document.getElementById('catIconId').value = id;
+  document.getElementById('catIconKeywords').value = (d.keywords || []).join(', ');
+  uploadedCatIconUrl = d.imageUrl;
+  const preview = document.getElementById('catIconPreview');
+  preview.src = d.imageUrl;
+  preview.style.display = 'block';
+  document.getElementById('saveCatIconBtn').textContent = 'حفظ التعديلات';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function deleteCategoryIcon(id) {
@@ -686,10 +711,12 @@ async function deleteCategoryIcon(id) {
 
 function resetCategoryIconForm() {
   uploadedCatIconUrl = null;
+  document.getElementById('catIconId').value = '';
   document.getElementById('catIconKeywords').value = '';
   document.getElementById('catIconImage').value = '';
   document.getElementById('catIconPreview').style.display = 'none';
   document.getElementById('catIconError').textContent = '';
+  document.getElementById('saveCatIconBtn').textContent = 'حفظ الأيقونة';
 }
 
 async function createShop() {

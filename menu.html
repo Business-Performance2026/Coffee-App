@@ -54,12 +54,22 @@ async function loadCustomCategoryIcons() {
   }
 }
 
+// Normalizes common Arabic letter variants that people type interchangeably
+// (ة/ه, أ/إ/آ/ا, ى/ي) so keyword matching isn't broken by minor spelling
+// differences. Only used for comparison — never changes stored/displayed text.
+function normalizeArabic(str) {
+  return (str || '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي');
+}
+
 // Checks the admin-managed icon set first; falls back to the built-in emoji
 // icons (getCategoryIcon, unchanged) if nothing matches.
 function renderCategoryIconHtml(categoryName) {
-  const n = (categoryName || '').toLowerCase();
+  const n = normalizeArabic((categoryName || '').toLowerCase());
   const match = customCategoryIcons.find(rule =>
-    (rule.keywords || []).some(k => n.includes(k))
+    (rule.keywords || []).some(k => n.includes(normalizeArabic(k)))
   );
   if (match && match.imageUrl) {
     return `<img src="${match.imageUrl}" alt="">`;
