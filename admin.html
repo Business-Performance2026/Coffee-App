@@ -93,6 +93,30 @@
     <div id="qrResult" style="margin-top:16px; text-align:center;"></div>
   </div>
 
+  <!-- Category icons: global, shown on every shop's customer menu -->
+  <h3 style="margin:28px 0 12px;">أيقونات التصنيفات (لكل الكوفيات)</h3>
+  <div class="card">
+    <p style="color:var(--stone); font-size:0.85rem; margin-bottom:14px;">
+      ارفع أيقونة واكتب الكلمات اللي لو ظهرت باسم تصنيف أي كوفي (عربي أو إنجليزي)، تخلي هذي الأيقونة تظهر للعميل بدل الأيقونة الافتراضية.
+    </p>
+    <input type="hidden" id="catIconId">
+    <div class="field">
+      <label for="catIconImage">صورة الأيقونة</label>
+      <input type="file" id="catIconImage" accept="image/*">
+      <img id="catIconPreview" style="display:none; width:60px; height:60px; border-radius:12px; object-fit:cover; margin-top:8px;">
+    </div>
+    <div class="field">
+      <label for="catIconKeywords">الكلمات المطابقة (افصل بفاصلة)</label>
+      <input type="text" id="catIconKeywords" placeholder="مثال: قهوة ساخنة, hot coffee, اسبريسو">
+    </div>
+    <button class="btn" onclick="saveCategoryIcon()" id="saveCatIconBtn">حفظ الأيقونة</button>
+    <button class="btn btn-ghost" onclick="resetCategoryIconForm()" style="margin-right:8px;">إلغاء</button>
+    <div id="catIconError" class="error-msg"></div>
+  </div>
+  <div class="card" id="categoryIconsList">
+    <div class="state-msg">جاري التحميل...</div>
+  </div>
+
   <!-- Shops list -->
   <h3 style="margin:28px 0 12px;">الكوفيات المسجّلة</h3>
 
@@ -117,6 +141,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
 
 <script>
@@ -155,6 +180,7 @@ auth.onAuthStateChanged(async user => {
   isAdmin = true;
   document.getElementById('adminScreen').style.display = 'block';
   await loadShops();
+  loadCategoryIcons();
 });
 
 function adminLogin() {
@@ -552,6 +578,120 @@ async function toggleSubscription(shopId, currentlyActive) {
 }
 
 // ---- Create a brand new shop (auth account + Firestore doc) ----
+// ===================== Global category icons (shown on every shop's menu) =====================
+let uploadedCatIconUrl = null;
+
+document.getElementById('catIconImage').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const errorEl = document.getElementById('catIconError');
+  errorEl.textContent = '';
+  try {
+    let uploadBlob = file;
+    // Resize down to a small icon — keeps things fast, with a safe fallback
+    // to the original file if resizing fails for any reason.
+    try {
+      uploadBlob = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = (ev) => { img.src = ev.target.result; };
+        reader.onerror = reject;
+        img.onload = () => {
+          const size = 160;
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          canvas.getContext('2d').drawImage(img, 0, 0, size, size);
+          canvas.toBlob(b => b ? resolve(b) : reject(new Error('resize failed')), 'image/png');
+        };
+        img.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    } catch (resizeErr) {
+      console.error('Resize failed, uploading original:', resizeErr);
+    }
+
+    const path = `categoryIcons/${Date.now()}_${file.name}`;
+    const ref = storage.ref().child(path);
+    await ref.put(uploadBlob);
+    uploadedCatIconUrl = await ref.getDownloadURL();
+
+    const preview = document.getElementById('catIconPreview');
+    preview.src = uploadedCatIconUrl;
+    preview.style.display = 'block';
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = 'تعذر رفع الصورة.';
+  }
+});
+
+async function loadCategoryIcons() {
+  const el = document.getElementById('categoryIconsList');
+  const snap = await db.collection('categoryIcons').get();
+
+  if (snap.empty) {
+    el.innerHTML = '<div class="state-msg">لا توجد أيقونات مضافة بعد.</div>';
+    return;
+  }
+
+  el.innerHTML = snap.docs.map(doc => {
+    const d = doc.data();
+    return `
+      <div class="dashboard-item">
+        <img src="${d.imageUrl}" style="width:44px; height:44px; border-radius:10px; object-fit:cover;">
+        <div class="grow">
+          <div class="item-desc">${(d.keywords || []).join('، ')}</div>
+        </div>
+        <button class="btn btn-danger" onclick='deleteCategoryIcon("${doc.id}")'>حذف</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function saveCategoryIcon() {
+  const errorEl = document.getElementById('catIconError');
+  errorEl.textContent = '';
+
+  const keywordsRaw = document.getElementById('catIconKeywords').value.trim();
+  if (!uploadedCatIconUrl) {
+    errorEl.textContent = 'ارفع صورة الأيقونة أولاً.';
+    return;
+  }
+  if (!keywordsRaw) {
+    errorEl.textContent = 'اكتب كلمة مطابقة واحدة على الأقل.';
+    return;
+  }
+
+  const keywords = keywordsRaw.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+
+  try {
+    await db.collection('categoryIcons').add({
+      imageUrl: uploadedCatIconUrl,
+      keywords,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    resetCategoryIconForm();
+    await loadCategoryIcons();
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = 'حدث خطأ أثناء الحفظ.';
+  }
+}
+
+async function deleteCategoryIcon(id) {
+  if (!confirm('متأكد تبي تحذف هذي الأيقونة؟')) return;
+  await db.collection('categoryIcons').doc(id).delete();
+  await loadCategoryIcons();
+}
+
+function resetCategoryIconForm() {
+  uploadedCatIconUrl = null;
+  document.getElementById('catIconKeywords').value = '';
+  document.getElementById('catIconImage').value = '';
+  document.getElementById('catIconPreview').style.display = 'none';
+  document.getElementById('catIconError').textContent = '';
+}
+
 async function createShop() {
   const errorEl = document.getElementById('createError');
   const successEl = document.getElementById('createSuccess');

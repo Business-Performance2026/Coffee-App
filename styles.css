@@ -601,6 +601,13 @@ button, input, select {
   font-size: 1.35rem;
   opacity: 0.5;
   transition: opacity 0.15s ease, transform 0.15s ease;
+  overflow: hidden;
+}
+
+.pill-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .pill-label {

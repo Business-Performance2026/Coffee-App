@@ -40,6 +40,32 @@
 <script>
 let shopId = null;
 let shopRooms = [];
+let customCategoryIcons = [];
+let customIconsLoaded = false;
+
+async function loadCustomCategoryIcons() {
+  if (customIconsLoaded) return;
+  try {
+    const snap = await db.collection('categoryIcons').get();
+    customCategoryIcons = snap.docs.map(d => d.data());
+    customIconsLoaded = true;
+  } catch (err) {
+    console.error('Could not load custom category icons (non-blocking):', err);
+  }
+}
+
+// Checks the admin-managed icon set first; falls back to the built-in emoji
+// icons (getCategoryIcon, unchanged) if nothing matches.
+function renderCategoryIconHtml(categoryName) {
+  const n = (categoryName || '').toLowerCase();
+  const match = customCategoryIcons.find(rule =>
+    (rule.keywords || []).some(k => n.includes(k))
+  );
+  if (match && match.imageUrl) {
+    return `<img src="${match.imageUrl}" alt="">`;
+  }
+  return getCategoryIcon(categoryName);
+}
 let shopInfo = {};
 let cart = {}; // { itemId: { name, price, qty } }
 let itemMeta = {}; // { itemId: { name, price } } — used to safely rebuild controls without re-escaping strings
@@ -143,6 +169,7 @@ async function loadMenu() {
   }
 
   try {
+    await loadCustomCategoryIcons();
     const shopDoc = await db.collection('shops').doc(shopId).get();
 
     if (!shopDoc.exists) {
@@ -217,7 +244,7 @@ async function loadMenu() {
     } else if (categoryNames.length > 1) {
       html += '<div class="category-pills" id="categoryPills">';
       categoryNames.forEach((cat, i) => {
-        html += `<button class="pill ${i === 0 ? 'active' : ''}" data-cat="cat-${i}" onclick="scrollToCategory('cat-${i}', this)"><span class="pill-icon">${getCategoryIcon(cat)}</span><span class="pill-label">${cat}</span></button>`;
+        html += `<button class="pill ${i === 0 ? 'active' : ''}" data-cat="cat-${i}" onclick="scrollToCategory('cat-${i}', this)"><span class="pill-icon">${renderCategoryIconHtml(cat)}</span><span class="pill-label">${cat}</span></button>`;
       });
       html += '</div>';
     }
@@ -230,7 +257,7 @@ async function loadMenu() {
         const unavailable = item.available === false;
         const itemName = (currentLang === 'en' && item.nameEn) ? item.nameEn : item.name;
         const itemDesc = item.description || '';
-        itemMeta[item.id] = { name: item.name, nameEn: item.nameEn || '', price: item.price, image: item.image || '', description: itemDesc };
+        itemMeta[item.id] = { name: item.name, nameEn: item.nameEn || '', price: item.price, image: item.image || '', description: itemDesc, available: item.available !== false };
         if (item.suggested === true && item.available !== false) suggestedItemIds.push(item.id);
         html += `
           <div class="grid-card ${unavailable ? 'unavailable' : ''}" data-search="${(itemName + ' ' + itemDesc).toLowerCase()}">
@@ -330,7 +357,10 @@ function openItemDetail(itemId) {
       <h3 style="margin-bottom:8px;">${meta.name}</h3>
       <div class="item-price" style="margin-bottom:12px;">${Number(meta.price).toFixed(2)} ${t('currency')}</div>
       ${meta.description ? `<p style="color:var(--stone); line-height:1.6;">${meta.description}</p>` : ''}
-      <button class="btn" style="width:100%; margin-top:16px;" onclick='document.getElementById("detailOverlay").remove(); changeQty("${itemId}", 1);'>+ ${t('addToCartBtn')}</button>
+      ${meta.available
+        ? `<button class="btn" style="width:100%; margin-top:16px;" onclick='document.getElementById("detailOverlay").remove(); changeQty("${itemId}", 1);'>+ ${t('addToCartBtn')}</button>`
+        : `<div class="grid-unavailable-tag" style="position:static; margin-top:16px; padding:12px; border-radius:10px;">${t('unavailableTag')}</div>`
+      }
     </div>
   `;
   document.body.appendChild(overlay);
