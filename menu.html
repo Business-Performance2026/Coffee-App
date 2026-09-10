@@ -40,42 +40,6 @@
 <script>
 let shopId = null;
 let shopRooms = [];
-let customCategoryIcons = [];
-let customIconsLoaded = false;
-
-async function loadCustomCategoryIcons() {
-  if (customIconsLoaded) return;
-  try {
-    const snap = await db.collection('categoryIcons').get();
-    customCategoryIcons = snap.docs.map(d => d.data());
-    customIconsLoaded = true;
-  } catch (err) {
-    console.error('Could not load custom category icons (non-blocking):', err);
-  }
-}
-
-// Normalizes common Arabic letter variants that people type interchangeably
-// (ة/ه, أ/إ/آ/ا, ى/ي) so keyword matching isn't broken by minor spelling
-// differences. Only used for comparison — never changes stored/displayed text.
-function normalizeArabic(str) {
-  return (str || '')
-    .replace(/[أإآ]/g, 'ا')
-    .replace(/ة/g, 'ه')
-    .replace(/ى/g, 'ي');
-}
-
-// Checks the admin-managed icon set first; falls back to the built-in emoji
-// icons (getCategoryIcon, unchanged) if nothing matches.
-function renderCategoryIconHtml(categoryName) {
-  const n = normalizeArabic((categoryName || '').toLowerCase());
-  const match = customCategoryIcons.find(rule =>
-    (rule.keywords || []).some(k => n.includes(normalizeArabic(k)))
-  );
-  if (match && match.imageUrl) {
-    return `<img src="${match.imageUrl}" alt="">`;
-  }
-  return getCategoryIcon(categoryName);
-}
 let shopInfo = {};
 let cart = {}; // { itemId: { name, price, qty } }
 let itemMeta = {}; // { itemId: { name, price } } — used to safely rebuild controls without re-escaping strings
@@ -179,7 +143,6 @@ async function loadMenu() {
   }
 
   try {
-    await loadCustomCategoryIcons();
     const shopDoc = await db.collection('shops').doc(shopId).get();
 
     if (!shopDoc.exists) {
@@ -254,7 +217,7 @@ async function loadMenu() {
     } else if (categoryNames.length > 1) {
       html += '<div class="category-pills" id="categoryPills">';
       categoryNames.forEach((cat, i) => {
-        html += `<button class="pill ${i === 0 ? 'active' : ''}" data-cat="cat-${i}" onclick="scrollToCategory('cat-${i}', this)"><span class="pill-icon">${renderCategoryIconHtml(cat)}</span><span class="pill-label">${cat}</span></button>`;
+        html += `<button class="pill ${i === 0 ? 'active' : ''}" data-cat="cat-${i}" onclick="scrollToCategory('cat-${i}', this)">${cat}</button>`;
       });
       html += '</div>';
     }
@@ -305,27 +268,6 @@ async function loadMenu() {
 
 function escapeStr(str) {
   return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-}
-
-// Picks a fitting icon for a category based on common keywords (Arabic or
-// English) in its name, with a generic fallback for anything unmatched.
-function getCategoryIcon(categoryName) {
-  const n = (categoryName || '').toLowerCase();
-  const rules = [
-    { keys: ['قهوة', 'كوفي', 'اسبريسو', 'إسبريسو', 'coffee', 'espresso', 'latte', 'كابتشينو'], icon: '☕' },
-    { keys: ['شاي', 'tea'], icon: '🍵' },
-    { keys: ['بارد', 'عصير', 'cold', 'juice', 'موهيتو', 'smoothie', 'سموذي'], icon: '🥤' },
-    { keys: ['ايس كريم', 'آيس كريم', 'ice cream', 'جيلاتو', 'gelato', 'دوندورما'], icon: '🍦' },
-    { keys: ['حلا', 'حلويات', 'كيك', 'dessert', 'cake', 'sweet', 'حلى'], icon: '🍰' },
-    { keys: ['مخبوزات', 'خبز', 'كرواسون', 'bakery', 'bread', 'croissant', 'pastry', 'معجنات'], icon: '🥐' },
-    { keys: ['ساندويش', 'sandwich', 'برجر', 'burger', 'طوست'], icon: '🥪' },
-    { keys: ['فطور', 'إفطار', 'breakfast'], icon: '🍳' },
-    { keys: ['سناك', 'snack', 'مقبلات', 'appetizer', 'بطاطس'], icon: '🍟' }
-  ];
-  for (const rule of rules) {
-    if (rule.keys.some(k => n.includes(k))) return rule.icon;
-  }
-  return '🍽️';
 }
 
 function toggleHours() {
