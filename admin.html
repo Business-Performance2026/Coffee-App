@@ -472,16 +472,44 @@ function openEditModal(shopId) {
 
       <div style="border-top:1px solid var(--line); margin-top:16px; padding-top:16px; text-align:center;">
         <div style="font-size:0.85rem; color:var(--stone); margin-bottom:10px;">باركود قائمته</div>
-        <canvas id="adminEditQrCanvas"></canvas>
+        <div style="display:inline-flex; align-items:flex-end; gap:8px;">
+          <canvas id="adminEditQrCanvas"></canvas>
+          <button onclick="copyAdminMenuLink()" title="نسخ الرابط" style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; width:38px; height:38px; font-size:1.1rem; cursor:pointer; flex-shrink:0;">📋</button>
+        </div>
+        <div id="adminMenuUrlText" style="font-size:0.78rem; color:var(--stone); word-break:break-all; margin-top:10px;"></div>
+        <div id="adminCopyLinkStatus" style="font-size:0.82rem; color:#3D6B4F; margin-top:6px;"></div>
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
 
   const menuUrl = info.menuUrl || (window.location.href.replace('admin.html', '') + 'menu.html?shop=' + shopId);
+  document.getElementById('adminMenuUrlText').textContent = menuUrl;
   if (typeof QRCode !== 'undefined') {
     QRCode.toCanvas(document.getElementById('adminEditQrCanvas'), menuUrl, { width: 160 }).catch(err => console.error(err));
   }
+}
+
+async function copyAdminMenuLink() {
+  const url = document.getElementById('adminMenuUrlText').textContent;
+  const statusEl = document.getElementById('adminCopyLinkStatus');
+  try {
+    await navigator.clipboard.writeText(url);
+    statusEl.textContent = 'تم نسخ الرابط ✓';
+  } catch (err) {
+    const tempInput = document.createElement('textarea');
+    tempInput.value = url;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    try {
+      document.execCommand('copy');
+      statusEl.textContent = 'تم نسخ الرابط ✓';
+    } catch (e) {
+      statusEl.textContent = 'تعذر النسخ، انسخه يدوياً من الأعلى';
+    }
+    document.body.removeChild(tempInput);
+  }
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
 }
 
 async function resetOwnerPassword(email) {
