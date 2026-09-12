@@ -60,11 +60,13 @@
     <div id="sub-qr" class="sub-view">
       <div class="card" style="text-align:center;">
         <h3 style="margin-bottom:12px;" data-i18n="qrTitle">باركود قائمتك</h3>
-        <canvas id="myQrCanvas"></canvas>
+        <div style="display:inline-flex; align-items:flex-end; gap:8px;">
+          <canvas id="myQrCanvas"></canvas>
+          <button onclick="copyMenuLink()" title="نسخ الرابط" style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; width:38px; height:38px; font-size:1.1rem; cursor:pointer; flex-shrink:0;">📋</button>
+        </div>
         <div id="myMenuUrl" style="display:none;"></div>
-        <button class="btn btn-ghost" onclick="downloadMyQr()" data-i18n="downloadQr">تحميل الباركود</button>
-        <button class="btn" style="margin-top:8px; width:100%;" onclick="copyMenuLink()" data-i18n="copyLinkBtn">📋 نسخ الرابط</button>
         <div id="copyLinkStatus" style="font-size:0.85rem; color:#3D6B4F; margin-top:8px;"></div>
+        <button class="btn btn-ghost" style="margin-top:12px;" onclick="downloadMyQr()" data-i18n="downloadQr">تحميل الباركود</button>
       </div>
     </div>
 
@@ -1050,6 +1052,8 @@ const dashT = {
   payCard: { ar: '💳 فيزا / بطاقة', en: '💳 Visa / Card' },
   paymentMethodLbl: { ar: 'طريقة الدفع', en: 'Payment method' },
   printReceiptBtn: { ar: 'طباعة الفاتورة', en: 'Print receipt' },
+  tapToOpenPrintPage: { ar: 'اضغط الزر تحت عشان تفتح صفحة الطباعة (بتفتح بمتصفح Safari)', en: 'Tap the button below to open the print page (it opens in Safari)' },
+  openPrintPageBtn: { ar: 'فتح صفحة الطباعة', en: 'Open print page' },
   receiptTitle: { ar: 'فاتورة', en: 'Receipt' },
   thankYouMsg: { ar: 'شكراً لزيارتكم ☕', en: 'Thank you for visiting ☕' },
   paymentOptionsLbl: { ar: 'طرق الدفع المتاحة للعميل', en: 'Payment methods available to customers' },
@@ -2275,12 +2279,23 @@ function printReceiptFromOrder(order) {
       thankYou: dt('thankYouMsg')
     };
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(receiptData))));
-    const link = document.createElement('a');
-    link.href = `receipt-print.html?data=${encoded}`;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    // iOS Safari silently blocks a script-triggered click on a hidden link
+    // when the app is running in standalone (installed) mode — there's no
+    // error, it just does nothing. A real, visible link that the person taps
+    // themselves is treated as a genuine user action and always works.
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'iosPrintOverlay';
+    overlay.innerHTML = `
+      <div class="modal-sheet" style="text-align:center;">
+        <button class="close-x" onclick="document.getElementById('iosPrintOverlay').remove()">×</button>
+        <h3 style="margin:8px 0 16px;">${dt('printReceiptBtn')}</h3>
+        <p style="color:var(--stone); font-size:0.9rem; margin-bottom:18px;">${dt('tapToOpenPrintPage')}</p>
+        <a href="receipt-print.html?data=${encoded}" target="_blank" class="btn" style="display:block; text-decoration:none;">🖨️ ${dt('openPrintPageBtn')}</a>
+      </div>
+    `;
+    document.body.appendChild(overlay);
     return;
   }
 
