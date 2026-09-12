@@ -561,6 +561,7 @@ auth.onAuthStateChanged(async user => {
     document.getElementById('app').style.display = 'block';
     document.getElementById('bottomNav').style.display = 'flex';
     document.getElementById('employeesCard').style.display = 'block';
+    history.replaceState({ dashTab: 'dashboard' }, '', '#dashboard');
     applyDashLang();
     currentUserEmail = user.email;
     document.getElementById('loggedInAsText').textContent = `${dt('loggedInAs')}: ${currentUserEmail}`;
@@ -600,6 +601,7 @@ auth.onAuthStateChanged(async user => {
     document.getElementById('app').style.display = 'block';
     document.getElementById('bottomNav').style.display = 'flex';
     document.getElementById('employeesCard').style.display = 'none';
+    history.replaceState({ dashTab: 'dashboard' }, '', '#dashboard');
     applyDashLang();
     currentUserEmail = empDoc.data().name || '';
     document.getElementById('loggedInAsText').textContent = `${dt('loggedInAs')}: ${currentUserEmail}`;
@@ -1258,7 +1260,14 @@ function resizeImage(file, maxDimension = 900, quality = 0.82) {
 }
 
 // ===================== Tab switching =====================
-function switchTab(name) {
+// Makes the phone/browser back button move between dashboard tabs instead
+// of exiting the app, using the history entries switchTab() now creates.
+window.addEventListener('popstate', (event) => {
+  const tab = (event.state && event.state.dashTab) || 'dashboard';
+  switchTab(tab, true);
+});
+
+function switchTab(name, fromPopState) {
   // Defense in depth: even if a hidden nav button were somehow triggered,
   // an employee can never switch into a tab they weren't granted.
   if (isEmployee && employeePermissions && employeePermissions[name] !== true) {
@@ -1271,6 +1280,13 @@ function switchTab(name) {
   document.querySelector(`.nav-item[data-tab="${name}"]`).classList.add('active');
 
   activeTab = name;
+
+  // Record this tab switch as a real browser history step (unless we got
+  // here FROM the back/forward button itself) so pressing "back" moves
+  // between tabs instead of exiting the app entirely.
+  if (!fromPopState) {
+    history.pushState({ dashTab: name }, '', '#' + name);
+  }
 
   if (name === 'pos') {
     requestWakeLock();
