@@ -15,7 +15,9 @@
 </head>
 <body>
 
-<div class="wrap" style="max-width:400px; padding-top:60px;">
+<div id="loadingMsg" class="state-msg">جاري التحقق من تسجيل الدخول...</div>
+
+<div class="wrap" id="loginForm" style="max-width:400px; padding-top:60px; display:none;">
   <div class="shop-name display" style="text-align:center; margin-bottom:30px;">دخول الموظفين</div>
 
   <div class="card">
@@ -56,9 +58,16 @@ window.addEventListener('pageshow', function (event) {
 });
 
 // If already logged in, go straight to dashboard (dashboard.html detects
-// automatically whether this is an owner or a staff account).
+// automatically whether this is an owner or a staff account). Otherwise,
+// NOW reveal the login form — kept hidden until this point so a quick
+// bounce-through after "back" navigation never flashes the form.
 auth.onAuthStateChanged(user => {
-  if (user) window.location.href = 'dashboard.html';
+  if (user) {
+    window.location.href = 'dashboard.html';
+    return;
+  }
+  document.getElementById('loadingMsg').style.display = 'none';
+  document.getElementById('loginForm').style.display = 'block';
 });
 
 function toggleStaffPwVisibility() {
