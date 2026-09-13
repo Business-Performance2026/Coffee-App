@@ -319,7 +319,12 @@ button, input, select {
   flex-shrink: 0;
 }
 
-.switch-toggle input { opacity: 0; width: 0; height: 0; }
+.switch-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
 
 .switch-slider {
   position: absolute;
@@ -346,11 +351,7 @@ button, input, select {
 .switch-toggle input:checked + .switch-slider { background-color: #3D9A5C; }
 
 .switch-toggle input:checked + .switch-slider::before {
-  transform: translateX(-19px);
-}
-
-html[dir="ltr"] .switch-toggle input:checked + .switch-slider::before {
-  transform: translateX(19px);
+  left: 22px;
 }
 
 .item-card-v2-actions {
