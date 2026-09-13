@@ -59,16 +59,14 @@
     <!-- Sub-view: QR -->
     <div id="sub-qr" class="sub-view">
       <div class="card" style="text-align:center;">
-        <h3 style="margin-bottom:16px;" data-i18n="qrTitle">باركود قائمتك</h3>
-        <div class="qr-frame">
+        <h3 style="margin-bottom:12px;" data-i18n="qrTitle">باركود قائمتك</h3>
+        <div style="display:inline-flex; align-items:flex-end; gap:8px;">
           <canvas id="myQrCanvas"></canvas>
+          <button onclick="copyMenuLink()" title="نسخ الرابط" style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; width:38px; height:38px; font-size:1.1rem; cursor:pointer; flex-shrink:0;">📋</button>
         </div>
         <div id="myMenuUrl" style="display:none;"></div>
-        <div id="copyLinkStatus" style="font-size:0.85rem; color:#3D6B4F; margin-top:10px;"></div>
-        <div class="qr-actions-row">
-          <button class="btn btn-ghost" onclick="copyMenuLink()" data-i18n="copyLinkBtn">📋 نسخ الرابط</button>
-          <button class="btn btn-ghost" onclick="downloadMyQr()" data-i18n="downloadQr">⬇️ تحميل الباركود</button>
-        </div>
+        <div id="copyLinkStatus" style="font-size:0.85rem; color:#3D6B4F; margin-top:8px;"></div>
+        <button class="btn btn-ghost" style="margin-top:12px;" onclick="downloadMyQr()" data-i18n="downloadQr">تحميل الباركود</button>
       </div>
     </div>
 
@@ -964,7 +962,7 @@ const dashT = {
   subAdd: { ar: 'إضافة صنف', en: 'Add Item' },
   subList: { ar: 'قائمة الأصناف', en: 'Items' },
   qrTitle: { ar: 'باركود قائمتك', en: 'Your menu QR code' },
-  downloadQr: { ar: '⬇️ تحميل الباركود', en: '⬇️ Download QR code' },
+  downloadQr: { ar: 'تحميل الباركود', en: 'Download QR code' },
   itemNameAr: { ar: 'اسم الصنف (عربي)', en: 'Item name (Arabic)' },
   itemNameEnLbl: { ar: 'اسم الصنف (إنجليزي)', en: 'Item name (English)' },
   itemCatAr: { ar: 'التصنيف (عربي)', en: 'Category (Arabic)' },
@@ -1078,7 +1076,6 @@ const dashT = {
   customerNameOptional: { ar: 'اسم العميل (اختياري)', en: 'Customer name (optional)' },
   addFirstItemsHint: { ar: 'أضف أصناف بالقائمة أولاً من تبويب "لوحة التحكم".', en: 'Add items to your menu first from the Dashboard tab.' },
   lowStockWarning: { ar: '⚠️ كمية منخفضة', en: '⚠️ Low stock' },
-  inStockBadge: { ar: 'متوفر في المخزون', en: 'In stock' },
   unlimitedPlaceholder: { ar: 'غير محدود', en: 'Unlimited' },
   noSalesPeriod: { ar: 'لا توجد مبيعات بهذي الفترة.', en: 'No sales in this period.' },
   salesUnit: { ar: 'مبيعات', en: 'sold' },
@@ -2042,40 +2039,16 @@ async function loadItems() {
     const isHidden = item.hidden === true;
     const displayName = (dashLang === 'en' && item.nameEn) ? item.nameEn : item.name;
     const displayCategory = (dashLang === 'en' && item.categoryEn) ? item.categoryEn : item.category;
-    const isLowStock = typeof item.stock === 'number' && item.stock <= 3;
-
-    let badgeHtml;
-    if (isHidden) {
-      badgeHtml = `<span class="item-card-v2-badge badge-neutral">🚫 ${dt('hiddenTag')}</span>`;
-    } else if (item.available === false) {
-      badgeHtml = `<span class="item-card-v2-badge badge-neutral">${dt('unavailableTag')}</span>`;
-    } else if (isLowStock) {
-      badgeHtml = `<span class="item-card-v2-badge badge-warning">${dt('lowStockWarning')}</span>`;
-    } else {
-      badgeHtml = `<span class="item-card-v2-badge badge-positive">📦 ${dt('inStockBadge')}</span>`;
-    }
-
     html += `
-      <div class="item-card-v2 ${isHidden ? 'item-hidden' : ''}">
-        <div class="item-card-v2-top">
-          ${item.image ? `<img src="${item.image}" class="item-card-v2-img">` : '<div class="item-card-v2-img item-photo"></div>'}
-          <div class="item-card-v2-info">
-            <div class="item-card-v2-name">${displayName}</div>
-            <div class="item-card-v2-cat">${displayCategory || ''}</div>
-            ${badgeHtml}
-          </div>
-          <div class="item-card-v2-right">
-            <div class="item-card-v2-price">${Number(item.price).toFixed(2)} ${dt('currency')}</div>
-            <label class="switch-toggle">
-              <input type="checkbox" ${!isHidden ? 'checked' : ''} onchange='toggleHidden("${doc.id}", ${isHidden})'>
-              <span class="switch-slider"></span>
-            </label>
-          </div>
+      <div class="dashboard-item ${isHidden ? 'item-hidden' : ''}">
+        ${item.image ? `<img src="${item.image}">` : '<div class="item-photo"></div>'}
+        <div class="grow">
+          <div class="item-name">${displayName} — ${Number(item.price).toFixed(2)} ${dt('currency')}</div>
+          <div class="item-desc">${displayCategory}${item.available === false ? ' · ' + dt('unavailableTag') : ''}${isHidden ? ' · ' + dt('hiddenTag') : ''}</div>
         </div>
-        <div class="item-card-v2-actions">
-          <button class="item-card-v2-btn btn-edit" onclick='editItem("${doc.id}")'>✏️ ${dt('editBtn')}</button>
-          <button class="item-card-v2-btn btn-delete" onclick='deleteItem("${doc.id}")'>🗑️ ${dt('deleteBtn')}</button>
-        </div>
+        <button class="btn btn-ghost" style="padding:6px 10px; font-size:0.8rem;" onclick='toggleHidden("${doc.id}", ${isHidden})'>${isHidden ? dt('showBtn') : dt('hideBtn')}</button>
+        <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>${dt('editBtn')}</button>
+        <button class="btn btn-danger" onclick='deleteItem("${doc.id}")'>${dt('deleteBtn')}</button>
       </div>
     `;
   });
