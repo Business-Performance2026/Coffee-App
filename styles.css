@@ -949,9 +949,10 @@ button, input, select {
   left: 0;
   right: 0;
   display: flex;
+  gap: 6px;
   background: white;
   border-top: 1px solid var(--line);
-  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+  padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
   z-index: 20;
 }
 
@@ -960,37 +961,37 @@ button, input, select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 6px 2px;
+  gap: 4px;
+  padding: 10px 4px;
   background: none;
   border: none;
+  border-radius: 14px;
   cursor: pointer;
-  color: var(--stone);
+  color: var(--ink);
   font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .nav-item .nav-icon {
-  font-size: 1.15rem;
-  width: 36px;
-  height: 36px;
+  font-size: 1.2rem;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  transition: transform 0.15s ease;
 }
 
-.nav-item .nav-label { font-size: 0.68rem; font-weight: 500; }
+.nav-item .nav-label { font-size: 0.7rem; font-weight: 500; }
 
-.nav-item.active { color: var(--ink); font-weight: 600; }
-.nav-item.active .nav-icon { transform: scale(1.08); }
+/* Active tab: one solid brown pill wrapping both the icon and the label,
+   matching the reference design exactly — every other tab stays a plain
+   uniform outline/icon color, no per-tab color coding anymore. */
+.nav-item.active {
+  background: var(--accent);
+  color: white;
+}
 
-/* Distinct color per tab — gives the bottom nav life instead of one flat tone */
-.nav-item[data-tab="dashboard"] .nav-icon { background: #F3DFC7; }
-.nav-item[data-tab="pos"] .nav-icon { background: #CFE8E1; }
-.nav-item[data-tab="inventory"] .nav-icon { background: #F6E2B8; }
-.nav-item[data-tab="sales"] .nav-icon { background: #D6E0F0; }
-.nav-item[data-tab="account"] .nav-icon { background: #EAD3DC; }
+.nav-item.active .nav-label { font-weight: 700; }
 
 .tab-view { display: none; }
 .tab-view.active { display: block; }
