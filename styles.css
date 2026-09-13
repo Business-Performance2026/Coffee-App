@@ -242,6 +242,139 @@ button, input, select {
 
 .dashboard-item .grow { flex: 1; min-width: 0; }
 
+/* ---- Redesigned item card (قائمة الأصناف) — new classes, doesn't touch
+   .dashboard-item which is still used by rooms/reservations/employees lists ---- */
+.item-card-v2 {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(36,27,21,0.05);
+}
+
+.item-card-v2.item-hidden { opacity: 0.55; }
+
+.item-card-v2-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.item-card-v2-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--paper-dim);
+  flex-shrink: 0;
+}
+
+.item-card-v2-info { flex: 1; min-width: 0; }
+
+.item-card-v2-name {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 2px;
+}
+
+.item-card-v2-cat {
+  color: var(--stone);
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+}
+
+.item-card-v2-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.badge-positive { background: #DCEEE0; color: #3D7A47; }
+.badge-warning { background: #FBEAD1; color: #A6650D; }
+.badge-neutral { background: #F1E9E0; color: var(--stone); }
+
+.item-card-v2-right {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.item-card-v2-price {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+/* Toggle switch */
+.switch-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 25px;
+  flex-shrink: 0;
+}
+
+.switch-toggle input { opacity: 0; width: 0; height: 0; }
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #D8CFC3;
+  border-radius: 999px;
+  transition: 0.2s;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 19px;
+  height: 19px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.switch-toggle input:checked + .switch-slider { background-color: #3D9A5C; }
+
+.switch-toggle input:checked + .switch-slider::before {
+  transform: translateX(-19px);
+}
+
+html[dir="ltr"] .switch-toggle input:checked + .switch-slider::before {
+  transform: translateX(19px);
+}
+
+.item-card-v2-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.item-card-v2-btn {
+  flex: 1;
+  padding: 9px;
+  border-radius: 10px;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.item-card-v2-btn.btn-edit { background: #F1E9E0; color: #8A5A28; }
+.item-card-v2-btn.btn-delete { background: #FBEAE5; color: #B3441E; }
+
 .error-msg {
   color: #B3441E;
   font-size: 0.9rem;

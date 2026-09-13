@@ -1001,6 +1001,7 @@ const dashT = {
   showRatingLbl: { ar: 'إظهار متوسط تقييمي للعملاء بالقائمة', en: 'Show my average rating to customers on the menu' },
   saveChangesBtn: { ar: 'حفظ التغييرات', en: 'Save changes' },
   logoutBtn: { ar: 'تسجيل خروج', en: 'Log out' },
+  pressBackAgainToExit: { ar: 'اضغط رجوع مرة ثانية للخروج', en: 'Press back again to exit' },
   loggedInAs: { ar: 'داخل بحساب', en: 'Logged in as' },
   employeesTitle: { ar: 'الموظفين', en: 'Staff' },
   empNameLbl: { ar: 'اسم الموظف', en: "Employee's name" },
@@ -1075,6 +1076,7 @@ const dashT = {
   customerNameOptional: { ar: 'اسم العميل (اختياري)', en: 'Customer name (optional)' },
   addFirstItemsHint: { ar: 'أضف أصناف بالقائمة أولاً من تبويب "لوحة التحكم".', en: 'Add items to your menu first from the Dashboard tab.' },
   lowStockWarning: { ar: '⚠️ كمية منخفضة', en: '⚠️ Low stock' },
+  inStockBadge: { ar: 'متوفر في المخزون', en: 'In stock' },
   unlimitedPlaceholder: { ar: 'غير محدود', en: 'Unlimited' },
   noSalesPeriod: { ar: 'لا توجد مبيعات بهذي الفترة.', en: 'No sales in this period.' },
   salesUnit: { ar: 'مبيعات', en: 'sold' },
@@ -1261,11 +1263,47 @@ function resizeImage(file, maxDimension = 900, quality = 0.82) {
 
 // ===================== Tab switching =====================
 // Makes the phone/browser back button move between dashboard tabs instead
-// of exiting the app, using the history entries switchTab() now creates.
+// of exiting the app. On the main "لوحة التحكم" tab specifically, pressing
+// back once shows a warning instead of leaving; pressing it again within
+// 2 seconds actually logs out — the familiar "press back again to exit"
+// pattern from mobile apps.
+let lastBackPressTime = 0;
+
 window.addEventListener('popstate', (event) => {
-  const tab = (event.state && event.state.dashTab) || 'dashboard';
-  switchTab(tab, true);
+  const tab = event.state && event.state.dashTab;
+
+  if (tab) {
+    switchTab(tab, true);
+    return;
+  }
+
+  // No tracked tab in this history entry — the person has gone back past
+  // our main tab, i.e. they're trying to exit.
+  const now = Date.now();
+  if (now - lastBackPressTime < 2000) {
+    logout();
+    return;
+  }
+  lastBackPressTime = now;
+
+  // Trap the back button at this same depth (replaceState, not pushState,
+  // so the stack doesn't grow) and warn the person to press back again.
+  history.replaceState({ dashTab: 'dashboard' }, '', '#dashboard');
+  switchTab('dashboard', true);
+  showExitToast();
 });
+
+function showExitToast() {
+  const existing = document.getElementById('exitToast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'exitToast';
+  toast.textContent = dt('pressBackAgainToExit');
+  toast.style.cssText = 'position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(36,27,21,0.9); color:white; padding:10px 20px; border-radius:999px; font-size:0.85rem; z-index:999; white-space:nowrap;';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+}
 
 function switchTab(name, fromPopState) {
   // Defense in depth: even if a hidden nav button were somehow triggered,
@@ -2002,16 +2040,40 @@ async function loadItems() {
     const isHidden = item.hidden === true;
     const displayName = (dashLang === 'en' && item.nameEn) ? item.nameEn : item.name;
     const displayCategory = (dashLang === 'en' && item.categoryEn) ? item.categoryEn : item.category;
+    const isLowStock = typeof item.stock === 'number' && item.stock <= 3;
+
+    let badgeHtml;
+    if (isHidden) {
+      badgeHtml = `<span class="item-card-v2-badge badge-neutral">🚫 ${dt('hiddenTag')}</span>`;
+    } else if (item.available === false) {
+      badgeHtml = `<span class="item-card-v2-badge badge-neutral">${dt('unavailableTag')}</span>`;
+    } else if (isLowStock) {
+      badgeHtml = `<span class="item-card-v2-badge badge-warning">${dt('lowStockWarning')}</span>`;
+    } else {
+      badgeHtml = `<span class="item-card-v2-badge badge-positive">📦 ${dt('inStockBadge')}</span>`;
+    }
+
     html += `
-      <div class="dashboard-item ${isHidden ? 'item-hidden' : ''}">
-        ${item.image ? `<img src="${item.image}">` : '<div class="item-photo"></div>'}
-        <div class="grow">
-          <div class="item-name">${displayName} — ${Number(item.price).toFixed(2)} ${dt('currency')}</div>
-          <div class="item-desc">${displayCategory}${item.available === false ? ' · ' + dt('unavailableTag') : ''}${isHidden ? ' · ' + dt('hiddenTag') : ''}</div>
+      <div class="item-card-v2 ${isHidden ? 'item-hidden' : ''}">
+        <div class="item-card-v2-top">
+          ${item.image ? `<img src="${item.image}" class="item-card-v2-img">` : '<div class="item-card-v2-img item-photo"></div>'}
+          <div class="item-card-v2-info">
+            <div class="item-card-v2-name">${displayName}</div>
+            <div class="item-card-v2-cat">${displayCategory || ''}</div>
+            ${badgeHtml}
+          </div>
+          <div class="item-card-v2-right">
+            <div class="item-card-v2-price">${Number(item.price).toFixed(2)} ${dt('currency')}</div>
+            <label class="switch-toggle">
+              <input type="checkbox" ${!isHidden ? 'checked' : ''} onchange='toggleHidden("${doc.id}", ${isHidden})'>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
         </div>
-        <button class="btn btn-ghost" style="padding:6px 10px; font-size:0.8rem;" onclick='toggleHidden("${doc.id}", ${isHidden})'>${isHidden ? dt('showBtn') : dt('hideBtn')}</button>
-        <button class="btn btn-ghost" style="padding:6px 12px; font-size:0.85rem;" onclick='editItem("${doc.id}")'>${dt('editBtn')}</button>
-        <button class="btn btn-danger" onclick='deleteItem("${doc.id}")'>${dt('deleteBtn')}</button>
+        <div class="item-card-v2-actions">
+          <button class="item-card-v2-btn btn-edit" onclick='editItem("${doc.id}")'>✏️ ${dt('editBtn')}</button>
+          <button class="item-card-v2-btn btn-delete" onclick='deleteItem("${doc.id}")'>🗑️ ${dt('deleteBtn')}</button>
+        </div>
       </div>
     `;
   });
