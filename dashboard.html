@@ -1040,7 +1040,9 @@ const dashT = {
   noOrdersYet: { ar: 'لا توجد طلبات حالياً.', en: 'No orders right now.' },
   completedOrdersTitle: { ar: 'الطلبات المكتملة', en: 'Completed orders' },
   noCompletedOrdersYet: { ar: 'لا توجد طلبات مكتملة بعد.', en: 'No completed orders yet.' },
-  printNowPrompt: { ar: 'الطلب جاهز! هل تبي تطبع الفاتورة الآن؟', en: 'Order ready! Do you want to print the receipt now?' },
+  printNowPrompt: { ar: 'هل تريد طباعة الفاتورة؟؟', en: 'Do you want to print the receipt?' },
+  printYesBtn: { ar: 'طباعة', en: 'Print' },
+  printCancelBtn: { ar: 'إلغاء', en: 'Cancel' },
   ordersLoadError: { ar: 'تعذر تحميل الطلبات.', en: 'Could not load orders.' },
   statusNew: { ar: 'جديد', en: 'New' },
   statusPreparing: { ar: 'قيد التحضير', en: 'Preparing' },
@@ -2437,10 +2439,35 @@ async function advanceOrder(orderId, newStatus) {
   await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({ status: newStatus });
 
   if (newStatus === 'ready' && orderBeforeUpdate) {
-    if (confirm(dt('printNowPrompt'))) {
-      printReceiptFromOrder(orderBeforeUpdate);
-    }
+    showPrintConfirmModal(orderBeforeUpdate);
   }
+}
+
+// A nicely styled replacement for the plain browser confirm() dialog,
+// asking whether to print the receipt right after an order is marked ready.
+function showPrintConfirmModal(order) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'printConfirmOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.2rem; margin-bottom:10px;">🖨️</div>
+      <h3 style="margin-bottom:20px;">${dt('printNowPrompt')}</h3>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="printConfirmYesBtn" style="flex:1;">${dt('printYesBtn')}</button>
+        <button class="btn btn-ghost" id="printConfirmNoBtn" style="flex:1;">${dt('printCancelBtn')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('printConfirmYesBtn').addEventListener('click', () => {
+    overlay.remove();
+    printReceiptFromOrder(order);
+  });
+  document.getElementById('printConfirmNoBtn').addEventListener('click', () => {
+    overlay.remove();
+  });
 }
 
 // ===================== Keep screen awake while on the POS tab =====================
