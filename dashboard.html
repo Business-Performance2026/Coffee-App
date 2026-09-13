@@ -1442,7 +1442,7 @@ async function loadShopInfo() {
       uploadedCoverUrl = info.coverImage;
     }
 
-    const menuUrl = info.menuUrl || (window.location.href.replace('dashboard.html', '') + 'menu.html?shop=' + currentShopId);
+    const menuUrl = window.location.href.replace('dashboard.html', '') + 'menu.html?shop=' + currentShopId;
     document.getElementById('myMenuUrl').textContent = menuUrl;
     try {
       if (typeof QRCode === 'undefined') throw new Error('مكتبة QR ما تحمّلت من الإنترنت');

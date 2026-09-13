@@ -483,7 +483,7 @@ function openEditModal(shopId) {
   `;
   document.body.appendChild(overlay);
 
-  const menuUrl = info.menuUrl || (window.location.href.replace('admin.html', '') + 'menu.html?shop=' + shopId);
+  const menuUrl = window.location.href.replace('admin.html', '') + 'menu.html?shop=' + shopId;
   document.getElementById('adminMenuUrlText').textContent = menuUrl;
   if (typeof QRCode !== 'undefined') {
     QRCode.toCanvas(document.getElementById('adminEditQrCanvas'), menuUrl, { width: 160 }).catch(err => console.error(err));
