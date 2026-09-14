@@ -395,15 +395,20 @@ async function addPayment(shopId) {
   }
   errorEl.textContent = '';
 
-  await db.collection('shops').doc(shopId).collection('payments').add({
-    amount,
-    note: note || null,
-    recordedAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
+  try {
+    await db.collection('shops').doc(shopId).collection('payments').add({
+      amount,
+      note: note || null,
+      recordedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
 
-  document.getElementById('paymentAmount').value = '';
-  document.getElementById('paymentNote').value = '';
-  await loadPayments(shopId);
+    document.getElementById('paymentAmount').value = '';
+    document.getElementById('paymentNote').value = '';
+    await loadPayments(shopId);
+  } catch (err) {
+    console.error('addPayment failed:', err);
+    errorEl.textContent = 'تعذر إضافة الدفعة: ' + err.message;
+  }
 }
 
 async function loadPayments(shopId) {
