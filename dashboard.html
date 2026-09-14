@@ -2566,6 +2566,13 @@ async function submitPosOrder() {
       status: 'pending',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+
+    // Best-effort activity tracking for the admin panel — never allowed to
+    // interfere with the order itself if it fails for any reason.
+    db.collection('shops').doc(currentShopId).update({
+      'info.lastOrderAt': firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(err => console.error('lastOrderAt update failed (non-blocking):', err));
+
     document.getElementById('posOverlay').remove();
   } catch (err) {
     console.error(err);

@@ -48,7 +48,14 @@ service cloud.firestore {
 
       // Write allowed if: you own this shop, you're a registered admin, OR
       // you're an employee this owner granted the "account" permission to.
-      allow write: if canManage(shopId, 'account');
+      // Exception: anyone (including a customer with no login) may update
+      // ONLY the "info.lastOrderAt" field, and only to a timestamp — used
+      // to track whether a shop is actively receiving orders, for the
+      // admin panel. No other field can be touched through this exception.
+      allow write: if canManage(shopId, 'account') || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['info.lastOrderAt']) &&
+        request.resource.data.info.lastOrderAt is timestamp
+      );
 
       match /menu/{itemId} {
         allow read: if true;

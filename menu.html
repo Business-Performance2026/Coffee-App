@@ -670,6 +670,13 @@ async function submitOrder() {
     // Reset cart
     cart = {};
     updateCartBar();
+
+    // Best-effort activity tracking for the admin panel — never allowed to
+    // interfere with the order itself if it fails for any reason.
+    db.collection('shops').doc(shopId).update({
+      'info.lastOrderAt': firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(err => console.error('lastOrderAt update failed (non-blocking):', err));
+
     document.querySelectorAll('.grid-qty-container').forEach(el => {
       const itemId = el.id.replace('qtyctrl-', '');
       el.innerHTML = renderQtyControl(itemId, 0);

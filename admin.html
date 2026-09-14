@@ -277,6 +277,7 @@ function renderShopsList() {
         <div class="grow">
           <div class="item-name">${info.name || info.email || '(بدون اسم)'}</div>
           <div class="item-desc">${info.location || ''} · ${statusLabel}</div>
+          <div>${getActivityBadge(info)}</div>
           ${!active && info.suspensionReason ? `<div class="item-desc" style="color:#B3441E;">السبب: ${info.suspensionReason}</div>` : ''}
           <div class="field" style="margin:8px 0 0;">
             <label style="font-size:0.75rem;">تاريخ انتهاء الاشتراك</label>
@@ -303,6 +304,31 @@ function renderShopsList() {
     `;
   });
   listEl.innerHTML = html;
+}
+
+// Shows a colored badge for how recently a shop received a real order
+// (customer QR order or counter order) — 🟢 active / 🟡 slow / 🔴 inactive.
+// Shops that haven't received any order since this feature launched will
+// simply show "لم يُستخدم بعد" until their next order comes in.
+function getActivityBadge(info) {
+  if (!info.lastOrderAt || typeof info.lastOrderAt.toDate !== 'function') {
+    return `<span style="display:inline-block; font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:999px; margin-top:6px; background:#F1E9E0; color:var(--stone);">⚪ لم يُستخدم بعد</span>`;
+  }
+
+  const last = info.lastOrderAt.toDate();
+  const diffDays = Math.max(0, Math.floor((Date.now() - last.getTime()) / (1000 * 60 * 60 * 24)));
+
+  let dot, colorStyle;
+  if (diffDays <= 3) {
+    dot = '🟢'; colorStyle = 'background:#DCEEE0; color:#3D7A47;';
+  } else if (diffDays <= 14) {
+    dot = '🟡'; colorStyle = 'background:#FBEAD1; color:#A6650D;';
+  } else {
+    dot = '🔴'; colorStyle = 'background:#FBEAE5; color:#B3441E;';
+  }
+
+  const label = diffDays === 0 ? 'اليوم' : `قبل ${diffDays} يوم`;
+  return `<span style="display:inline-block; font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:999px; margin-top:6px; ${colorStyle}">${dot} آخر طلب: ${label}</span>`;
 }
 
 async function updateEndDate(shopId, value) {
