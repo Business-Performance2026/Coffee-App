@@ -1063,6 +1063,9 @@ const dashT = {
   orderTypesLbl: { ar: 'أنواع الطلب المتاحة للعميل', en: 'Order types available to customers' },
   orderFromTable: { ar: '🍽️ طلب من الطاولة', en: '🍽️ Order from table' },
   orderFromCar: { ar: '🚗 طلب من السيارة', en: '🚗 Order from car' },
+  carNumberLbl: { ar: 'رقم السيارة', en: 'Car number' },
+  carColorLbl: { ar: 'لون السيارة', en: 'Car color' },
+  tableNumberLbl: { ar: 'رقم الطاولة', en: 'Table number' },
   atLeastOnePaymentError: { ar: 'لازم تفعّل طريقة دفع واحدة على الأقل.', en: 'Please enable at least one payment method.' },
   atLeastOneOrderTypeError: { ar: 'لازم تفعّل نوع طلب واحد على الأقل.', en: 'Please enable at least one order type.' },
   paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
@@ -2493,38 +2496,114 @@ document.addEventListener('visibilitychange', () => {
 // Manual "counter" order (staff-entered, no QR needed)
 let posCart = {};
 let posMenuItems = [];
+let posSelectedOrderType = 'table';
 
 async function openNewOrderModal() {
   const snap = await db.collection('shops').doc(currentShopId).collection('menu').where('available', '!=', false).get();
   posMenuItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   posCart = {};
 
+  const shopDoc = await db.collection('shops').doc(currentShopId).get();
+  const shopInfoForPos = shopDoc.exists ? (shopDoc.data().info || {}) : {};
+
+  const orderTypesEnabled = {
+    table: (shopInfoForPos.orderTypes ? shopInfoForPos.orderTypes.table !== false : true),
+    car: (shopInfoForPos.orderTypes ? shopInfoForPos.orderTypes.car !== false : true)
+  };
+  if (!orderTypesEnabled.table && !orderTypesEnabled.car) orderTypesEnabled.table = true;
+  posSelectedOrderType = orderTypesEnabled.table ? 'table' : 'car';
+
+  let posOrderTypeHtml = '<div class="order-type-toggle">';
+  if (orderTypesEnabled.table) {
+    posOrderTypeHtml += `
+      <button type="button" class="order-type-btn ${posSelectedOrderType === 'table' ? 'active' : ''}" id="posTypeTableBtn" onclick="setPosOrderType('table')">
+        <span class="order-type-icon">🍽️</span><span>${dt('orderFromTable')}</span>
+      </button>`;
+  }
+  if (orderTypesEnabled.car) {
+    posOrderTypeHtml += `
+      <button type="button" class="order-type-btn ${posSelectedOrderType === 'car' ? 'active' : ''}" id="posTypeCarBtn" onclick="setPosOrderType('car')">
+        <span class="order-type-icon">🚗</span><span>${dt('orderFromCar')}</span>
+      </button>`;
+  }
+  posOrderTypeHtml += '</div>';
+
+  const paymentMethodsEnabled = shopInfoForPos.paymentMethods || { cash: true, transfer: true, card: true };
+  const paymentOptionDefs = [
+    { key: 'cash', label: dt('payCash') },
+    { key: 'transfer', label: dt('payTransfer') },
+    { key: 'card', label: dt('payCard') }
+  ];
+  let posPaymentOptionsHtml = paymentOptionDefs
+    .filter(p => paymentMethodsEnabled[p.key] !== false)
+    .map(p => `<option value="${p.key}">${p.label}</option>`)
+    .join('');
+  if (!posPaymentOptionsHtml) posPaymentOptionsHtml = `<option value="cash">${dt('payCash')}</option>`;
+
+  // Group items by category, preserving the order categories first appear in
+  const categoriesMap = {};
+  posMenuItems.forEach(item => {
+    const catKey = (dashLang === 'en' && item.categoryEn) ? item.categoryEn : (item.category || dt('uncategorizedLabel'));
+    if (!categoriesMap[catKey]) categoriesMap[catKey] = [];
+    categoriesMap[catKey].push(item);
+  });
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'posOverlay';
-  let itemsHtml = posMenuItems.map(item => {
-    const displayName = (dashLang === 'en' && item.nameEn) ? item.nameEn : item.name;
-    const nameEnSafe = (item.nameEn || '').replace(/'/g, "\\'");
-    return `
-    <div class="item-row">
-      ${item.image ? `<img src="${item.image}" style="width:44px; height:44px; border-radius:10px; object-fit:cover; flex-shrink:0;">` : '<div style="width:44px; height:44px; border-radius:10px; background:var(--paper-dim); flex-shrink:0;"></div>'}
-      <div class="item-info">
-        <div class="item-name">${displayName}</div>
-        <div class="item-price">${Number(item.price).toFixed(2)} ${dt('currency')}</div>
+
+  let itemsHtml = Object.keys(categoriesMap).map(catName => {
+    const rowsHtml = categoriesMap[catName].map(item => {
+      const displayName = (dashLang === 'en' && item.nameEn) ? item.nameEn : item.name;
+      const nameEnSafe = (item.nameEn || '').replace(/'/g, "\\'");
+      return `
+      <div class="item-row">
+        ${item.image ? `<img src="${item.image}" style="width:44px; height:44px; border-radius:10px; object-fit:cover; flex-shrink:0;">` : '<div style="width:44px; height:44px; border-radius:10px; background:var(--paper-dim); flex-shrink:0;"></div>'}
+        <div class="item-info">
+          <div class="item-name">${displayName}</div>
+          <div class="item-price">${Number(item.price).toFixed(2)} ${dt('currency')}</div>
+        </div>
+        <div class="qty-control">
+          <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", "${nameEnSafe}", ${item.price}, -1)'>−</button>
+          <span class="qty-count" id="pos-count-${item.id}">0</span>
+          <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", "${nameEnSafe}", ${item.price}, 1)'>+</button>
+        </div>
       </div>
-      <div class="qty-control">
-        <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", "${nameEnSafe}", ${item.price}, -1)'>−</button>
-        <span class="qty-count" id="pos-count-${item.id}">0</span>
-        <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", "${nameEnSafe}", ${item.price}, 1)'>+</button>
-      </div>
-    </div>
-  `;
+    `;
+    }).join('');
+    return `<h4 style="margin:16px 0 4px; color:var(--stone);">${catName}</h4>${rowsHtml}`;
   }).join('');
 
   overlay.innerHTML = `
     <div class="modal-sheet">
       <button class="close-x" onclick="document.getElementById('posOverlay').remove()">×</button>
       <h3 style="margin:8px 0 16px;">${dt('newCounterOrderTitle')}</h3>
+
+      ${posOrderTypeHtml}
+
+      <div id="posTableFields" style="margin-top:14px; display:${orderTypesEnabled.table ? 'block' : 'none'};">
+        <div class="field">
+          <label for="posTableNum">${dt('tableNumberLbl')}</label>
+          <input type="text" id="posTableNum">
+        </div>
+      </div>
+
+      <div id="posCarFields" style="margin-top:14px; display:${(orderTypesEnabled.car && !orderTypesEnabled.table) ? 'block' : 'none'};">
+        <div class="field">
+          <label for="posCarNumber">${dt('carNumberLbl')}</label>
+          <input type="text" id="posCarNumber">
+        </div>
+        <div class="field">
+          <label for="posCarColorInput">${dt('carColorLbl')}</label>
+          <input type="text" id="posCarColorInput">
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:14px;">
+        <label for="posPaymentMethod">${dt('paymentMethodLbl')}</label>
+        <select id="posPaymentMethod">${posPaymentOptionsHtml}</select>
+      </div>
+
       ${itemsHtml}
       <div class="field" style="margin-top:16px;">
         <label for="posCustomerName">${dt('customerNameOptional')}</label>
@@ -2535,6 +2614,16 @@ async function openNewOrderModal() {
     </div>
   `;
   document.body.appendChild(overlay);
+}
+
+function setPosOrderType(type) {
+  posSelectedOrderType = type;
+  const tableBtn = document.getElementById('posTypeTableBtn');
+  const carBtn = document.getElementById('posTypeCarBtn');
+  if (tableBtn) tableBtn.classList.toggle('active', type === 'table');
+  if (carBtn) carBtn.classList.toggle('active', type === 'car');
+  document.getElementById('posTableFields').style.display = type === 'table' ? 'block' : 'none';
+  document.getElementById('posCarFields').style.display = type === 'car' ? 'block' : 'none';
 }
 
 function posChangeQty(id, name, nameEn, price, delta) {
@@ -2555,11 +2644,19 @@ async function submitPosOrder() {
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
   const name = document.getElementById('posCustomerName').value.trim() || dt('counterCustomer');
   const soldBy = isEmployee ? currentUserEmail : dt('shopOwnerLabel');
+  const paymentMethod = document.getElementById('posPaymentMethod').value;
+  const tableNum = document.getElementById('posTableNum') ? document.getElementById('posTableNum').value.trim() : '';
+  const carNum = document.getElementById('posCarNumber') ? document.getElementById('posCarNumber').value.trim() : '';
+  const carColorVal = document.getElementById('posCarColorInput') ? document.getElementById('posCarColorInput').value.trim() : '';
 
   try {
     await db.collection('shops').doc(currentShopId).collection('orders').add({
       customerName: name,
-      tableNumber: null,
+      orderType: posSelectedOrderType,
+      tableNumber: posSelectedOrderType === 'table' ? (tableNum || null) : null,
+      carNumber: posSelectedOrderType === 'car' ? (carNum || null) : null,
+      carColor: posSelectedOrderType === 'car' ? (carColorVal || null) : null,
+      paymentMethod,
       notes: null,
       items,
       total,
