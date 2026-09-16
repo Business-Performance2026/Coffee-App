@@ -101,6 +101,56 @@ button, input, select {
 
 .item-row:last-child { border-bottom: none; }
 
+/* ---- Counter-order modal: category quick-jump pills + floating submit ----
+   Fully separate class names from menu.html's .category-pills/.pill, so
+   neither can ever interfere with the other. ---- */
+.pos-cat-pills-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 0;
+  margin: 0 0 8px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+
+.pos-cat-pills-wrap::-webkit-scrollbar { display: none; }
+
+.pos-cat-pill {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.pos-cat-pill.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.pos-floating-submit-wrap {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--paper);
+  padding: 12px 0 0;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
 .item-photo {
   width: 56px;
   height: 56px;

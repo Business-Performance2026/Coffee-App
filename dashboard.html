@@ -2552,7 +2552,8 @@ async function openNewOrderModal() {
   overlay.className = 'modal-overlay';
   overlay.id = 'posOverlay';
 
-  let itemsHtml = Object.keys(categoriesMap).map(catName => {
+  let posCatPillsHtml = '';
+  let itemsHtml = Object.keys(categoriesMap).map((catName, catIndex) => {
     const rowsHtml = categoriesMap[catName].map(item => {
       const displayName = (dashLang === 'en' && item.nameEn) ? item.nameEn : item.name;
       const nameEnSafe = (item.nameEn || '').replace(/'/g, "\\'");
@@ -2571,13 +2572,18 @@ async function openNewOrderModal() {
       </div>
     `;
     }).join('');
-    return `<h4 style="margin:16px 0 4px; color:var(--stone);">${catName}</h4>${rowsHtml}`;
+
+    posCatPillsHtml += `<button type="button" class="pos-cat-pill ${catIndex === 0 ? 'active' : ''}" data-poscat="pos-cat-${catIndex}" onclick="scrollToPosCategory('pos-cat-${catIndex}', this)">${catName}</button>`;
+
+    return `<h4 id="pos-cat-${catIndex}" style="margin:16px 0 4px; color:var(--stone); scroll-margin-top:8px;">${catName}</h4>${rowsHtml}`;
   }).join('');
 
   overlay.innerHTML = `
-    <div class="modal-sheet">
+    <div class="modal-sheet" id="posModalSheet" style="position:relative;">
       <button class="close-x" onclick="document.getElementById('posOverlay').remove()">×</button>
       <h3 style="margin:8px 0 16px;">${dt('newCounterOrderTitle')}</h3>
+
+      <div class="pos-cat-pills-wrap">${posCatPillsHtml}</div>
 
       ${posOrderTypeHtml}
 
@@ -2609,11 +2615,21 @@ async function openNewOrderModal() {
         <label for="posCustomerName">${dt('customerNameOptional')}</label>
         <input type="text" id="posCustomerName" placeholder="${dt('counterCustomer')}">
       </div>
-      <button class="btn" style="width:100%; margin-top:10px;" onclick="submitPosOrder()">إرسال الطلب</button>
       <div id="posError" class="error-msg"></div>
+
+      <div class="pos-floating-submit-wrap">
+        <button class="btn" style="width:100%;" onclick="submitPosOrder()">📤 إرسال الطلب</button>
+      </div>
     </div>
   `;
   document.body.appendChild(overlay);
+}
+
+function scrollToPosCategory(anchorId, pillEl) {
+  document.querySelectorAll('.pos-cat-pill').forEach(p => p.classList.remove('active'));
+  pillEl.classList.add('active');
+  const target = document.getElementById(anchorId);
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function setPosOrderType(type) {
