@@ -37,6 +37,8 @@
     </div>
   </div>
 
+  <div id="noPermissionsScreen" class="state-msg" style="display:none; padding-top:60px;"></div>
+
   <!-- ===================== TAB 1: لوحة التحكم (Menu + QR) ===================== -->
   <div id="view-dashboard" class="tab-view active">
 
@@ -633,9 +635,13 @@ function applyEmployeePermissionsUI() {
   if (!employeePermissions.dashboard && firstAllowed) {
     switchTab(firstAllowed);
   } else if (!firstAllowed) {
-    // Employee has no permissions at all — shouldn't normally happen, but
-    // avoid leaving them on a totally blank screen.
-    document.getElementById('app').innerHTML = `<div class="state-msg" style="padding-top:60px;">${dt('noPermissionsMsg')}</div>`;
+    // Employee has no permissions at all — hide the tabs and bottom nav,
+    // show a clear message, but NEVER touch the top bar (that's where the
+    // logout button lives, and they still need a way to sign out).
+    document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+    document.getElementById('bottomNav').style.display = 'none';
+    document.getElementById('noPermissionsScreen').textContent = dt('noPermissionsMsg');
+    document.getElementById('noPermissionsScreen').style.display = 'block';
   }
 }
 
