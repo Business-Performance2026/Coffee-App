@@ -263,6 +263,13 @@
           <input type="date" id="exportTo">
         </div>
       </div>
+      <div class="field">
+        <label for="exportLang" data-i18n="exportLangLbl">لغة الملف</label>
+        <select id="exportLang">
+          <option value="ar">العربية</option>
+          <option value="en">English</option>
+        </select>
+      </div>
       <button class="btn" style="width:100%;" onclick="exportSalesExcel()" data-i18n="exportBtn">📥 تصدير Excel</button>
       <div id="exportError" class="error-msg"></div>
       <div id="exportStatus" style="font-size:0.85rem; color:#3D6B4F; margin-top:8px;"></div>
@@ -1114,6 +1121,7 @@ const dashT = {
   copyFailedMsg: { ar: 'تعذر النسخ، انسخه يدوياً من الأعلى', en: 'Could not copy — please copy it manually above' },
   scanAndOrder: { ar: 'امسح واطلب', en: 'Scan & Order' },
   exportTitle: { ar: 'تصدير تقرير Excel', en: 'Export Excel report' },
+  exportLangLbl: { ar: 'لغة الملف', en: 'File language' },
   fromDateLbl: { ar: 'من تاريخ', en: 'From date' },
   toDateLbl: { ar: 'إلى تاريخ', en: 'To date' },
   exportBtn: { ar: '📥 تصدير Excel', en: '📥 Export Excel' },
@@ -2838,6 +2846,22 @@ async function exportSalesExcel() {
 
   statusEl.textContent = dt('exportPreparing');
 
+  const exportLang = document.getElementById('exportLang').value;
+  const EL = {
+    ar: {
+      reportTitle: 'تقرير المبيعات', period: 'الفترة', to: 'إلى', totalSales: 'إجمالي المبيعات (ر.ع)',
+      orderCount: 'عدد الطلبات', topSelling: 'الأكثر مبيعاً', qty: 'الكمية', date: 'التاريخ', time: 'الوقت',
+      type: 'النوع', items: 'الأصناف', payment: 'طريقة الدفع', total: 'الإجمالي (ر.ع)', table: 'طاولة',
+      cash: 'نقداً', transfer: 'تحويل بنكي', card: 'فيزا/بطاقة', sheetName: 'المبيعات'
+    },
+    en: {
+      reportTitle: 'Sales Report', period: 'Period', to: 'to', totalSales: 'Total Sales (OMR)',
+      orderCount: 'Order Count', topSelling: 'Top Selling', qty: 'Qty', date: 'Date', time: 'Time',
+      type: 'Type', items: 'Items', payment: 'Payment Method', total: 'Total (OMR)', table: 'Table',
+      cash: 'Cash', transfer: 'Bank Transfer', card: 'Visa/Card', sheetName: 'Sales'
+    }
+  }[exportLang] || {};
+
   try {
     const snap = await db.collection('shops').doc(currentShopId).collection('orders')
       .where('createdAt', '>=', fromDate)
@@ -2846,7 +2870,8 @@ async function exportSalesExcel() {
       .get();
 
     const shopDoc = await db.collection('shops').doc(currentShopId).get();
-    const shopName = shopDoc.exists ? (shopDoc.data().info || {}).name || '' : '';
+    const shopInfoForExport = shopDoc.exists ? (shopDoc.data().info || {}) : {};
+    const shopName = (exportLang === 'en' && shopInfoForExport.nameEn) ? shopInfoForExport.nameEn : (shopInfoForExport.name || '');
 
     let totalSales = 0;
     const itemCounts = {};
@@ -2855,14 +2880,20 @@ async function exportSalesExcel() {
     snap.forEach(doc => {
       const o = doc.data();
       totalSales += Number(o.total) || 0;
-      (o.items || []).forEach(i => { itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty; });
+      (o.items || []).forEach(i => {
+        const itemLabel = (exportLang === 'en' && i.nameEn) ? i.nameEn : i.name;
+        itemCounts[itemLabel] = (itemCounts[itemLabel] || 0) + i.qty;
+      });
 
       const created = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : null;
       const typeLabel = o.orderType === 'car'
         ? `🚗 ${o.carColor || ''} (${o.carNumber || ''})`
-        : `🍽️ طاولة ${o.tableNumber || '-'}`;
-      const itemsText = (o.items || []).map(i => `${i.name} ×${i.qty}`).join('، ');
-      const paymentLabels = { cash: 'نقداً', transfer: 'تحويل بنكي', card: 'فيزا/بطاقة' };
+        : `🍽️ ${EL.table} ${o.tableNumber || '-'}`;
+      const itemsText = (o.items || []).map(i => {
+        const itemLabel = (exportLang === 'en' && i.nameEn) ? i.nameEn : i.name;
+        return `${itemLabel} ×${i.qty}`;
+      }).join('، ');
+      const paymentLabels = { cash: EL.cash, transfer: EL.transfer, card: EL.card };
       const paymentText = paymentLabels[o.paymentMethod] || '-';
 
       rows.push([
@@ -2879,17 +2910,17 @@ async function exportSalesExcel() {
 
     // ---- Build the worksheet as a 2D array first ----
     const data = [];
-    data.push([shopName || 'تقرير المبيعات']);
-    data.push([`الفترة: ${fromStr} إلى ${toStr}`]);
+    data.push([shopName || EL.reportTitle]);
+    data.push([`${EL.period}: ${fromStr} ${EL.to} ${toStr}`]);
     data.push([]);
-    data.push(['إجمالي المبيعات (ر.ع)', totalSales.toFixed(2)]);
-    data.push(['عدد الطلبات', snap.size]);
+    data.push([EL.totalSales, totalSales.toFixed(2)]);
+    data.push([EL.orderCount, snap.size]);
     data.push([]);
-    data.push(['الأكثر مبيعاً', 'الكمية']);
+    data.push([EL.topSelling, EL.qty]);
     topItems.forEach(([name, qty]) => data.push([name, qty]));
     data.push([]);
     const headerRowIndex = data.length;
-    data.push(['التاريخ', 'الوقت', 'النوع', 'الأصناف', 'طريقة الدفع', 'الإجمالي (ر.ع)']);
+    data.push([EL.date, EL.time, EL.type, EL.items, EL.payment, EL.total]);
     const firstDataRow = data.length;
     rows.forEach(r => data.push(r));
 
@@ -2920,7 +2951,7 @@ async function exportSalesExcel() {
     }
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'المبيعات');
+    XLSX.utils.book_append_sheet(wb, ws, EL.sheetName);
     XLSX.writeFile(wb, `sales-report-${fromStr}-to-${toStr}.xlsx`);
 
     statusEl.textContent = dt('exportDone');
