@@ -35,6 +35,7 @@
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
 
 <script>
@@ -64,6 +65,15 @@ const translations = {
   tablePlaceholder: { ar: 'مثال: 5', en: 'e.g. 5' },
   notesLabel: { ar: 'ملاحظات (اختياري)', en: 'Notes (optional)' },
   paymentMethodLbl: { ar: 'طريقة الدفع', en: 'Payment method' },
+  payCashInstruction: { ar: 'الرجاء الدفع عند المحاسب كاش', en: 'Please pay in cash at the counter' },
+  payCardInstruction: { ar: 'الرجاء الدفع عند المحاسب بالفيزا', en: 'Please pay by card at the counter' },
+  payTransferInstruction: { ar: 'تم استلام وصل التحويل، بانتظار تأكيد الكوفي ✓', en: 'Transfer receipt received, awaiting confirmation from the shop ✓' },
+  bankTransferInstructions: { ar: 'حوّل المبلغ على الرقم التالي:', en: 'Transfer the amount to the following number:' },
+  attachReceiptBtn: { ar: 'إرفاق وصل التحويل', en: 'Attach transfer receipt' },
+  uploadingReceipt: { ar: 'جاري رفع الوصل...', en: 'Uploading receipt...' },
+  receiptUploaded: { ar: 'تم إرفاق الوصل ✓', en: 'Receipt attached ✓' },
+  receiptUploadFailed: { ar: 'تعذر رفع الوصل، حاول مرة أخرى.', en: 'Could not upload the receipt. Please try again.' },
+  receiptRequiredError: { ar: 'الرجاء إرفاق وصل التحويل قبل إرسال الطلب.', en: 'Please attach the transfer receipt before sending the order.' },
   payCash: { ar: '💵 نقداً', en: '💵 Cash' },
   payTransfer: { ar: '🏦 تحويل بنكي', en: '🏦 Bank transfer' },
   payCard: { ar: '💳 فيزا / بطاقة', en: '💳 Visa / Card' },
@@ -600,7 +610,16 @@ function openCartModal() {
 
       <div class="field">
         <label for="paymentMethod">${t('paymentMethodLbl')}</label>
-        <select id="paymentMethod">${paymentOptionsHtml}</select>
+        <select id="paymentMethod" onchange="onPaymentMethodChange()">${paymentOptionsHtml}</select>
+      </div>
+
+      <div id="bankTransferPanel" style="display:none; background:var(--paper-dim); border-radius:12px; padding:14px; margin-top:10px;">
+        <div style="font-size:0.85rem; margin-bottom:8px;">${t('bankTransferInstructions')}</div>
+        <div style="font-weight:700; font-size:1.05rem; direction:ltr; text-align:left;">${(shopInfo.bankAccountName || '').toUpperCase()}</div>
+        <div style="font-weight:700; font-size:1.1rem; direction:ltr; text-align:left; margin-bottom:10px;">${shopInfo.bankTransferNumber || ''}</div>
+        <label for="receiptFileInput" class="btn btn-ghost" style="display:block; text-align:center; cursor:pointer;">📎 ${t('attachReceiptBtn')}</label>
+        <input type="file" id="receiptFileInput" accept="image/*" style="display:none;" onchange="handleReceiptUpload(this)">
+        <div id="receiptUploadStatus" style="font-size:0.8rem; margin-top:8px; text-align:center;"></div>
       </div>
 
       <div class="field" style="margin-top:16px;">
@@ -613,9 +632,39 @@ function openCartModal() {
     </div>
   `;
   document.body.appendChild(overlay);
+  onPaymentMethodChange();
 }
 
 let selectedOrderType = 'table';
+let uploadedReceiptUrl = null;
+
+function onPaymentMethodChange() {
+  const method = document.getElementById('paymentMethod').value;
+  const panel = document.getElementById('bankTransferPanel');
+  if (panel) panel.style.display = method === 'transfer' ? 'block' : 'none';
+}
+
+async function handleReceiptUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('receiptUploadStatus');
+  statusEl.style.color = 'var(--stone)';
+  statusEl.textContent = t('uploadingReceipt');
+
+  try {
+    const path = `shops/${shopId}/receipts/${Date.now()}_${file.name}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    uploadedReceiptUrl = await ref.getDownloadURL();
+    statusEl.style.color = '#3D6B4F';
+    statusEl.textContent = t('receiptUploaded');
+  } catch (err) {
+    console.error('Receipt upload failed:', err);
+    uploadedReceiptUrl = null;
+    statusEl.style.color = '#B3441E';
+    statusEl.textContent = t('receiptUploadFailed');
+  }
+}
 
 function setOrderType(type) {
   selectedOrderType = type;
@@ -650,6 +699,11 @@ async function submitOrder() {
     table = document.getElementById('tableNum').value.trim();
   }
 
+  if (paymentMethod === 'transfer' && !uploadedReceiptUrl) {
+    errorEl.textContent = t('receiptRequiredError');
+    return;
+  }
+
   const items = Object.values(cart).map(i => ({ name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
 
@@ -661,6 +715,7 @@ async function submitOrder() {
       carColor: carColor || null,
       notes: notes || null,
       paymentMethod,
+      receiptUrl: paymentMethod === 'transfer' ? uploadedReceiptUrl : null,
       items,
       total,
       status: 'pending',
@@ -670,6 +725,7 @@ async function submitOrder() {
     // Reset cart
     cart = {};
     updateCartBar();
+    uploadedReceiptUrl = null;
 
     // Best-effort activity tracking for the admin panel — never allowed to
     // interfere with the order itself if it fails for any reason.
@@ -685,8 +741,15 @@ async function submitOrder() {
     // Start live tracking of this order and show the step tracker
     trackOrder(docRef.id);
 
+    const paymentInstructions = {
+      cash: t('payCashInstruction'),
+      card: t('payCardInstruction'),
+      transfer: t('payTransferInstruction')
+    };
+
     document.querySelector('.modal-sheet').innerHTML = `
-      <h3 style="margin:8px 0 20px; text-align:center;">${t('orderSent')}</h3>
+      <h3 style="margin:8px 0 12px; text-align:center;">${t('orderSent')}</h3>
+      <p style="text-align:center; color:var(--ink); font-weight:600; margin-bottom:20px;">${paymentInstructions[paymentMethod] || ''}</p>
       <div id="trackerContainer">${renderTracker('pending')}</div>
       <button class="btn" style="width:100%; margin-top:24px;" onclick="closeCartModal()">${t('close')}</button>
     `;

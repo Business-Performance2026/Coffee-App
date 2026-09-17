@@ -390,6 +390,16 @@
       </div>
 
       <div class="field">
+        <label for="bankAccountNameInput" data-i18n="bankAccountNameLbl">اسم صاحب الحساب البنكي (بالإنجليزي فقط)</label>
+        <input type="text" id="bankAccountNameInput" placeholder="e.g. AHMED SAID" dir="ltr" style="text-align:left;">
+      </div>
+
+      <div class="field">
+        <label for="bankTransferNumberInput" data-i18n="bankTransferNumberLbl">رقم التحويل</label>
+        <input type="tel" id="bankTransferNumberInput" placeholder="+968 9xxxxxxx">
+      </div>
+
+      <div class="field">
         <label data-i18n="orderTypesLbl">أنواع الطلب المتاحة للعميل</label>
         <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
           <div style="display:flex; align-items:center; gap:8px;">
@@ -1068,6 +1078,7 @@ const dashT = {
   payCard: { ar: '💳 فيزا / بطاقة', en: '💳 Visa / Card' },
   paymentMethodLbl: { ar: 'طريقة الدفع', en: 'Payment method' },
   printReceiptBtn: { ar: 'طباعة الفاتورة', en: 'Print receipt' },
+  viewReceiptBtn: { ar: 'عرض الوصل', en: 'View receipt' },
   tapToOpenPrintPage: { ar: 'اضغط الزر تحت عشان تفتح صفحة الطباعة (بتفتح بمتصفح Safari)', en: 'Tap the button below to open the print page (it opens in Safari)' },
   openPrintPageBtn: { ar: 'فتح صفحة الطباعة', en: 'Open print page' },
   receiptTitle: { ar: 'فاتورة', en: 'Receipt' },
@@ -1080,6 +1091,10 @@ const dashT = {
   carColorLbl: { ar: 'لون السيارة', en: 'Car color' },
   tableNumberLbl: { ar: 'رقم الطاولة', en: 'Table number' },
   atLeastOnePaymentError: { ar: 'لازم تفعّل طريقة دفع واحدة على الأقل.', en: 'Please enable at least one payment method.' },
+  bankAccountNameLbl: { ar: 'اسم صاحب الحساب البنكي (بالإنجليزي فقط)', en: 'Bank account holder name (English only)' },
+  bankTransferNumberLbl: { ar: 'رقم التحويل', en: 'Transfer number' },
+  bankNameEnglishOnlyError: { ar: 'اسم صاحب الحساب لازم يكون بالإنجليزي بس (بدون حروف عربية).', en: 'The account holder name must be in English only (no Arabic characters).' },
+  bankDetailsRequiredError: { ar: 'أدخل اسم صاحب الحساب ورقم التحويل عشان تفعّل التحويل البنكي.', en: 'Enter the account holder name and transfer number to enable bank transfer.' },
   atLeastOneOrderTypeError: { ar: 'لازم تفعّل نوع طلب واحد على الأقل.', en: 'Please enable at least one order type.' },
   paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
   staffBreakdownTitle: { ar: 'حسب البائع', en: 'By staff member' },
@@ -1440,6 +1455,9 @@ async function loadShopInfo() {
     document.getElementById('payTransferEnabled').checked = pm.transfer !== false;
     document.getElementById('payCardEnabled').checked = pm.card !== false;
 
+    document.getElementById('bankAccountNameInput').value = info.bankAccountName || '';
+    document.getElementById('bankTransferNumberInput').value = info.bankTransferNumber || '';
+
     const ot = info.orderTypes || {};
     document.getElementById('orderTypeTableEnabled').checked = ot.table !== false;
     document.getElementById('orderTypeCarEnabled').checked = ot.car !== false;
@@ -1739,6 +1757,8 @@ async function saveShopInfo() {
     table: document.getElementById('orderTypeTableEnabled').checked,
     car: document.getElementById('orderTypeCarEnabled').checked
   };
+  const bankAccountName = document.getElementById('bankAccountNameInput').value.trim();
+  const bankTransferNumber = document.getElementById('bankTransferNumberInput').value.trim();
 
   if (!paymentMethods.cash && !paymentMethods.transfer && !paymentMethods.card) {
     errorEl.textContent = dt('atLeastOnePaymentError');
@@ -1746,6 +1766,17 @@ async function saveShopInfo() {
   }
   if (!orderTypes.table && !orderTypes.car) {
     errorEl.textContent = dt('atLeastOneOrderTypeError');
+    return;
+  }
+
+  // English letters, digits, spaces and basic punctuation only — no Arabic
+  // characters allowed in the bank account holder name.
+  if (bankAccountName && /[\u0600-\u06FF]/.test(bankAccountName)) {
+    errorEl.textContent = dt('bankNameEnglishOnlyError');
+    return;
+  }
+  if (paymentMethods.transfer && (!bankAccountName || !bankTransferNumber)) {
+    errorEl.textContent = dt('bankDetailsRequiredError');
     return;
   }
 
@@ -1770,7 +1801,9 @@ async function saveShopInfo() {
       'info.estimatedMinutes': prepTime,
       'info.showRatingPublicly': showRatingPublicly,
       'info.paymentMethods': paymentMethods,
-      'info.orderTypes': orderTypes
+      'info.orderTypes': orderTypes,
+      'info.bankAccountName': bankAccountName,
+      'info.bankTransferNumber': bankTransferNumber
     };
     if (uploadedLogoUrl) updateData['info.logo'] = uploadedLogoUrl;
     if (uploadedCoverUrl) updateData['info.coverImage'] = uploadedCoverUrl;
@@ -2297,6 +2330,7 @@ function renderOrdersColumns() {
         <div class="order-actions">
           ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
+          ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
         </div>
       </div>
     `;
@@ -2441,6 +2475,7 @@ function renderCompletedOrders() {
         <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
         <div class="order-actions">
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
+          ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
         </div>
       </div>
     `;
