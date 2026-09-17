@@ -554,6 +554,7 @@ window.addEventListener('pageshow', function (event) {
 let currentShopId = null;
 let currentUserEmail = null;
 let shopNameForReceipt = '';
+let cachedLoyaltyRewardText = '';
 let uploadedImageUrl = null;
 let uploadedLogoUrl = null;
 let uploadedCoverUrl = null;
@@ -1499,6 +1500,7 @@ async function loadShopInfo() {
     document.getElementById('loyaltySettingsFields').style.display = info.loyaltyEnabled === true ? 'block' : 'none';
     document.getElementById('loyaltyThreshold').value = info.loyaltyThreshold || 6;
     document.getElementById('loyaltyRewardText').value = info.loyaltyRewardText || '';
+    cachedLoyaltyRewardText = info.loyaltyRewardText || '';
 
     const ot = info.orderTypes || {};
     document.getElementById('orderTypeTableEnabled').checked = ot.table !== false;
@@ -2420,7 +2422,7 @@ function renderOrdersColumns() {
         <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
         ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
         ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
-        ${order.loyaltyRewardReady ? `<div style="display:inline-block; font-size:0.72rem; font-weight:600; padding:4px 10px; border-radius:999px; margin-top:6px; background:#FBEAD1; color:#A6650D;">🎁 ${dt('customerHasRewardBadge')}</div>` : ''}
+        ${order.loyaltyRewardReady ? `<div style="display:inline-flex; align-items:center; gap:5px; font-size:0.75rem; font-weight:600; padding:5px 12px; border-radius:999px; margin-top:6px; background:#FBEAD1; color:#A6650D;"><span style="font-size:1rem;">🎁</span><span>${cachedLoyaltyRewardText || dt('customerHasRewardBadge')}</span></div>` : ''}
         <div class="order-actions">
           ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
