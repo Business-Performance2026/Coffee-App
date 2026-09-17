@@ -77,6 +77,8 @@ const translations = {
   receiptRequiredError: { ar: 'الرجاء إرفاق وصل التحويل قبل إرسال الطلب.', en: 'Please attach the transfer receipt before sending the order.' },
   loyaltyPhoneLbl: { ar: 'رقم جوالك (لجمع نقاط الولاء) - اختياري', en: 'Your phone (for loyalty points) - optional' },
   rewardReadyMsg: { ar: 'عندك مكافأة جاهزة! أخبر الموظف عند الاستلام:', en: 'You have a reward ready! Tell the staff when you pick up:' },
+  rewardReadyPopupTitle: { ar: 'مبروك! 🎉 طلبك هذا مجاني', en: 'Congrats! 🎉 This order is free' },
+  okBtn: { ar: 'حسناً', en: 'OK' },
   pointsProgressMsg: { ar: 'باقي لك {count} طلبات على المكافأة', en: '{count} more orders until your reward' },
   payCash: { ar: '💵 نقداً', en: '💵 Cash' },
   payTransfer: { ar: '🏦 تحويل بنكي', en: '🏦 Bank transfer' },
@@ -655,6 +657,23 @@ let selectedOrderType = 'table';
 let uploadedReceiptUrl = null;
 let currentLoyaltyRewardReady = false;
 
+function showRewardReadyPopup() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'rewardReadyOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">🎉</div>
+      <h3 style="margin-bottom:12px;">${t('rewardReadyPopupTitle')}</h3>
+      <p style="color:var(--stone); margin-bottom:20px;">${shopInfo.loyaltyRewardText || t('rewardReadyMsg')}</p>
+      <button class="btn" style="width:100%;" onclick="document.getElementById('rewardReadyOverlay').remove()">${t('okBtn')}</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+let rewardPopupShownForPhone = null;
+
 async function checkLoyaltyPoints() {
   const phoneInput = document.getElementById('loyaltyPhoneInput');
   const displayEl = document.getElementById('loyaltyPointsDisplay');
@@ -678,6 +697,10 @@ async function checkLoyaltyPoints() {
       currentLoyaltyRewardReady = true;
       displayEl.innerHTML = `🎉 <strong>${t('rewardReadyMsg')}</strong> ${shopInfo.loyaltyRewardText || ''}`;
       displayEl.style.color = '#3D7A47';
+      if (rewardPopupShownForPhone !== phone) {
+        rewardPopupShownForPhone = phone;
+        showRewardReadyPopup();
+      }
     } else {
       const remaining = threshold - points;
       displayEl.textContent = `🎁 ${t('pointsProgressMsg').replace('{count}', remaining)}`;

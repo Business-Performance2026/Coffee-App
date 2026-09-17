@@ -1129,6 +1129,9 @@ const dashT = {
   resetPointsBtn: { ar: 'إعادة تعيين', en: 'Reset' },
   confirmResetPoints: { ar: 'متأكد تبي تصفّر نقاط هذا العميل؟ (سوّها بعد ما تعطيه مكافأته)', en: "Reset this customer's points? (Do this after giving them their reward)" },
   customerHasRewardBadge: { ar: 'هذا العميل عنده مكافأة جاهزة', en: 'This customer has a reward ready' },
+  newRewardOrderTitle: { ar: 'طلب مكافأة! 🎁', en: 'Reward order! 🎁' },
+  newRewardOrderMsg: { ar: 'وصلك طلب من عميل حقق نقاط الولاء — هذا الطلب يستاهل مكافأة مجانية.', en: 'You received an order from a customer who reached their loyalty points — this order deserves a free reward.' },
+  okBtn: { ar: 'حسناً', en: 'OK' },
   atLeastOneOrderTypeError: { ar: 'لازم تفعّل نوع طلب واحد على الأقل.', en: 'Please enable at least one order type.' },
   paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
   staffBreakdownTitle: { ar: 'حسب البائع', en: 'By staff member' },
@@ -2344,6 +2347,12 @@ function listenToOrders() {
           bell.classList.remove('bell-shake');
           void bell.offsetWidth;
           bell.classList.add('bell-shake');
+
+          newOnes.forEach(change => {
+            if (change.doc.data().loyaltyRewardReady) {
+              showLoyaltyRewardPopup();
+            }
+          });
         }
       }
       isFirstOrdersLoad = false;
@@ -2596,6 +2605,24 @@ async function advanceOrder(orderId, newStatus) {
 
 // A nicely styled replacement for the plain browser confirm() dialog,
 // asking whether to print the receipt right after an order is marked ready.
+// Clear popup for staff when a newly-arrived order qualifies for a free
+// loyalty reward — separate from (and in addition to) the small badge on
+// the order card itself, so it's impossible to miss.
+function showLoyaltyRewardPopup() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'loyaltyRewardOverlay-' + Date.now();
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">🎁</div>
+      <h3 style="margin-bottom:12px;">${dt('newRewardOrderTitle')}</h3>
+      <p style="color:var(--stone); margin-bottom:20px;">${dt('newRewardOrderMsg')}</p>
+      <button class="btn" style="width:100%;" onclick="this.closest('.modal-overlay').remove()">${dt('okBtn')}</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
 function showPrintConfirmModal(order) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
