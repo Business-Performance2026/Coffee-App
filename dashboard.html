@@ -1787,7 +1787,7 @@ async function loadLoyaltyCustomers() {
     return `
       <div class="dashboard-item">
         <div class="grow">
-          <div class="item-name">+968 ${doc.id}</div>
+          <div class="item-name">${doc.id}</div>
           <div class="item-desc">${points} ${dt('pointsWord')}</div>
         </div>
         <button class="btn btn-ghost" onclick='resetLoyaltyPoints("${doc.id}")'>${dt('resetPointsBtn')}</button>
@@ -2577,10 +2577,18 @@ async function advanceOrder(orderId, newStatus) {
 
   if (newStatus === 'ready' && orderBeforeUpdate) {
     if (orderBeforeUpdate.loyaltyPhone) {
-      db.collection('shops').doc(currentShopId).collection('loyaltyCustomers').doc(orderBeforeUpdate.loyaltyPhone)
-        .set({ points: firebase.firestore.FieldValue.increment(1) }, { merge: true })
-        .then(() => loadLoyaltyCustomers())
-        .catch(err => console.error('Loyalty point update failed (non-blocking):', err));
+      const loyaltyRef = db.collection('shops').doc(currentShopId).collection('loyaltyCustomers').doc(orderBeforeUpdate.loyaltyPhone);
+      if (orderBeforeUpdate.loyaltyRewardReady) {
+        // The customer already had enough points when they placed this
+        // order — they're redeeming their reward now, so reset automatically.
+        loyaltyRef.set({ points: 0 }, { merge: true })
+          .then(() => loadLoyaltyCustomers())
+          .catch(err => console.error('Loyalty reset failed (non-blocking):', err));
+      } else {
+        loyaltyRef.set({ points: firebase.firestore.FieldValue.increment(1) }, { merge: true })
+          .then(() => loadLoyaltyCustomers())
+          .catch(err => console.error('Loyalty point update failed (non-blocking):', err));
+      }
     }
     showPrintConfirmModal(orderBeforeUpdate);
   }
