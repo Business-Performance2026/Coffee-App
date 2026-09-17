@@ -75,6 +75,9 @@ const translations = {
   receiptUploaded: { ar: 'تم إرفاق الوصل ✓', en: 'Receipt attached ✓' },
   receiptUploadFailed: { ar: 'تعذر رفع الوصل، حاول مرة أخرى.', en: 'Could not upload the receipt. Please try again.' },
   receiptRequiredError: { ar: 'الرجاء إرفاق وصل التحويل قبل إرسال الطلب.', en: 'Please attach the transfer receipt before sending the order.' },
+  loyaltyPhoneLbl: { ar: 'رقم جوالك (لجمع نقاط الولاء) - اختياري', en: 'Your phone (for loyalty points) - optional' },
+  rewardReadyMsg: { ar: 'عندك مكافأة جاهزة! أخبر الموظف عند الاستلام:', en: 'You have a reward ready! Tell the staff when you pick up:' },
+  pointsProgressMsg: { ar: 'باقي لك {count} طلبات على المكافأة', en: '{count} more orders until your reward' },
   payCash: { ar: '💵 نقداً', en: '💵 Cash' },
   payTransfer: { ar: '🏦 تحويل بنكي', en: '🏦 Bank transfer' },
   payCard: { ar: '💳 فيزا / بطاقة', en: '💳 Visa / Card' },
@@ -609,6 +612,17 @@ function openCartModal() {
         </div>
       </div>
 
+      ${shopInfo.loyaltyEnabled ? `
+      <div class="field">
+        <label for="loyaltyPhoneInput">${t('loyaltyPhoneLbl')}</label>
+        <div style="display:flex; gap:8px;">
+          <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
+          <input type="text" inputmode="numeric" id="loyaltyPhoneInput" placeholder="9xxxxxxx" style="flex:1;" value="${(localStorage.getItem('loyaltyPhone_' + shopId) || '')}" onblur="checkLoyaltyPoints()">
+        </div>
+        <div id="loyaltyPointsDisplay" style="font-size:0.85rem; margin-top:8px;"></div>
+      </div>
+      ` : ''}
+
       <div class="field" style="margin-top:16px;">
         <label for="orderNotes">${t('notesLabel')}</label>
         <input type="text" id="orderNotes" placeholder="${t('notesPlaceholder')}">
@@ -634,10 +648,46 @@ function openCartModal() {
   `;
   document.body.appendChild(overlay);
   onPaymentMethodChange();
+  if (shopInfo.loyaltyEnabled) checkLoyaltyPoints();
 }
 
 let selectedOrderType = 'table';
 let uploadedReceiptUrl = null;
+let currentLoyaltyRewardReady = false;
+
+async function checkLoyaltyPoints() {
+  const phoneInput = document.getElementById('loyaltyPhoneInput');
+  const displayEl = document.getElementById('loyaltyPointsDisplay');
+  if (!phoneInput || !displayEl) return;
+
+  const phone = phoneInput.value.trim();
+  currentLoyaltyRewardReady = false;
+  if (!phone || phone.length < 7) {
+    displayEl.textContent = '';
+    return;
+  }
+
+  localStorage.setItem('loyaltyPhone_' + shopId, phone);
+  const threshold = shopInfo.loyaltyThreshold || 6;
+
+  try {
+    const doc = await db.collection('shops').doc(shopId).collection('loyaltyCustomers').doc(phone).get();
+    const points = doc.exists ? (doc.data().points || 0) : 0;
+
+    if (points >= threshold) {
+      currentLoyaltyRewardReady = true;
+      displayEl.innerHTML = `🎉 <strong>${t('rewardReadyMsg')}</strong> ${shopInfo.loyaltyRewardText || ''}`;
+      displayEl.style.color = '#3D7A47';
+    } else {
+      const remaining = threshold - points;
+      displayEl.textContent = `🎁 ${t('pointsProgressMsg').replace('{count}', remaining)}`;
+      displayEl.style.color = 'var(--stone)';
+    }
+  } catch (err) {
+    console.error('Loyalty points check failed:', err);
+    displayEl.textContent = '';
+  }
+}
 
 function onPaymentMethodChange() {
   const method = document.getElementById('paymentMethod').value;
@@ -705,6 +755,9 @@ async function submitOrder() {
     return;
   }
 
+  const loyaltyPhoneInput = document.getElementById('loyaltyPhoneInput');
+  const loyaltyPhone = (loyaltyPhoneInput && loyaltyPhoneInput.value.trim()) ? `+968 ${loyaltyPhoneInput.value.trim()}` : null;
+
   const items = Object.values(cart).map(i => ({ name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
 
@@ -717,6 +770,8 @@ async function submitOrder() {
       notes: notes || null,
       paymentMethod,
       receiptUrl: paymentMethod === 'transfer' ? uploadedReceiptUrl : null,
+      loyaltyPhone,
+      loyaltyRewardReady: loyaltyPhone ? currentLoyaltyRewardReady : false,
       items,
       total,
       status: 'pending',

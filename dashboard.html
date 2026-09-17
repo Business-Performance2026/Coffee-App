@@ -402,6 +402,21 @@
         </div>
       </div>
 
+      <div class="field" style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="loyaltyEnabled" style="width:auto;">
+        <label for="loyaltyEnabled" style="margin:0;" data-i18n="loyaltyEnabledLbl">تفعيل نظام نقاط الولاء</label>
+      </div>
+      <div id="loyaltySettingsFields" style="display:none;">
+        <div class="field">
+          <label for="loyaltyThreshold" data-i18n="loyaltyThresholdLbl">عدد الطلبات المطلوب للمكافأة</label>
+          <input type="number" id="loyaltyThreshold" min="2" value="6">
+        </div>
+        <div class="field">
+          <label for="loyaltyRewardText" data-i18n="loyaltyRewardTextLbl">نص المكافأة</label>
+          <input type="text" id="loyaltyRewardText" placeholder="مثال: قهوة مجانية">
+        </div>
+      </div>
+
       <div class="field">
         <label data-i18n="orderTypesLbl">أنواع الطلب المتاحة للعميل</label>
         <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
@@ -419,6 +434,11 @@
       <button class="btn" onclick="saveShopInfo()" data-i18n="saveChangesBtn">حفظ التغييرات</button>
       <div id="shopInfoError" class="error-msg"></div>
       <div id="shopInfoSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
+    </div>
+
+    <h3 style="margin:24px 0 12px;" data-i18n="loyaltyCustomersTitle">نقاط عملاء الولاء</h3>
+    <div class="card" id="loyaltyCustomersList">
+      <div class="state-msg">جاري التحميل...</div>
     </div>
     </div>
 
@@ -593,6 +613,7 @@ auth.onAuthStateChanged(async user => {
     listenToCompletedOrders();
     updateBestSellerFlag();
     updatePublicRatingStats();
+    loadLoyaltyCustomers();
     loadEmployees();
 
   } else {
@@ -629,6 +650,7 @@ auth.onAuthStateChanged(async user => {
     applyEmployeePermissionsUI();
 
     await loadShopInfo();
+    loadLoyaltyCustomers();
     if (employeePermissions.dashboard || employeePermissions.inventory) await loadItems();
     loadCategoryManager();
     if (employeePermissions.pos || employeePermissions.sales) {
@@ -1098,6 +1120,15 @@ const dashT = {
   bankTransferNumberLbl: { ar: 'رقم التحويل', en: 'Transfer number' },
   bankNameEnglishOnlyError: { ar: 'اسم صاحب الحساب لازم يكون بالإنجليزي بس (بدون حروف عربية).', en: 'The account holder name must be in English only (no Arabic characters).' },
   bankDetailsRequiredError: { ar: 'أدخل اسم صاحب الحساب ورقم التحويل عشان تفعّل التحويل البنكي.', en: 'Enter the account holder name and transfer number to enable bank transfer.' },
+  loyaltyEnabledLbl: { ar: 'تفعيل نظام نقاط الولاء', en: 'Enable loyalty points program' },
+  loyaltyThresholdLbl: { ar: 'عدد الطلبات المطلوب للمكافأة', en: 'Orders required for a reward' },
+  loyaltyRewardTextLbl: { ar: 'نص المكافأة', en: 'Reward description' },
+  loyaltyCustomersTitle: { ar: 'نقاط عملاء الولاء', en: 'Loyalty customers' },
+  noLoyaltyCustomersYet: { ar: 'لا يوجد عملاء ولاء بعد.', en: 'No loyalty customers yet.' },
+  pointsWord: { ar: 'نقطة', en: 'points' },
+  resetPointsBtn: { ar: 'إعادة تعيين', en: 'Reset' },
+  confirmResetPoints: { ar: 'متأكد تبي تصفّر نقاط هذا العميل؟ (سوّها بعد ما تعطيه مكافأته)', en: "Reset this customer's points? (Do this after giving them their reward)" },
+  customerHasRewardBadge: { ar: 'هذا العميل عنده مكافأة جاهزة', en: 'This customer has a reward ready' },
   atLeastOneOrderTypeError: { ar: 'لازم تفعّل نوع طلب واحد على الأقل.', en: 'Please enable at least one order type.' },
   paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
   staffBreakdownTitle: { ar: 'حسب البائع', en: 'By staff member' },
@@ -1461,6 +1492,11 @@ async function loadShopInfo() {
     document.getElementById('bankAccountNameInput').value = info.bankAccountName || '';
     document.getElementById('bankTransferNumberInput').value = (info.bankTransferNumber || '').replace('+968', '').trim();
 
+    document.getElementById('loyaltyEnabled').checked = info.loyaltyEnabled === true;
+    document.getElementById('loyaltySettingsFields').style.display = info.loyaltyEnabled === true ? 'block' : 'none';
+    document.getElementById('loyaltyThreshold').value = info.loyaltyThreshold || 6;
+    document.getElementById('loyaltyRewardText').value = info.loyaltyRewardText || '';
+
     const ot = info.orderTypes || {};
     document.getElementById('orderTypeTableEnabled').checked = ot.table !== false;
     document.getElementById('orderTypeCarEnabled').checked = ot.car !== false;
@@ -1732,6 +1768,44 @@ document.getElementById('shopCoverInput').addEventListener('change', async (e) =
   }
 });
 
+// ===================== Loyalty points customer management =====================
+async function loadLoyaltyCustomers() {
+  const el = document.getElementById('loyaltyCustomersList');
+  if (!el) return;
+
+  const snap = await db.collection('shops').doc(currentShopId).collection('loyaltyCustomers')
+    .orderBy('points', 'desc').limit(50).get();
+
+  if (snap.empty) {
+    el.innerHTML = `<div class="state-msg">${dt('noLoyaltyCustomersYet')}</div>`;
+    return;
+  }
+
+  el.innerHTML = snap.docs.map(doc => {
+    const d = doc.data();
+    const points = d.points || 0;
+    return `
+      <div class="dashboard-item">
+        <div class="grow">
+          <div class="item-name">${doc.id}</div>
+          <div class="item-desc">${points} ${dt('pointsWord')}</div>
+        </div>
+        <button class="btn btn-ghost" onclick='resetLoyaltyPoints("${doc.id}")'>${dt('resetPointsBtn')}</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function resetLoyaltyPoints(phone) {
+  if (!confirm(dt('confirmResetPoints'))) return;
+  await db.collection('shops').doc(currentShopId).collection('loyaltyCustomers').doc(phone).update({ points: 0 });
+  await loadLoyaltyCustomers();
+}
+
+document.getElementById('loyaltyEnabled').addEventListener('change', function () {
+  document.getElementById('loyaltySettingsFields').style.display = this.checked ? 'block' : 'none';
+});
+
 async function saveShopInfo() {
   const errorEl = document.getElementById('shopInfoError');
   const successEl = document.getElementById('shopInfoSuccess');
@@ -1763,6 +1837,9 @@ async function saveShopInfo() {
   const bankAccountName = document.getElementById('bankAccountNameInput').value.trim();
   const bankTransferNumberDigits = document.getElementById('bankTransferNumberInput').value.trim();
   const bankTransferNumber = bankTransferNumberDigits ? `+968 ${bankTransferNumberDigits}` : '';
+  const loyaltyEnabled = document.getElementById('loyaltyEnabled').checked;
+  const loyaltyThreshold = parseInt(document.getElementById('loyaltyThreshold').value) || 6;
+  const loyaltyRewardText = document.getElementById('loyaltyRewardText').value.trim();
 
   if (!paymentMethods.cash && !paymentMethods.transfer && !paymentMethods.card) {
     errorEl.textContent = dt('atLeastOnePaymentError');
@@ -1807,7 +1884,10 @@ async function saveShopInfo() {
       'info.paymentMethods': paymentMethods,
       'info.orderTypes': orderTypes,
       'info.bankAccountName': bankAccountName,
-      'info.bankTransferNumber': bankTransferNumber
+      'info.bankTransferNumber': bankTransferNumber,
+      'info.loyaltyEnabled': loyaltyEnabled,
+      'info.loyaltyThreshold': loyaltyThreshold,
+      'info.loyaltyRewardText': loyaltyRewardText
     };
     if (uploadedLogoUrl) updateData['info.logo'] = uploadedLogoUrl;
     if (uploadedCoverUrl) updateData['info.coverImage'] = uploadedCoverUrl;
@@ -2331,6 +2411,7 @@ function renderOrdersColumns() {
         <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
         ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
         ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
+        ${order.loyaltyRewardReady ? `<div style="display:inline-block; font-size:0.72rem; font-weight:600; padding:4px 10px; border-radius:999px; margin-top:6px; background:#FBEAD1; color:#A6650D;">🎁 ${dt('customerHasRewardBadge')}</div>` : ''}
         <div class="order-actions">
           ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
@@ -2495,6 +2576,12 @@ async function advanceOrder(orderId, newStatus) {
   await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({ status: newStatus });
 
   if (newStatus === 'ready' && orderBeforeUpdate) {
+    if (orderBeforeUpdate.loyaltyPhone) {
+      db.collection('shops').doc(currentShopId).collection('loyaltyCustomers').doc(orderBeforeUpdate.loyaltyPhone)
+        .set({ points: firebase.firestore.FieldValue.increment(1) }, { merge: true })
+        .then(() => loadLoyaltyCustomers())
+        .catch(err => console.error('Loyalty point update failed (non-blocking):', err));
+    }
     showPrintConfirmModal(orderBeforeUpdate);
   }
 }
