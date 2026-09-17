@@ -636,7 +636,7 @@ function openCartModal() {
       <div id="bankTransferPanel" style="display:none; background:var(--paper-dim); border-radius:12px; padding:14px; margin-top:10px;">
         <div style="font-size:0.85rem; margin-bottom:8px;">${t('bankTransferInstructions')}</div>
         <div style="font-weight:700; font-size:1.05rem; direction:ltr; text-align:left;">${(shopInfo.bankAccountName || '').toUpperCase()}</div>
-        <div style="font-weight:700; font-size:1.1rem; direction:ltr; text-align:left; margin-bottom:10px;">${shopInfo.bankTransferNumber || ''}</div>
+        <div style="font-weight:700; font-size:1.1rem; direction:ltr; text-align:left; margin-bottom:10px;">${(shopInfo.bankTransferNumber || '').replace('+968', '').trim()}</div>
         <label for="receiptFileInput" class="btn btn-ghost" style="display:block; text-align:center; cursor:pointer;">📎 ${t('attachReceiptBtn')}</label>
         <input type="file" id="receiptFileInput" accept="image/*" style="display:none;" onchange="handleReceiptUpload(this)">
         <div id="receiptUploadStatus" style="font-size:0.8rem; margin-top:8px; text-align:center;"></div>
@@ -756,7 +756,7 @@ async function submitOrder() {
   }
 
   const loyaltyPhoneInput = document.getElementById('loyaltyPhoneInput');
-  const loyaltyPhone = (loyaltyPhoneInput && loyaltyPhoneInput.value.trim()) ? `+968 ${loyaltyPhoneInput.value.trim()}` : null;
+  const loyaltyPhone = (loyaltyPhoneInput && loyaltyPhoneInput.value.trim()) ? loyaltyPhoneInput.value.trim() : null;
 
   const items = Object.values(cart).map(i => ({ name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
