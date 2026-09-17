@@ -396,7 +396,10 @@
 
       <div class="field">
         <label for="bankTransferNumberInput" data-i18n="bankTransferNumberLbl">رقم التحويل</label>
-        <input type="tel" id="bankTransferNumberInput" placeholder="+968 9xxxxxxx">
+        <div style="display:flex; gap:8px;">
+          <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
+          <input type="text" inputmode="numeric" id="bankTransferNumberInput" placeholder="9xxxxxxx" style="flex:1;">
+        </div>
       </div>
 
       <div class="field">
@@ -1456,7 +1459,7 @@ async function loadShopInfo() {
     document.getElementById('payCardEnabled').checked = pm.card !== false;
 
     document.getElementById('bankAccountNameInput').value = info.bankAccountName || '';
-    document.getElementById('bankTransferNumberInput').value = info.bankTransferNumber || '';
+    document.getElementById('bankTransferNumberInput').value = (info.bankTransferNumber || '').replace('+968', '').trim();
 
     const ot = info.orderTypes || {};
     document.getElementById('orderTypeTableEnabled').checked = ot.table !== false;
@@ -1758,7 +1761,8 @@ async function saveShopInfo() {
     car: document.getElementById('orderTypeCarEnabled').checked
   };
   const bankAccountName = document.getElementById('bankAccountNameInput').value.trim();
-  const bankTransferNumber = document.getElementById('bankTransferNumberInput').value.trim();
+  const bankTransferNumberDigits = document.getElementById('bankTransferNumberInput').value.trim();
+  const bankTransferNumber = bankTransferNumberDigits ? `+968 ${bankTransferNumberDigits}` : '';
 
   if (!paymentMethods.cash && !paymentMethods.transfer && !paymentMethods.card) {
     errorEl.textContent = dt('atLeastOnePaymentError');

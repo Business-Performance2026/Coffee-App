@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -608,6 +609,11 @@ function openCartModal() {
         </div>
       </div>
 
+      <div class="field" style="margin-top:16px;">
+        <label for="orderNotes">${t('notesLabel')}</label>
+        <input type="text" id="orderNotes" placeholder="${t('notesPlaceholder')}">
+      </div>
+
       <div class="field">
         <label for="paymentMethod">${t('paymentMethodLbl')}</label>
         <select id="paymentMethod" onchange="onPaymentMethodChange()">${paymentOptionsHtml}</select>
@@ -622,12 +628,7 @@ function openCartModal() {
         <div id="receiptUploadStatus" style="font-size:0.8rem; margin-top:8px; text-align:center;"></div>
       </div>
 
-      <div class="field" style="margin-top:16px;">
-        <label for="orderNotes">${t('notesLabel')}</label>
-        <input type="text" id="orderNotes" placeholder="${t('notesPlaceholder')}">
-      </div>
-
-      <button class="btn" style="width:100%;" onclick="submitOrder()">${t('sendOrder')}</button>
+      <button class="btn" style="width:100%; margin-top:16px;" onclick="submitOrder()">${t('sendOrder')}</button>
       <div id="orderError" class="error-msg"></div>
     </div>
   `;
