@@ -1105,6 +1105,9 @@ const dashT = {
   paymentMethodLbl: { ar: 'طريقة الدفع', en: 'Payment method' },
   printReceiptBtn: { ar: 'طباعة الفاتورة', en: 'Print receipt' },
   viewReceiptBtn: { ar: 'عرض الوصل', en: 'View receipt' },
+  sendWhatsappBtn: { ar: 'واتساب', en: 'WhatsApp' },
+  waInvoiceItemsLabel: { ar: 'الأصناف', en: 'Items' },
+  waInvoiceThankYou: { ar: 'شكراً لطلبك ☕', en: 'Thank you for your order ☕' },
   tapToOpenPrintPage: { ar: 'اضغط الزر تحت عشان تفتح صفحة الطباعة (بتفتح بمتصفح Safari)', en: 'Tap the button below to open the print page (it opens in Safari)' },
   openPrintPageBtn: { ar: 'فتح صفحة الطباعة', en: 'Open print page' },
   receiptTitle: { ar: 'فاتورة', en: 'Receipt' },
@@ -2414,6 +2417,12 @@ function renderOrdersColumns() {
 
     return `
       <div class="order-card ${isUrgent ? 'order-urgent' : ''}">
+        ${order.loyaltyRewardReady ? `
+          <div style="text-align:center; background:#FBEAD1; border-radius:14px; padding:16px 10px; margin-bottom:12px;">
+            <div style="font-size:2.8rem; line-height:1;">🎁</div>
+            <div style="font-weight:700; color:#A6650D; margin-top:8px; font-size:0.95rem;">${cachedLoyaltyRewardText || dt('customerHasRewardBadge')}</div>
+          </div>
+        ` : ''}
         <div class="order-card-top">
           <strong>${order.orderType === 'car' ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})` : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
           <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
@@ -2422,10 +2431,10 @@ function renderOrdersColumns() {
         <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
         ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
         ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
-        ${order.loyaltyRewardReady ? `<div style="display:inline-flex; align-items:center; gap:5px; font-size:0.75rem; font-weight:600; padding:5px 12px; border-radius:999px; margin-top:6px; background:#FBEAD1; color:#A6650D;"><span style="font-size:1rem;">🎁</span><span>${cachedLoyaltyRewardText || dt('customerHasRewardBadge')}</span></div>` : ''}
         <div class="order-actions">
           ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
+          ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
           ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
         </div>
       </div>
@@ -2442,6 +2451,22 @@ function renderOrdersColumns() {
 }
 
 // ===================== Thermal receipt printing =====================
+// Opens WhatsApp with a ready-made text message summarizing the order,
+// addressed to the customer's own phone number (the one they gave for
+// loyalty points). The owner/staff still has to press Send themselves —
+// nothing is sent automatically.
+function sendWhatsAppInvoice(orderId) {
+  const order = lastOrdersData.find(o => o.id === orderId) || completedOrdersData.find(o => o.id === orderId);
+  if (!order || !order.loyaltyPhone) return;
+
+  const itemsText = order.items.map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
+  const message = `*${shopNameForReceipt}*\n\n${dt('waInvoiceItemsLabel')}: ${itemsText}\n${dt('total')}: ${Number(order.total).toFixed(2)} ${dt('currency')}\n\n${dt('waInvoiceThankYou')}`;
+
+  const phoneDigits = order.loyaltyPhone.replace(/\D/g, '');
+  const waUrl = `https://wa.me/968${phoneDigits}?text=${encodeURIComponent(message)}`;
+  window.open(waUrl, '_blank');
+}
+
 function printReceipt(orderId) {
   // Looks in both the live (pending/preparing) cache and the completed-orders
   // cache, so the print button works from either list.
@@ -2571,6 +2596,7 @@ function renderCompletedOrders() {
         <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
         <div class="order-actions">
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
+          ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
           ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
         </div>
       </div>
