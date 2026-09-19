@@ -75,6 +75,7 @@ const translations = {
   receiptUploaded: { ar: 'تم إرفاق الوصل ✓', en: 'Receipt attached ✓' },
   receiptUploadFailed: { ar: 'تعذر رفع الوصل، حاول مرة أخرى.', en: 'Could not upload the receipt. Please try again.' },
   receiptRequiredError: { ar: 'الرجاء إرفاق وصل التحويل قبل إرسال الطلب.', en: 'Please attach the transfer receipt before sending the order.' },
+  outOfStockError: { ar: 'نفذت الكمية من', en: 'Out of stock' },
   loyaltyPhoneLbl: { ar: 'رقم جوالك (لجمع نقاط الولاء) - اختياري', en: 'Your phone (for loyalty points) - optional' },
   rewardReadyMsg: { ar: 'عندك مكافأة جاهزة! أخبر الموظف عند الاستلام:', en: 'You have a reward ready! Tell the staff when you pick up:' },
   rewardReadyPopupTitle: { ar: 'مبروك! 🎉 طلبك هذا مجاني', en: 'Congrats! 🎉 This order is free' },
@@ -243,10 +244,10 @@ async function loadMenu() {
       html += `<div class="category-title" id="cat-${i}">${category}</div>`;
       html += '<div class="menu-grid">';
       items.forEach(item => {
-        const unavailable = item.available === false;
+        const unavailable = item.available === false || item.stock === 0;
         const itemName = (currentLang === 'en' && item.nameEn) ? item.nameEn : item.name;
         const itemDesc = item.description || '';
-        itemMeta[item.id] = { name: item.name, nameEn: item.nameEn || '', price: item.price, image: item.image || '', description: itemDesc, available: item.available !== false };
+        itemMeta[item.id] = { name: item.name, nameEn: item.nameEn || '', price: item.price, image: item.image || '', description: itemDesc, available: item.available !== false && item.stock !== 0 };
         if (item.suggested === true && item.available !== false) suggestedItemIds.push(item.id);
         html += `
           <div class="grid-card ${unavailable ? 'unavailable' : ''}" data-search="${(itemName + ' ' + itemDesc).toLowerCase()}">
@@ -781,25 +782,57 @@ async function submitOrder() {
   const loyaltyPhoneInput = document.getElementById('loyaltyPhoneInput');
   const loyaltyPhone = (loyaltyPhoneInput && loyaltyPhoneInput.value.trim()) ? loyaltyPhoneInput.value.trim() : null;
 
-  const items = Object.values(cart).map(i => ({ name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
+  const cartEntries = Object.entries(cart); // [itemId, {name, nameEn, price, qty}]
+  const items = cartEntries.map(([, i]) => ({ name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
+  const orderRef = db.collection('shops').doc(shopId).collection('orders').doc();
 
   try {
-    const docRef = await db.collection('shops').doc(shopId).collection('orders').add({
-      orderType: selectedOrderType,
-      tableNumber: table || null,
-      carNumber: carNumber || null,
-      carColor: carColor || null,
-      notes: notes || null,
-      paymentMethod,
-      receiptUrl: paymentMethod === 'transfer' ? uploadedReceiptUrl : null,
-      loyaltyPhone,
-      loyaltyRewardReady: loyaltyPhone ? currentLoyaltyRewardReady : false,
-      items,
-      total,
-      status: 'pending',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    await db.runTransaction(async (tx) => {
+      const menuRefs = cartEntries.map(([id]) => db.collection('shops').doc(shopId).collection('menu').doc(id));
+      const menuDocs = [];
+      for (const ref of menuRefs) {
+        menuDocs.push(await tx.get(ref));
+      }
+
+      // Verify stock BEFORE writing anything — if any tracked item doesn't
+      // have enough left, the whole order is rejected (nothing is decremented).
+      for (let i = 0; i < cartEntries.length; i++) {
+        const [, cartItem] = cartEntries[i];
+        const menuData = menuDocs[i].exists ? menuDocs[i].data() : {};
+        if (typeof menuData.stock === 'number' && menuData.stock < cartItem.qty) {
+          const err = new Error('OUT_OF_STOCK');
+          err.itemName = (currentLang === 'en' && menuData.nameEn) ? menuData.nameEn : cartItem.name;
+          throw err;
+        }
+      }
+
+      for (let i = 0; i < cartEntries.length; i++) {
+        const [, cartItem] = cartEntries[i];
+        const menuData = menuDocs[i].exists ? menuDocs[i].data() : {};
+        if (typeof menuData.stock === 'number') {
+          tx.update(menuRefs[i], { stock: menuData.stock - cartItem.qty });
+        }
+      }
+
+      tx.set(orderRef, {
+        orderType: selectedOrderType,
+        tableNumber: table || null,
+        carNumber: carNumber || null,
+        carColor: carColor || null,
+        notes: notes || null,
+        paymentMethod,
+        receiptUrl: paymentMethod === 'transfer' ? uploadedReceiptUrl : null,
+        loyaltyPhone,
+        loyaltyRewardReady: loyaltyPhone ? currentLoyaltyRewardReady : false,
+        items,
+        total,
+        status: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
     });
+
+    const docRef = orderRef;
 
     // Reset cart
     cart = {};
@@ -811,6 +844,10 @@ async function submitOrder() {
     db.collection('shops').doc(shopId).update({
       'info.lastOrderAt': firebase.firestore.FieldValue.serverTimestamp()
     }).catch(err => console.error('lastOrderAt update failed (non-blocking):', err));
+
+    // Refresh the grid so any item that just hit zero stock shows as
+    // unavailable immediately, without needing a full page reload.
+    loadMenu();
 
     document.querySelectorAll('.grid-qty-container').forEach(el => {
       const itemId = el.id.replace('qtyctrl-', '');
@@ -834,7 +871,12 @@ async function submitOrder() {
     `;
   } catch (err) {
     console.error(err);
-    errorEl.textContent = t('orderSendError');
+    if (err.message === 'OUT_OF_STOCK') {
+      errorEl.textContent = `${t('outOfStockError')}: ${err.itemName || ''}`;
+      loadMenu();
+    } else {
+      errorEl.textContent = t('orderSendError');
+    }
   }
 }
 
