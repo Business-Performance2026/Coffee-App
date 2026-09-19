@@ -1152,6 +1152,7 @@ const dashT = {
   paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
   staffBreakdownTitle: { ar: 'حسب البائع', en: 'By staff member' },
   shopOwnerLabel: { ar: 'صاحب الكوفي', en: 'Shop owner' },
+  soldByLabel: { ar: 'بواسطة', en: 'By' },
   noCounterSalesYet: { ar: 'لا توجد مبيعات كاونتر بهذي الفترة.', en: 'No counter sales in this period.' },
   addOneItemError: { ar: 'أضف صنف واحد على الأقل.', en: 'Add at least one item.' },
   orderSendErrorGeneric: { ar: 'حدث خطأ أثناء إرسال الطلب.', en: 'An error occurred while sending the order.' },
@@ -2499,6 +2500,7 @@ function renderFullOrderCardHtml(order) {
       <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
       ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
       ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
+      ${order.soldBy ? `<div class="order-items-line">👤 ${dt('soldByLabel')}: ${order.soldBy}</div>` : ''}
       <div class="order-actions">
         ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}"); document.getElementById("orderDetailOverlay").remove();'>${nextLabel[status]}</button>` : ''}
         <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
@@ -2893,31 +2895,34 @@ async function openNewOrderModal() {
 
   let posCatPillsHtml = '';
   let itemsHtml = Object.keys(categoriesMap).map((catName, catIndex) => {
-    const rowsHtml = categoriesMap[catName].map(item => {
+    const cardsHtml = categoriesMap[catName].map(item => {
       const displayName = (dashLang === 'en' && item.nameEn) ? item.nameEn : item.name;
       const nameEnSafe = (item.nameEn || '').replace(/'/g, "\\'");
+      const nameSafe = item.name.replace(/'/g, "\\'");
       const outOfStock = item.stock === 0;
       return `
-      <div class="item-row" style="${outOfStock ? 'opacity:0.5;' : ''}">
-        ${item.image ? `<img src="${item.image}" style="width:44px; height:44px; border-radius:10px; object-fit:cover; flex-shrink:0;">` : '<div style="width:44px; height:44px; border-radius:10px; background:var(--paper-dim); flex-shrink:0;"></div>'}
-        <div class="item-info">
-          <div class="item-name">${displayName}</div>
-          ${outOfStock ? `<div class="item-price" style="color:#B3441E;">${dt('outOfStockLabel')}</div>` : `<div class="item-price">${Number(item.price).toFixed(2)} ${dt('currency')}</div>`}
+      <div class="grid-card ${outOfStock ? 'unavailable' : ''}">
+        <div class="grid-card-img-wrap">
+          ${item.image ? `<img src="${item.image}" class="grid-card-img" alt="">` : ''}
+          ${outOfStock ? `<div class="grid-unavailable-tag">${dt('outOfStockLabel')}</div>` : `
+            <div class="qty-control" style="position:absolute; bottom:8px; left:8px; right:8px; background:white; border-radius:999px; box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+              <button class="qty-btn" onclick='posChangeQty("${item.id}", "${nameSafe}", "${nameEnSafe}", ${item.price}, -1)'>−</button>
+              <span class="qty-count" id="pos-count-${item.id}">0</span>
+              <button class="qty-btn" onclick='posChangeQty("${item.id}", "${nameSafe}", "${nameEnSafe}", ${item.price}, 1)'>+</button>
+            </div>
+          `}
         </div>
-        ${outOfStock ? '' : `
-        <div class="qty-control">
-          <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", "${nameEnSafe}", ${item.price}, -1)'>−</button>
-          <span class="qty-count" id="pos-count-${item.id}">0</span>
-          <button class="qty-btn" onclick='posChangeQty("${item.id}", "${item.name.replace(/'/g, "\\'")}", "${nameEnSafe}", ${item.price}, 1)'>+</button>
+        <div class="grid-card-body">
+          <div class="grid-card-name">${displayName}</div>
+          <div class="grid-card-price">${Number(item.price).toFixed(2)} ${dt('currency')}</div>
         </div>
-        `}
       </div>
     `;
     }).join('');
 
     posCatPillsHtml += `<button type="button" class="pos-cat-pill ${catIndex === 0 ? 'active' : ''}" data-poscat="pos-cat-${catIndex}" onclick="scrollToPosCategory('pos-cat-${catIndex}', this)">${catName}</button>`;
 
-    return `<h4 id="pos-cat-${catIndex}" style="margin:16px 0 4px; color:var(--stone); scroll-margin-top:8px;">${catName}</h4>${rowsHtml}`;
+    return `<h4 id="pos-cat-${catIndex}" style="margin:16px 0 4px; color:var(--stone); scroll-margin-top:8px;">${catName}</h4><div class="menu-grid">${cardsHtml}</div>`;
   }).join('');
 
   overlay.innerHTML = `
