@@ -199,8 +199,11 @@
       </div>
     </div>
 
-    <h3 style="margin:24px 0 12px;" data-i18n="completedOrdersTitle">الطلبات المكتملة</h3>
-    <div id="completedOrdersList"><div class="state-msg">جاري التحميل...</div></div>
+    <button type="button" class="completed-orders-toggle" id="completedOrdersToggle" onclick="toggleCompletedOrders()">
+      <span data-i18n="completedOrdersTitle">الطلبات المكتملة</span>
+      <span id="completedOrdersChevron">▾</span>
+    </button>
+    <div id="completedOrdersList" style="display:none;"><div class="state-msg">جاري التحميل...</div></div>
   </div>
 
   <!-- ===================== TAB 3: المخزون (Inventory) ===================== -->
@@ -2634,6 +2637,14 @@ function listenToCompletedOrders() {
       const el = document.getElementById('completedOrdersList');
       if (el) el.innerHTML = `<div class="state-msg">${dt('ordersLoadError')}</div>`;
     });
+}
+
+function toggleCompletedOrders() {
+  const listEl = document.getElementById('completedOrdersList');
+  const chevron = document.getElementById('completedOrdersChevron');
+  const isOpen = listEl.style.display !== 'none';
+  listEl.style.display = isOpen ? 'none' : 'block';
+  chevron.textContent = isOpen ? '▾' : '▴';
 }
 
 function renderCompletedOrders() {

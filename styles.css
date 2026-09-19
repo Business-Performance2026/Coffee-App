@@ -948,6 +948,28 @@ button, input, select {
 
 .stock-low { color: #B3441E; font-size: 0.78rem; margin-top:2px; }
 
+.completed-orders-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  padding: 18px 4px 12px;
+  margin-top: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.completed-orders-toggle #completedOrdersChevron {
+  color: var(--stone);
+  font-size: 1.2rem;
+}
+
 /* ---- Thermal receipt printing (in-page, no popup window) ---- */
 #printReceiptArea {
   display: none;
