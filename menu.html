@@ -819,10 +819,7 @@ async function submitOrder() {
   try {
     await db.runTransaction(async (tx) => {
       const menuRefs = cartEntries.map(([id]) => db.collection('shops').doc(shopId).collection('menu').doc(id));
-      const menuDocs = [];
-      for (const ref of menuRefs) {
-        menuDocs.push(await tx.get(ref));
-      }
+      const menuDocs = await Promise.all(menuRefs.map(ref => tx.get(ref)));
 
       // Verify stock BEFORE writing anything — if any tracked item doesn't
       // have enough left, the whole order is rejected (nothing is decremented).
