@@ -76,6 +76,7 @@ const translations = {
   receiptUploadFailed: { ar: 'تعذر رفع الوصل، حاول مرة أخرى.', en: 'Could not upload the receipt. Please try again.' },
   receiptRequiredError: { ar: 'الرجاء إرفاق وصل التحويل قبل إرسال الطلب.', en: 'Please attach the transfer receipt before sending the order.' },
   outOfStockError: { ar: 'نفذت الكمية من', en: 'Out of stock' },
+  sendingOrderLoading: { ar: '⏳ جاري الإرسال...', en: '⏳ Sending...' },
   cancelOrderBtn: { ar: '❌ إلغاء الطلب', en: '❌ Cancel order' },
   confirmCancelOrder: { ar: 'متأكد تريد تلغي طلبك؟', en: 'Are you sure you want to cancel your order?' },
   cancelOrderFailed: { ar: 'تعذر إلغاء الطلب، حاول مرة أخرى.', en: 'Could not cancel the order. Please try again.' },
@@ -666,7 +667,7 @@ function openCartModal() {
         <div id="receiptUploadStatus" style="font-size:0.8rem; margin-top:8px; text-align:center;"></div>
       </div>
 
-      <button class="btn" style="width:100%; margin-top:16px;" onclick="submitOrder()">${t('sendOrder')}</button>
+      <button class="btn" id="submitOrderBtn" style="width:100%; margin-top:16px;" onclick="submitOrder()">${t('sendOrder')}</button>
       <div id="orderError" class="error-msg"></div>
     </div>
   `;
@@ -778,6 +779,9 @@ function closeCartModal() {
 }
 
 async function submitOrder() {
+  const submitBtn = document.getElementById('submitOrderBtn');
+  if (submitBtn.disabled) return; // already submitting — ignore extra taps
+
   const errorEl = document.getElementById('orderError');
   const notes = document.getElementById('orderNotes').value.trim();
   const paymentMethod = document.getElementById('paymentMethod').value;
@@ -807,6 +811,10 @@ async function submitOrder() {
   const items = cartEntries.map(([, i]) => ({ name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
   const orderRef = db.collection('shops').doc(shopId).collection('orders').doc();
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = t('sendingOrderLoading');
+  errorEl.textContent = '';
 
   try {
     await db.runTransaction(async (tx) => {
@@ -898,6 +906,8 @@ async function submitOrder() {
     } else {
       errorEl.textContent = t('orderSendError');
     }
+    submitBtn.disabled = false;
+    submitBtn.textContent = t('sendOrder');
   }
 }
 
