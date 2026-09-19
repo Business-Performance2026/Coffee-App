@@ -2434,59 +2434,96 @@ function renderOrdersColumns() {
   const prepCol = document.getElementById('ordersColPreparing');
   if (!newCol || !prepCol) return;
 
-  const statusLabels = { pending: dt('statusNew'), preparing: dt('statusPreparing'), ready: dt('statusReady') };
-  const nextLabel = { pending: dt('startPreparingBtn'), preparing: dt('markReadyBtn') };
   const now = Date.now();
-
   const newOrders = lastOrdersData.filter(o => (o.status || 'pending') === 'pending');
   const prepOrders = lastOrdersData.filter(o => (o.status || 'pending') === 'preparing');
 
-  function renderCard(order) {
-    const status = order.status || 'pending';
-    const itemsText = order.items.map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
+  function renderTile(order) {
     let elapsedMin = null;
     if (order.createdAt && order.createdAt.toDate) {
       elapsedMin = Math.floor((now - order.createdAt.toDate().getTime()) / 60000);
     }
     const isUrgent = elapsedMin !== null && elapsedMin >= 10;
-
-    const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
-    const paymentLabel = paymentLabels[order.paymentMethod] || '';
+    const label = order.orderType === 'car'
+      ? `🚗 ${order.carNumber || '-'}`
+      : `🍽️ ${order.tableNumber || '-'}`;
 
     return `
-      <div class="order-card ${isUrgent ? 'order-urgent' : ''}">
-        ${order.loyaltyRewardReady ? `
-          <div style="text-align:center; background:#FBEAD1; border-radius:14px; padding:16px 10px; margin-bottom:12px;">
-            <div style="font-size:2.8rem; line-height:1;">🎁</div>
-            <div style="font-weight:700; color:#A6650D; margin-top:8px; font-size:0.95rem;">${cachedLoyaltyRewardText || dt('customerHasRewardBadge')}</div>
-          </div>
-        ` : ''}
-        <div class="order-card-top">
-          <strong>${order.orderType === 'car' ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})` : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
-          <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
-        </div>
-        ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
-        <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
-        ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
-        ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
-        <div class="order-actions">
-          ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}")'>${nextLabel[status]}</button>` : ''}
-          <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
-          ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
-          ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
-          <button class="btn btn-ghost" style="color:#B3441E;" onclick='staffCancelOrder("${order.id}")'>❌ ${dt('cancelOrderBtn')}</button>
-        </div>
-      </div>
+      <button type="button" class="order-tile ${isUrgent ? 'order-tile-urgent' : ''}" onclick='openOrderDetailModal("${order.id}")'>
+        ${order.loyaltyRewardReady ? '<span class="order-tile-gift">🎁</span>' : ''}
+        <span>${label}</span>
+      </button>
     `;
   }
 
   newCol.innerHTML = newOrders.length
-    ? newOrders.map(renderCard).join('')
+    ? `<div class="order-tiles-grid">${newOrders.map(renderTile).join('')}</div>`
     : `<div class="state-msg">${dt('noOrdersYet')}</div>`;
 
   prepCol.innerHTML = prepOrders.length
-    ? prepOrders.map(renderCard).join('')
+    ? `<div class="order-tiles-grid">${prepOrders.map(renderTile).join('')}</div>`
     : `<div class="state-msg">${dt('noOrdersYet')}</div>`;
+}
+
+// Builds the exact same detailed order card used before this redesign —
+// now only shown inside the tap-to-open modal, keeping all the same
+// actions (advance, print, WhatsApp, receipt, cancel) fully unchanged.
+function renderFullOrderCardHtml(order) {
+  const now = Date.now();
+  const status = order.status || 'pending';
+  const statusLabels = { pending: dt('statusNew'), preparing: dt('statusPreparing'), ready: dt('statusReady') };
+  const nextLabel = { pending: dt('startPreparingBtn'), preparing: dt('markReadyBtn') };
+  const itemsText = order.items.map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
+  let elapsedMin = null;
+  if (order.createdAt && order.createdAt.toDate) {
+    elapsedMin = Math.floor((now - order.createdAt.toDate().getTime()) / 60000);
+  }
+  const isUrgent = elapsedMin !== null && elapsedMin >= 10;
+
+  const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
+  const paymentLabel = paymentLabels[order.paymentMethod] || '';
+
+  return `
+    <div class="order-card ${isUrgent ? 'order-urgent' : ''}" style="border:none; padding:0; margin:0;">
+      ${order.loyaltyRewardReady ? `
+        <div style="text-align:center; background:#FBEAD1; border-radius:14px; padding:16px 10px; margin-bottom:12px;">
+          <div style="font-size:2.8rem; line-height:1;">🎁</div>
+          <div style="font-weight:700; color:#A6650D; margin-top:8px; font-size:0.95rem;">${cachedLoyaltyRewardText || dt('customerHasRewardBadge')}</div>
+        </div>
+      ` : ''}
+      <div class="order-card-top">
+        <strong>${order.orderType === 'car' ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})` : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
+        <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
+      </div>
+      ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
+      <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
+      ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
+      ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
+      <div class="order-actions">
+        ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}"); document.getElementById("orderDetailOverlay").remove();'>${nextLabel[status]}</button>` : ''}
+        <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
+        ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
+        ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
+        <button class="btn btn-ghost" style="color:#B3441E;" onclick='staffCancelOrder("${order.id}"); document.getElementById("orderDetailOverlay").remove();'>❌ ${dt('cancelOrderBtn')}</button>
+      </div>
+    </div>
+  `;
+}
+
+function openOrderDetailModal(orderId) {
+  const order = lastOrdersData.find(o => o.id === orderId);
+  if (!order) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'orderDetailOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="document.getElementById('orderDetailOverlay').remove()">×</button>
+      ${renderFullOrderCardHtml(order)}
+    </div>
+  `;
+  document.body.appendChild(overlay);
 }
 
 // ===================== Thermal receipt printing =====================

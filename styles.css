@@ -466,6 +466,42 @@ button, input, select {
   gap: 8px;
 }
 
+.order-tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.order-tile {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+  padding: 4px;
+  text-align: center;
+}
+
+.order-tile.order-tile-urgent {
+  border-color: #C0392B;
+  background: #FBEAE5;
+}
+
+.order-tile-gift {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  font-size: 1rem;
+}
+
 /* ---- Notification bell ---- */
 .bell-wrap {
   position: relative;
