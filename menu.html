@@ -77,8 +77,10 @@ const translations = {
   receiptRequiredError: { ar: 'الرجاء إرفاق وصل التحويل قبل إرسال الطلب.', en: 'Please attach the transfer receipt before sending the order.' },
   outOfStockError: { ar: 'نفذت الكمية من', en: 'Out of stock' },
   cancelOrderBtn: { ar: '❌ إلغاء الطلب', en: '❌ Cancel order' },
-  confirmCancelOrder: { ar: 'متأكد تبي تلغي طلبك؟', en: 'Are you sure you want to cancel your order?' },
+  confirmCancelOrder: { ar: 'متأكد تريد تلغي طلبك؟', en: 'Are you sure you want to cancel your order?' },
   cancelOrderFailed: { ar: 'تعذر إلغاء الطلب، حاول مرة أخرى.', en: 'Could not cancel the order. Please try again.' },
+  yesCancelBtn: { ar: 'نعم، ألغِ الطلب', en: 'Yes, cancel it' },
+  noKeepBtn: { ar: 'تراجع', en: 'No, keep it' },
   loyaltyPhoneLbl: { ar: 'رقم جوالك (لجمع نقاط الولاء) - اختياري', en: 'Your phone (for loyalty points) - optional' },
   rewardReadyMsg: { ar: 'عندك مكافأة جاهزة! أخبر الموظف عند الاستلام:', en: 'You have a reward ready! Tell the staff when you pick up:' },
   rewardReadyPopupTitle: { ar: 'مبروك! 🎉 طلبك هذا مجاني', en: 'Congrats! 🎉 This order is free' },
@@ -93,6 +95,7 @@ const translations = {
   orderSendError: { ar: 'حدث خطأ أثناء إرسال الطلب. حاول مرة أخرى.', en: 'Something went wrong sending your order. Please try again.' },
   orderSent: { ar: 'تم إرسال طلبك!', en: 'Your order has been sent!' },
   close: { ar: 'إغلاق', en: 'Close' },
+  orderCancelledByShopMsg: { ar: 'تم إلغاء طلبك من قبل الكوفي', en: 'Your order was cancelled by the shop' },
   yourOrderStatus: { ar: 'حالة طلبك', en: 'Your order status' },
   etaText: { ar: 'الوقت المتوقع', en: 'Estimated time' },
   minuteWord: { ar: 'دقيقة', en: 'min' },
@@ -931,6 +934,22 @@ function trackOrder(orderId) {
       }
       const status = doc.data().status || 'pending';
 
+      if (status === 'cancelled') {
+        const bar = document.getElementById('orderStatusBar');
+        bar.style.display = 'none';
+        const trackerEl = document.getElementById('trackerContainer');
+        if (trackerEl && !ratingInProgress) {
+          trackerEl.innerHTML = `
+            <div style="text-align:center; padding:10px 0;">
+              <div style="font-size:2.2rem; margin-bottom:10px;">❌</div>
+              <div style="font-weight:600; margin-bottom:18px;">${t('orderCancelledByShopMsg')}</div>
+              <button class="btn" style="width:100%;" onclick="clearOrderTracking()">${t('close')}</button>
+            </div>
+          `;
+        }
+        return;
+      }
+
       const bar = document.getElementById('orderStatusBar');
       bar.style.display = 'block';
       document.getElementById('statusBarText').textContent = getStatusBarText(status);
@@ -1040,15 +1059,33 @@ function renderTracker(status) {
 
 async function cancelOrder() {
   if (!activeOrderId) return;
-  if (!confirm(t('confirmCancelOrder'))) return;
 
-  try {
-    await db.collection('shops').doc(shopId).collection('orders').doc(activeOrderId).update({ status: 'cancelled' });
-    clearOrderTracking();
-  } catch (err) {
-    console.error('Cancel order failed:', err);
-    alert(t('cancelOrderFailed'));
-  }
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'cancelConfirmOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">❌</div>
+      <h3 style="margin-bottom:20px;">${t('confirmCancelOrder')}</h3>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" style="flex:1; background:#B3441E;" id="confirmCancelYesBtn">${t('yesCancelBtn')}</button>
+        <button class="btn btn-ghost" style="flex:1;" id="confirmCancelNoBtn">${t('noKeepBtn')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('confirmCancelNoBtn').addEventListener('click', () => overlay.remove());
+  document.getElementById('confirmCancelYesBtn').addEventListener('click', async () => {
+    overlay.remove();
+    try {
+      await db.collection('shops').doc(shopId).collection('orders').doc(activeOrderId).update({ status: 'cancelled' });
+      clearOrderTracking();
+    } catch (err) {
+      console.error('Cancel order failed:', err);
+      alert(t('cancelOrderFailed'));
+    }
+  });
 }
 
 function openStatusModal() {

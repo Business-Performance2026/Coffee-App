@@ -1141,6 +1141,10 @@ const dashT = {
   newRewardOrderTitle: { ar: 'طلب مكافأة! 🎁', en: 'Reward order! 🎁' },
   newRewardOrderMsg: { ar: 'وصلك طلب من عميل حقق نقاط الولاء — هذا الطلب يستاهل مكافأة مجانية.', en: 'You received an order from a customer who reached their loyalty points — this order deserves a free reward.' },
   orderCancelledTitle: { ar: 'العميل ألغى الطلب', en: 'Customer cancelled the order' },
+  cancelOrderBtn: { ar: 'إلغاء الطلب', en: 'Cancel order' },
+  confirmStaffCancelOrder: { ar: 'متأكد تريد تلغي هذا الطلب؟', en: 'Are you sure you want to cancel this order?' },
+  yesCancelBtn: { ar: 'نعم، ألغِ الطلب', en: 'Yes, cancel it' },
+  noKeepBtn: { ar: 'تراجع', en: 'No, keep it' },
   okBtn: { ar: 'حسناً', en: 'OK' },
   atLeastOneOrderTypeError: { ar: 'لازم تفعّل نوع طلب واحد على الأقل.', en: 'Please enable at least one order type.' },
   paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
@@ -2467,6 +2471,7 @@ function renderOrdersColumns() {
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
           ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
           ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
+          <button class="btn btn-ghost" style="color:#B3441E;" onclick='staffCancelOrder("${order.id}")'>❌ ${dt('cancelOrderBtn')}</button>
         </div>
       </div>
     `;
@@ -2496,6 +2501,33 @@ function sendWhatsAppInvoice(orderId) {
   const phoneDigits = order.loyaltyPhone.replace(/\D/g, '');
   const waUrl = `https://wa.me/968${phoneDigits}?text=${encodeURIComponent(message)}`;
   window.open(waUrl, '_blank');
+}
+
+function staffCancelOrder(orderId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'staffCancelOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">❌</div>
+      <h3 style="margin-bottom:20px;">${dt('confirmStaffCancelOrder')}</h3>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" style="flex:1; background:#B3441E;" id="staffCancelYesBtn">${dt('yesCancelBtn')}</button>
+        <button class="btn btn-ghost" style="flex:1;" id="staffCancelNoBtn">${dt('noKeepBtn')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('staffCancelNoBtn').addEventListener('click', () => overlay.remove());
+  document.getElementById('staffCancelYesBtn').addEventListener('click', async () => {
+    overlay.remove();
+    try {
+      await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({ status: 'cancelled' });
+    } catch (err) {
+      console.error('Staff cancel order failed:', err);
+    }
+  });
 }
 
 function printReceipt(orderId) {
