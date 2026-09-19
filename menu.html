@@ -76,6 +76,9 @@ const translations = {
   receiptUploadFailed: { ar: 'تعذر رفع الوصل، حاول مرة أخرى.', en: 'Could not upload the receipt. Please try again.' },
   receiptRequiredError: { ar: 'الرجاء إرفاق وصل التحويل قبل إرسال الطلب.', en: 'Please attach the transfer receipt before sending the order.' },
   outOfStockError: { ar: 'نفذت الكمية من', en: 'Out of stock' },
+  cancelOrderBtn: { ar: '❌ إلغاء الطلب', en: '❌ Cancel order' },
+  confirmCancelOrder: { ar: 'متأكد تبي تلغي طلبك؟', en: 'Are you sure you want to cancel your order?' },
+  cancelOrderFailed: { ar: 'تعذر إلغاء الطلب، حاول مرة أخرى.', en: 'Could not cancel the order. Please try again.' },
   loyaltyPhoneLbl: { ar: 'رقم جوالك (لجمع نقاط الولاء) - اختياري', en: 'Your phone (for loyalty points) - optional' },
   rewardReadyMsg: { ar: 'عندك مكافأة جاهزة! أخبر الموظف عند الاستلام:', en: 'You have a reward ready! Tell the staff when you pick up:' },
   rewardReadyPopupTitle: { ar: 'مبروك! 🎉 طلبك هذا مجاني', en: 'Congrats! 🎉 This order is free' },
@@ -380,12 +383,27 @@ function updateCartBar() {
 
   if (totalQty === 0) {
     bar.style.display = 'none';
+    adjustStatusBarPosition();
     return;
   }
 
   bar.style.display = 'flex';
   document.getElementById('cartCount').textContent = `${totalQty} ${t('itemsWord')}`;
   document.getElementById('cartTotal').textContent = `${totalPrice.toFixed(2)} ${t('currency')}`;
+  adjustStatusBarPosition();
+}
+
+// The cart bar and the order-tracking status bar both sit at the same
+// fixed spot at the bottom of the screen. If a customer is already
+// tracking one order and starts building a second, both bars would show
+// at once and silently overlap — this lifts the status bar clear of the
+// cart bar whenever both are visible, so neither is ever hidden behind
+// the other.
+function adjustStatusBarPosition() {
+  const cartBarVisible = document.getElementById('cartBar').style.display === 'flex';
+  const statusBar = document.getElementById('orderStatusBar');
+  if (!statusBar) return;
+  statusBar.style.bottom = cartBarVisible ? 'calc(86px + env(safe-area-inset-bottom))' : '';
 }
 
 function addSuggestedToCart(itemId) {
@@ -917,6 +935,7 @@ function trackOrder(orderId) {
       bar.style.display = 'block';
       document.getElementById('statusBarText').textContent = getStatusBarText(status);
       bar.classList.toggle('status-bar-ready', status === 'ready');
+      adjustStatusBarPosition();
 
       const trackerEl = document.getElementById('trackerContainer');
       if (trackerEl && !ratingInProgress) trackerEl.innerHTML = renderTracker(status);
@@ -1012,9 +1031,24 @@ function renderTracker(status) {
   let doneBtnHtml = '';
   if (status === 'ready') {
     doneBtnHtml = `<button class="btn" style="width:100%; margin-top:20px;" onclick="showRatingPrompt()">${t('orderPickedUp')}</button>`;
+  } else if (status === 'pending') {
+    doneBtnHtml = `<button class="btn btn-ghost" style="width:100%; margin-top:20px; color:#B3441E;" onclick="cancelOrder()">${t('cancelOrderBtn')}</button>`;
   }
 
   return `<div class="order-track">${barHtml}${labelsHtml}${etaHtml}${doneBtnHtml}</div>`;
+}
+
+async function cancelOrder() {
+  if (!activeOrderId) return;
+  if (!confirm(t('confirmCancelOrder'))) return;
+
+  try {
+    await db.collection('shops').doc(shopId).collection('orders').doc(activeOrderId).update({ status: 'cancelled' });
+    clearOrderTracking();
+  } catch (err) {
+    console.error('Cancel order failed:', err);
+    alert(t('cancelOrderFailed'));
+  }
 }
 
 function openStatusModal() {

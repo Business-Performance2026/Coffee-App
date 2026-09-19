@@ -1140,6 +1140,7 @@ const dashT = {
   customerHasRewardBadge: { ar: 'هذا العميل عنده مكافأة جاهزة', en: 'This customer has a reward ready' },
   newRewardOrderTitle: { ar: 'طلب مكافأة! 🎁', en: 'Reward order! 🎁' },
   newRewardOrderMsg: { ar: 'وصلك طلب من عميل حقق نقاط الولاء — هذا الطلب يستاهل مكافأة مجانية.', en: 'You received an order from a customer who reached their loyalty points — this order deserves a free reward.' },
+  orderCancelledTitle: { ar: 'العميل ألغى الطلب', en: 'Customer cancelled the order' },
   okBtn: { ar: 'حسناً', en: 'OK' },
   atLeastOneOrderTypeError: { ar: 'لازم تفعّل نوع طلب واحد على الأقل.', en: 'Please enable at least one order type.' },
   paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
@@ -1472,6 +1473,14 @@ function playAlertSound() {
     t += toneDur + 0.4;
   }
 }
+function playCancelSound() {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  const now = ctx.currentTime;
+  playTone(ctx, 440, now, 0.18);
+  playTone(ctx, 294, now + 0.2, 0.32);
+}
+
 document.addEventListener('click', function unlockAudioOnce() {
   const ctx = getAudioCtx();
   if (ctx.state === 'suspended') ctx.resume();
@@ -2347,6 +2356,8 @@ let lastOrdersData = [];
 let completedOrdersData = [];
 let completedOrdersUnsub = null;
 
+const alertedCancelIds = new Set();
+
 function listenToOrders() {
   ordersUnsub = db.collection('shops').doc(currentShopId).collection('orders')
     .where('status', 'in', ['pending', 'preparing'])
@@ -2367,6 +2378,18 @@ function listenToOrders() {
             }
           });
         }
+
+        // A cancelled order exits this pending/preparing query, showing up
+        // as a "removed" change — with a distinct sound and a clear popup
+        // so it's never mistaken for an order that was simply completed.
+        snap.docChanges().forEach(change => {
+          const data = change.doc.data();
+          if (data.status === 'cancelled' && !alertedCancelIds.has(change.doc.id)) {
+            alertedCancelIds.add(change.doc.id);
+            playCancelSound();
+            showCancelledOrderPopup(data);
+          }
+        });
       }
       isFirstOrdersLoad = false;
 
@@ -2644,6 +2667,31 @@ async function advanceOrder(orderId, newStatus) {
 // Clear popup for staff when a newly-arrived order qualifies for a free
 // loyalty reward — separate from (and in addition to) the small badge on
 // the order card itself, so it's impossible to miss.
+// Clear popup for staff when a customer cancels their own order — the order
+// disappears from the live board at the same moment, so this ensures the
+// cancellation is never missed or mistaken for a normal completion.
+function showCancelledOrderPopup(order) {
+  const typeLabel = order.orderType === 'car'
+    ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
+    : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '-'}`;
+  const itemsText = (order.items || []).map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'cancelledOrderOverlay-' + Date.now();
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">❌</div>
+      <h3 style="margin-bottom:12px; color:#B3441E;">${dt('orderCancelledTitle')}</h3>
+      <p style="color:var(--ink); margin-bottom:4px;">${typeLabel}</p>
+      <p style="color:var(--stone); margin-bottom:4px;">${itemsText}</p>
+      <p style="color:var(--stone); margin-bottom:20px;">${Number(order.total).toFixed(2)} ${dt('currency')}</p>
+      <button class="btn" style="width:100%;" onclick="this.closest('.modal-overlay').remove()">${dt('okBtn')}</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
 function showLoyaltyRewardPopup() {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';

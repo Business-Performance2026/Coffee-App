@@ -140,6 +140,22 @@ button, input, select {
   border-color: var(--accent);
 }
 
+/* ---- Inventory tab: floating save bar, fixed just above the bottom nav ---- */
+.inventory-floating-save {
+  position: fixed;
+  bottom: 62px;
+  left: 12px;
+  right: 12px;
+  max-width: 616px;
+  margin: 0 auto;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 14px rgba(36,27,21,0.08);
+  z-index: 15;
+}
+
 .pos-floating-submit-wrap {
   position: sticky;
   bottom: 0;
@@ -1401,6 +1417,7 @@ button, input, select {
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(0,0,0,0.18);
   z-index: 10;
+  transition: bottom 0.15s ease;
 }
 
 .status-bar.status-bar-ready {
