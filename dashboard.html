@@ -2474,7 +2474,6 @@ function renderFullOrderCardHtml(order) {
   const status = order.status || 'pending';
   const statusLabels = { pending: dt('statusNew'), preparing: dt('statusPreparing'), ready: dt('statusReady') };
   const nextLabel = { pending: dt('startPreparingBtn'), preparing: dt('markReadyBtn') };
-  const itemsText = order.items.map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
   let elapsedMin = null;
   if (order.createdAt && order.createdAt.toDate) {
     elapsedMin = Math.floor((now - order.createdAt.toDate().getTime()) / 60000);
@@ -2497,7 +2496,22 @@ function renderFullOrderCardHtml(order) {
         <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
       </div>
       ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
-      <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
+      <div class="order-items-detail">
+        ${order.items.map(i => {
+          const iName = (dashLang === 'en' && i.nameEn) ? i.nameEn : i.name;
+          return `
+          <div class="order-item-row">
+            <span class="order-item-qty">${i.qty}×</span>
+            <span class="order-item-name">${iName}</span>
+            <span class="order-item-price">${(i.price * i.qty).toFixed(2)}</span>
+          </div>
+        `;
+        }).join('')}
+        <div class="order-item-total-row">
+          <span>${dt('total')}</span>
+          <span>${Number(order.total).toFixed(2)} ${dt('currency')}</span>
+        </div>
+      </div>
       ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
       ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
       ${order.soldBy ? `<div class="order-items-line">👤 ${dt('soldByLabel')}: ${order.soldBy}</div>` : ''}
@@ -2696,7 +2710,6 @@ function renderCompletedOrders() {
   }
 
   el.innerHTML = completedOrdersData.map(order => {
-    const itemsText = order.items.map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
     const typeLabel = order.orderType === 'car'
       ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
       : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '—'}`;
@@ -2706,7 +2719,22 @@ function renderCompletedOrders() {
           <strong>${typeLabel}</strong>
           <span class="order-status status-ready">${dt('statusReady')}</span>
         </div>
-        <div class="order-items-line">${itemsText} — ${Number(order.total).toFixed(2)} ${dt('currency')}</div>
+        <div class="order-items-detail">
+          ${order.items.map(i => {
+            const iName = (dashLang === 'en' && i.nameEn) ? i.nameEn : i.name;
+            return `
+            <div class="order-item-row">
+              <span class="order-item-qty">${i.qty}×</span>
+              <span class="order-item-name">${iName}</span>
+              <span class="order-item-price">${(i.price * i.qty).toFixed(2)}</span>
+            </div>
+          `;
+          }).join('')}
+          <div class="order-item-total-row">
+            <span>${dt('total')}</span>
+            <span>${Number(order.total).toFixed(2)} ${dt('currency')}</span>
+          </div>
+        </div>
         <div class="order-actions">
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
           ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}

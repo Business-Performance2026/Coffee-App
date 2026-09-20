@@ -461,6 +461,50 @@ button, input, select {
   margin-bottom: 10px;
 }
 
+.order-items-detail {
+  margin-bottom: 10px;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+  padding: 8px 0;
+}
+
+.order-item-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.92rem;
+}
+
+.order-item-qty {
+  flex-shrink: 0;
+  color: var(--stone);
+  font-weight: 600;
+  min-width: 28px;
+}
+
+.order-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.order-item-price {
+  flex-shrink: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.order-item-total-row {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 1rem;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
 .order-actions {
   display: flex;
   flex-wrap: wrap;
