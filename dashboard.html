@@ -2476,6 +2476,14 @@ function formatElapsed(minutes) {
   return `${minutes} ${dt('minutesAgo')}`;
 }
 
+// Safe to call whether the card is shown inside the tap-to-open modal
+// (mobile) or directly inline in the column (desktop, no modal at all) —
+// does nothing if there's no modal to close.
+function closeOrderDetailModalIfOpen() {
+  const el = document.getElementById('orderDetailOverlay');
+  if (el) el.remove();
+}
+
 function renderOrdersColumns() {
   const newCol = document.getElementById('ordersColNew');
   const prepCol = document.getElementById('ordersColPreparing');
@@ -2505,12 +2513,16 @@ function renderOrdersColumns() {
     `;
   }
 
+  function renderGridItem(order) {
+    return renderTile(order) + `<div class="order-card-desktop">${renderFullOrderCardHtml(order)}</div>`;
+  }
+
   newCol.innerHTML = newOrders.length
-    ? `<div class="order-tiles-grid">${newOrders.map(renderTile).join('')}</div>`
+    ? `<div class="order-tiles-grid">${newOrders.map(renderGridItem).join('')}</div>`
     : `<div class="state-msg">${dt('noOrdersYet')}</div>`;
 
   prepCol.innerHTML = prepOrders.length
-    ? `<div class="order-tiles-grid">${prepOrders.map(renderTile).join('')}</div>`
+    ? `<div class="order-tiles-grid">${prepOrders.map(renderGridItem).join('')}</div>`
     : `<div class="state-msg">${dt('noOrdersYet')}</div>`;
 }
 
@@ -2571,11 +2583,11 @@ function renderFullOrderCardHtml(order) {
       ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
       ${order.soldBy ? `<div class="order-items-line">👤 ${dt('soldByLabel')}: ${order.soldBy}</div>` : ''}
       <div class="order-actions">
-        ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}"); document.getElementById("orderDetailOverlay").remove();'>${nextLabel[status]}</button>` : ''}
+        ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}"); closeOrderDetailModalIfOpen();'>${nextLabel[status]}</button>` : ''}
         <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
         ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
         ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
-        <button class="btn btn-ghost" style="color:#B3441E;" onclick='staffCancelOrder("${order.id}"); document.getElementById("orderDetailOverlay").remove();'>❌ ${dt('cancelOrderBtn')}</button>
+        <button class="btn btn-ghost" style="color:#B3441E;" onclick='staffCancelOrder("${order.id}"); closeOrderDetailModalIfOpen();'>❌ ${dt('cancelOrderBtn')}</button>
       </div>
     </div>
   `;

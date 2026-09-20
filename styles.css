@@ -563,6 +563,47 @@ button, input, select {
   font-size: 1rem;
 }
 
+/* Full order card rendered alongside every tile, hidden by default —
+   shown only on wide screens (see the media query below) so mobile is
+   never affected in any way. */
+.order-card-desktop {
+  display: none;
+}
+
+/* Wide screens (desktop/laptop/large tablets): show the full order card
+   directly instead of the tap-to-open tile, so nothing needs a click to
+   read. Reacts live to window resizing since this is pure CSS. */
+@media (min-width: 900px) {
+  .order-tile {
+    display: none;
+  }
+
+  .order-tiles-grid {
+    display: block;
+  }
+
+  .order-card-desktop {
+    display: block;
+  }
+
+  /* renderFullOrderCardHtml sets border:none/padding:0/margin:0 inline for
+     its normal home inside a modal sheet — restore a proper card look here
+     since on desktop it's shown directly in the column, not in a modal. */
+  .order-card-desktop .order-card {
+    border: 1px solid var(--line) !important;
+    border-radius: var(--radius) !important;
+    padding: 16px 18px !important;
+    margin: 0 0 12px 0 !important;
+    background: white !important;
+    box-shadow: 0 2px 8px rgba(36,27,21,0.05) !important;
+  }
+
+  .order-card-desktop .order-card.order-urgent {
+    border-color: #C0392B !important;
+    background: #FBEAE5 !important;
+  }
+}
+
 /* ---- Notification bell ---- */
 .bell-wrap {
   position: relative;
