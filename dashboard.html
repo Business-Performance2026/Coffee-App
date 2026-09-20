@@ -2522,7 +2522,7 @@ function openOrderDetailModal(orderId) {
   overlay.innerHTML = `
     <div class="modal-sheet">
       <button class="close-x" onclick="document.getElementById('orderDetailOverlay').remove()">×</button>
-      ${renderFullOrderCardHtml(order)}
+      <div style="clear:both; padding-top:6px;">${renderFullOrderCardHtml(order)}</div>
     </div>
   `;
   document.body.appendChild(overlay);
