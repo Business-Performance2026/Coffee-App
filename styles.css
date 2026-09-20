@@ -1460,8 +1460,22 @@ button, input, select {
 }
 
 .acc-icon-subnav-btn[data-accsub="info"] .icon-subnav-icon { background: #F3DFC7; color: #8A5A28; }
+.acc-icon-subnav-btn[data-accsub="payment"] .icon-subnav-icon { background: #CFE8E1; color: #2F6B5C; }
+.acc-icon-subnav-btn[data-accsub="loyalty"] .icon-subnav-icon { background: #FBEAD1; color: #A6650D; }
+.acc-icon-subnav-btn[data-accsub="ordertypes"] .icon-subnav-icon { background: #F6E2B8; color: #8A6A1E; }
 .acc-icon-subnav-btn[data-accsub="staff"] .icon-subnav-icon { background: #EAD3DC; color: #8A4A63; }
 .acc-icon-subnav-btn[data-accsub="session"] .icon-subnav-icon { background: #D6E0F0; color: #3E5C8A; }
+
+/* Account tab now has 6 icons — wrap into 2 rows of 3 instead of squeezing
+   them into one row. Scoped to .acc-icon-subnav only, so the main
+   dashboard tab's icon-subnav (still 4 icons in one row) is untouched. */
+.acc-icon-subnav {
+  flex-wrap: wrap;
+}
+
+.acc-icon-subnav .acc-icon-subnav-btn {
+  flex: 0 0 calc(33.333% - 7px);
+}
 
 .acc-icon-subnav-btn.active {
   border-color: var(--accent);
