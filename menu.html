@@ -128,6 +128,14 @@ const translations = {
   barPreparing: { ar: '🔥 جاري تحضير طلبك', en: '🔥 Preparing your order' },
   barReady: { ar: '🎉 طلبك جاهز — تفضل استلمه', en: '🎉 Your order is ready — please pick it up' },
   orderFromCar: { ar: 'طلب من السيارة', en: 'Order from car' },
+  orderFromDelivery: { ar: 'طلب خارجي', en: 'External order' },
+  deliveryPhoneLbl: { ar: 'رقم الواتساب', en: 'WhatsApp number' },
+  deliveryMapsLbl: { ar: 'رابط موقعك على خرائط جوجل', en: 'Your Google Maps location link' },
+  deliveryMapsPlaceholder: { ar: 'https://maps.google.com/...', en: 'https://maps.google.com/...' },
+  deliveryWilayatLbl: { ar: 'الولاية', en: 'Wilayat' },
+  deliveryAreaLbl: { ar: 'المنطقة', en: 'Area' },
+  deliveryHouseNumberLbl: { ar: 'رقم البيت (اختياري)', en: 'House number (optional)' },
+  deliveryFieldsError: { ar: 'الرجاء تعبئة رقم الواتساب ورابط الموقع والولاية والمنطقة.', en: 'Please fill in the WhatsApp number, maps link, wilayat, and area.' },
   orderFromTable: { ar: 'طلب من الطاولة', en: 'Order from table' },
   carNumber: { ar: 'رقم السيارة', en: 'Car plate number' },
   carNumberPlaceholder: { ar: 'مثال: 12345', en: 'e.g. 12345' },
@@ -536,12 +544,13 @@ function openCartModal() {
 
   const orderTypesEnabled = {
     table: (shopInfo.orderTypes ? shopInfo.orderTypes.table !== false : true),
-    car: (shopInfo.orderTypes ? shopInfo.orderTypes.car !== false : true)
+    car: (shopInfo.orderTypes ? shopInfo.orderTypes.car !== false : true),
+    delivery: (shopInfo.orderTypes ? shopInfo.orderTypes.delivery === true : false)
   };
-  // If both got disabled somehow, fall back to table so ordering still works
-  if (!orderTypesEnabled.table && !orderTypesEnabled.car) orderTypesEnabled.table = true;
+  // If all got disabled somehow, fall back to table so ordering still works
+  if (!orderTypesEnabled.table && !orderTypesEnabled.car && !orderTypesEnabled.delivery) orderTypesEnabled.table = true;
 
-  selectedOrderType = orderTypesEnabled.table ? 'table' : 'car';
+  selectedOrderType = orderTypesEnabled.table ? 'table' : (orderTypesEnabled.car ? 'car' : 'delivery');
 
   let orderTypeHtml = '<div class="order-type-toggle">';
   if (orderTypesEnabled.table) {
@@ -555,6 +564,13 @@ function openCartModal() {
     orderTypeHtml += `
       <button class="order-type-btn ${selectedOrderType === 'car' ? 'active' : ''}" id="typeCarBtn" onclick="setOrderType('car')">
         <span class="order-type-icon">🚗</span><span>${t('orderFromCar')}</span>
+      </button>
+    `;
+  }
+  if (orderTypesEnabled.delivery) {
+    orderTypeHtml += `
+      <button class="order-type-btn ${selectedOrderType === 'delivery' ? 'active' : ''}" id="typeDeliveryBtn" onclick="setOrderType('delivery')">
+        <span class="order-type-icon">🛵</span><span>${t('orderFromDelivery')}</span>
       </button>
     `;
   }
@@ -619,14 +635,14 @@ function openCartModal() {
 
       ${orderTypeHtml}
 
-      <div id="tableFields" style="display:${orderTypesEnabled.table ? 'block' : 'none'};">
+      <div id="tableFields" style="display:${selectedOrderType === 'table' ? 'block' : 'none'};">
         <div class="field">
           <label for="tableNum">${t('tableNumber')}</label>
           <input type="text" id="tableNum" placeholder="${t('tablePlaceholder')}">
         </div>
       </div>
 
-      <div id="carFields" style="display:${(orderTypesEnabled.car && !orderTypesEnabled.table) ? 'block' : 'none'};">
+      <div id="carFields" style="display:${selectedOrderType === 'car' ? 'block' : 'none'};">
         <div class="field">
           <label for="carNumber">${t('carNumber')}</label>
           <input type="text" id="carNumber" placeholder="${t('carNumberPlaceholder')}">
@@ -634,6 +650,32 @@ function openCartModal() {
         <div class="field">
           <label for="carColor">${t('carColor')}</label>
           <input type="text" id="carColor" placeholder="${t('carColorPlaceholder')}">
+        </div>
+      </div>
+
+      <div id="deliveryFields" style="display:${selectedOrderType === 'delivery' ? 'block' : 'none'};">
+        <div class="field">
+          <label for="deliveryPhoneInput">${t('deliveryPhoneLbl')}</label>
+          <div style="display:flex; gap:8px;">
+            <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
+            <input type="text" inputmode="numeric" id="deliveryPhoneInput" placeholder="9xxxxxxx" style="flex:1;">
+          </div>
+        </div>
+        <div class="field">
+          <label for="deliveryMapsLink">${t('deliveryMapsLbl')}</label>
+          <input type="text" id="deliveryMapsLink" placeholder="${t('deliveryMapsPlaceholder')}" dir="ltr" style="text-align:left;">
+        </div>
+        <div class="field">
+          <label for="deliveryWilayat">${t('deliveryWilayatLbl')}</label>
+          <input type="text" id="deliveryWilayat">
+        </div>
+        <div class="field">
+          <label for="deliveryArea">${t('deliveryAreaLbl')}</label>
+          <input type="text" id="deliveryArea">
+        </div>
+        <div class="field">
+          <label for="deliveryHouseNumber">${t('deliveryHouseNumberLbl')}</label>
+          <input type="text" id="deliveryHouseNumber">
         </div>
       </div>
 
@@ -767,10 +809,13 @@ function setOrderType(type) {
   selectedOrderType = type;
   const tableBtn = document.getElementById('typeTableBtn');
   const carBtn = document.getElementById('typeCarBtn');
+  const deliveryBtn = document.getElementById('typeDeliveryBtn');
   if (tableBtn) tableBtn.classList.toggle('active', type === 'table');
   if (carBtn) carBtn.classList.toggle('active', type === 'car');
+  if (deliveryBtn) deliveryBtn.classList.toggle('active', type === 'delivery');
   document.getElementById('tableFields').style.display = type === 'table' ? 'block' : 'none';
   document.getElementById('carFields').style.display = type === 'car' ? 'block' : 'none';
+  document.getElementById('deliveryFields').style.display = type === 'delivery' ? 'block' : 'none';
 }
 
 function closeCartModal() {
@@ -787,12 +832,23 @@ async function submitOrder() {
   const paymentMethod = document.getElementById('paymentMethod').value;
 
   let table = null, carNumber = null, carColor = null;
+  let deliveryPhone = null, deliveryMapsLink = null, deliveryWilayat = null, deliveryArea = null, deliveryHouseNumber = null;
 
   if (selectedOrderType === 'car') {
     carNumber = document.getElementById('carNumber').value.trim();
     carColor = document.getElementById('carColor').value.trim();
     if (!carNumber || !carColor) {
       errorEl.textContent = t('carFieldsError');
+      return;
+    }
+  } else if (selectedOrderType === 'delivery') {
+    deliveryPhone = document.getElementById('deliveryPhoneInput').value.trim();
+    deliveryMapsLink = document.getElementById('deliveryMapsLink').value.trim();
+    deliveryWilayat = document.getElementById('deliveryWilayat').value.trim();
+    deliveryArea = document.getElementById('deliveryArea').value.trim();
+    deliveryHouseNumber = document.getElementById('deliveryHouseNumber').value.trim();
+    if (!deliveryPhone || !deliveryMapsLink || !deliveryWilayat || !deliveryArea) {
+      errorEl.textContent = t('deliveryFieldsError');
       return;
     }
   } else {
@@ -846,6 +902,11 @@ async function submitOrder() {
         tableNumber: table || null,
         carNumber: carNumber || null,
         carColor: carColor || null,
+        deliveryPhone: deliveryPhone ? `+968 ${deliveryPhone}` : null,
+        deliveryMapsLink: deliveryMapsLink || null,
+        deliveryWilayat: deliveryWilayat || null,
+        deliveryArea: deliveryArea || null,
+        deliveryHouseNumber: deliveryHouseNumber || null,
         notes: notes || null,
         paymentMethod,
         receiptUrl: paymentMethod === 'transfer' ? uploadedReceiptUrl : null,

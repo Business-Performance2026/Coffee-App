@@ -505,6 +505,22 @@ button, input, select {
   border-top: 1px solid var(--line);
 }
 
+.delivery-details-box {
+  background: var(--paper-dim);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.delivery-link-row {
+  display: block;
+  color: #2F6B5C;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 4px 0;
+  font-size: 0.92rem;
+}
+
 .order-actions {
   display: flex;
   flex-wrap: wrap;

@@ -477,6 +477,10 @@
             <input type="checkbox" id="orderTypeCarEnabled" style="width:auto;" checked>
             <label for="orderTypeCarEnabled" style="margin:0;" data-i18n="orderFromCar">🚗 طلب من السيارة</label>
           </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="orderTypeDeliveryEnabled" style="width:auto;">
+            <label for="orderTypeDeliveryEnabled" style="margin:0;" data-i18n="orderFromDelivery">🛵 طلب خارجي (توصيل)</label>
+          </div>
         </div>
       </div>
 
@@ -1160,6 +1164,9 @@ const dashT = {
   orderTypesLbl: { ar: 'أنواع الطلب المتاحة للعميل', en: 'Order types available to customers' },
   orderFromTable: { ar: '🍽️ طلب من الطاولة', en: '🍽️ Order from table' },
   orderFromCar: { ar: '🚗 طلب من السيارة', en: '🚗 Order from car' },
+  orderFromDelivery: { ar: '🛵 طلب خارجي (توصيل)', en: '🛵 External order (delivery)' },
+  openMapsBtn: { ar: 'فتح الموقع بالخريطة', en: 'Open location on map' },
+  houseNoShort: { ar: 'بيت', en: 'House' },
   carNumberLbl: { ar: 'رقم السيارة', en: 'Car number' },
   carColorLbl: { ar: 'لون السيارة', en: 'Car color' },
   tableNumberLbl: { ar: 'رقم الطاولة', en: 'Table number' },
@@ -1570,6 +1577,7 @@ async function loadShopInfo() {
     const ot = info.orderTypes || {};
     document.getElementById('orderTypeTableEnabled').checked = ot.table !== false;
     document.getElementById('orderTypeCarEnabled').checked = ot.car !== false;
+    document.getElementById('orderTypeDeliveryEnabled').checked = ot.delivery === true;
 
     renderSubscriptionBanner(info);
 
@@ -1902,7 +1910,8 @@ async function saveShopInfo() {
   };
   const orderTypes = {
     table: document.getElementById('orderTypeTableEnabled').checked,
-    car: document.getElementById('orderTypeCarEnabled').checked
+    car: document.getElementById('orderTypeCarEnabled').checked,
+    delivery: document.getElementById('orderTypeDeliveryEnabled').checked
   };
   const bankAccountName = document.getElementById('bankAccountNameInput').value.trim();
   const bankTransferNumberDigits = document.getElementById('bankTransferNumberInput').value.trim();
@@ -1915,7 +1924,7 @@ async function saveShopInfo() {
     errorEl.textContent = dt('atLeastOnePaymentError');
     return;
   }
-  if (!orderTypes.table && !orderTypes.car) {
+  if (!orderTypes.table && !orderTypes.car && !orderTypes.delivery) {
     errorEl.textContent = dt('atLeastOneOrderTypeError');
     return;
   }
@@ -2484,7 +2493,9 @@ function renderOrdersColumns() {
     const isUrgent = elapsedMin !== null && elapsedMin >= 10;
     const label = order.orderType === 'car'
       ? `🚗 ${order.carNumber || '-'}`
-      : `🍽️ ${order.tableNumber || '-'}`;
+      : order.orderType === 'delivery'
+        ? `🛵 ${order.deliveryWilayat || '—'}`
+        : `🍽️ ${order.tableNumber || '-'}`;
 
     return `
       <button type="button" class="order-tile ${isUrgent ? 'order-tile-urgent' : ''}" onclick='openOrderDetailModal("${order.id}")'>
@@ -2529,9 +2540,16 @@ function renderFullOrderCardHtml(order) {
         </div>
       ` : ''}
       <div class="order-card-top">
-        <strong>${order.orderType === 'car' ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})` : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
+        <strong>${order.orderType === 'car' ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})` : order.orderType === 'delivery' ? dt('orderFromDelivery') : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
         <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
       </div>
+      ${order.orderType === 'delivery' ? `
+        <div class="delivery-details-box">
+          <a href="https://wa.me/${(order.deliveryPhone || '').replace(/\D/g, '')}" target="_blank" class="delivery-link-row">📱 ${order.deliveryPhone || ''}</a>
+          ${order.deliveryMapsLink ? `<a href="${order.deliveryMapsLink}" target="_blank" class="delivery-link-row">📍 ${dt('openMapsBtn')}</a>` : ''}
+          <div class="order-items-line">${order.deliveryWilayat || ''}${order.deliveryArea ? ' - ' + order.deliveryArea : ''}${order.deliveryHouseNumber ? ' - ' + dt('houseNoShort') + ' ' + order.deliveryHouseNumber : ''}</div>
+        </div>
+      ` : ''}
       ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
       <div class="order-items-detail">
         ${order.items.map(i => {
@@ -2636,7 +2654,9 @@ function printReceiptFromOrder(order) {
   const paymentLabel = paymentLabels[order.paymentMethod] || '-';
   const typeLine = order.orderType === 'car'
     ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
-    : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '-'}`;
+    : order.orderType === 'delivery'
+      ? `🛵 ${order.deliveryWilayat || ''} ${order.deliveryArea || ''}`
+      : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '-'}`;
   const dateStr = order.createdAt && order.createdAt.toDate
     ? order.createdAt.toDate().toLocaleString('ar-OM')
     : new Date().toLocaleString('ar-OM');
@@ -2749,13 +2769,22 @@ function renderCompletedOrders() {
   el.innerHTML = completedOrdersData.map(order => {
     const typeLabel = order.orderType === 'car'
       ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
-      : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '—'}`;
+      : order.orderType === 'delivery'
+        ? dt('orderFromDelivery')
+        : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '—'}`;
     return `
       <div class="order-card">
         <div class="order-card-top">
           <strong>${typeLabel}</strong>
           <span class="order-status status-ready">${dt('statusReady')}</span>
         </div>
+        ${order.orderType === 'delivery' ? `
+          <div class="delivery-details-box">
+            <a href="https://wa.me/${(order.deliveryPhone || '').replace(/\D/g, '')}" target="_blank" class="delivery-link-row">📱 ${order.deliveryPhone || ''}</a>
+            ${order.deliveryMapsLink ? `<a href="${order.deliveryMapsLink}" target="_blank" class="delivery-link-row">📍 ${dt('openMapsBtn')}</a>` : ''}
+            <div class="order-items-line">${order.deliveryWilayat || ''}${order.deliveryArea ? ' - ' + order.deliveryArea : ''}${order.deliveryHouseNumber ? ' - ' + dt('houseNoShort') + ' ' + order.deliveryHouseNumber : ''}</div>
+          </div>
+        ` : ''}
         <div class="order-items-detail">
           ${order.items.map(i => {
             const iName = (dashLang === 'en' && i.nameEn) ? i.nameEn : i.name;
@@ -2820,7 +2849,9 @@ async function advanceOrder(orderId, newStatus) {
 function showCancelledOrderPopup(order) {
   const typeLabel = order.orderType === 'car'
     ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
-    : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '-'}`;
+    : order.orderType === 'delivery'
+      ? dt('orderFromDelivery')
+      : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '-'}`;
   const itemsText = (order.items || []).map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
 
   const overlay = document.createElement('div');
