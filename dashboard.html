@@ -1165,6 +1165,13 @@ const dashT = {
   orderFromTable: { ar: '🍽️ طلب من الطاولة', en: '🍽️ Order from table' },
   orderFromCar: { ar: '🚗 طلب من السيارة', en: '🚗 Order from car' },
   orderFromDelivery: { ar: '🛵 طلب خارجي (توصيل)', en: '🛵 External order (delivery)' },
+  deliveryPhoneLbl: { ar: 'رقم الواتساب', en: 'WhatsApp number' },
+  deliveryMapsLbl: { ar: 'رابط موقعك على خرائط جوجل', en: 'Your Google Maps location link' },
+  deliveryMapsPlaceholder: { ar: 'https://maps.google.com/...', en: 'https://maps.google.com/...' },
+  deliveryWilayatLbl: { ar: 'الولاية', en: 'Wilayat' },
+  deliveryAreaLbl: { ar: 'المنطقة', en: 'Area' },
+  deliveryHouseNumberLbl: { ar: 'رقم البيت (اختياري)', en: 'House number (optional)' },
+  deliveryFieldsError: { ar: 'الرجاء تعبئة رقم الواتساب ورابط الموقع والولاية والمنطقة.', en: 'Please fill in the WhatsApp number, maps link, wilayat, and area.' },
   openMapsBtn: { ar: 'فتح الموقع بالخريطة', en: 'Open location on map' },
   houseNoShort: { ar: 'بيت', en: 'House' },
   carNumberLbl: { ar: 'رقم السيارة', en: 'Car number' },
@@ -2957,10 +2964,11 @@ async function openNewOrderModal() {
 
   const orderTypesEnabled = {
     table: (shopInfoForPos.orderTypes ? shopInfoForPos.orderTypes.table !== false : true),
-    car: (shopInfoForPos.orderTypes ? shopInfoForPos.orderTypes.car !== false : true)
+    car: (shopInfoForPos.orderTypes ? shopInfoForPos.orderTypes.car !== false : true),
+    delivery: (shopInfoForPos.orderTypes ? shopInfoForPos.orderTypes.delivery === true : false)
   };
-  if (!orderTypesEnabled.table && !orderTypesEnabled.car) orderTypesEnabled.table = true;
-  posSelectedOrderType = orderTypesEnabled.table ? 'table' : 'car';
+  if (!orderTypesEnabled.table && !orderTypesEnabled.car && !orderTypesEnabled.delivery) orderTypesEnabled.table = true;
+  posSelectedOrderType = orderTypesEnabled.table ? 'table' : (orderTypesEnabled.car ? 'car' : 'delivery');
 
   let posOrderTypeHtml = '<div class="order-type-toggle">';
   if (orderTypesEnabled.table) {
@@ -2973,6 +2981,12 @@ async function openNewOrderModal() {
     posOrderTypeHtml += `
       <button type="button" class="order-type-btn ${posSelectedOrderType === 'car' ? 'active' : ''}" id="posTypeCarBtn" onclick="setPosOrderType('car')">
         <span class="order-type-icon">🚗</span><span>${dt('orderFromCar')}</span>
+      </button>`;
+  }
+  if (orderTypesEnabled.delivery) {
+    posOrderTypeHtml += `
+      <button type="button" class="order-type-btn ${posSelectedOrderType === 'delivery' ? 'active' : ''}" id="posTypeDeliveryBtn" onclick="setPosOrderType('delivery')">
+        <span class="order-type-icon">🛵</span><span>${dt('orderFromDelivery')}</span>
       </button>`;
   }
   posOrderTypeHtml += '</div>';
@@ -3038,14 +3052,14 @@ async function openNewOrderModal() {
 
       ${posOrderTypeHtml}
 
-      <div id="posTableFields" style="margin-top:14px; display:${orderTypesEnabled.table ? 'block' : 'none'};">
+      <div id="posTableFields" style="margin-top:14px; display:${posSelectedOrderType === 'table' ? 'block' : 'none'};">
         <div class="field">
           <label for="posTableNum">${dt('tableNumberLbl')}</label>
           <input type="text" id="posTableNum">
         </div>
       </div>
 
-      <div id="posCarFields" style="margin-top:14px; display:${(orderTypesEnabled.car && !orderTypesEnabled.table) ? 'block' : 'none'};">
+      <div id="posCarFields" style="margin-top:14px; display:${posSelectedOrderType === 'car' ? 'block' : 'none'};">
         <div class="field">
           <label for="posCarNumber">${dt('carNumberLbl')}</label>
           <input type="text" id="posCarNumber">
@@ -3053,6 +3067,32 @@ async function openNewOrderModal() {
         <div class="field">
           <label for="posCarColorInput">${dt('carColorLbl')}</label>
           <input type="text" id="posCarColorInput">
+        </div>
+      </div>
+
+      <div id="posDeliveryFields" style="margin-top:14px; display:${posSelectedOrderType === 'delivery' ? 'block' : 'none'};">
+        <div class="field">
+          <label for="posDeliveryPhone">${dt('deliveryPhoneLbl')}</label>
+          <div style="display:flex; gap:8px;">
+            <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
+            <input type="text" inputmode="numeric" id="posDeliveryPhone" placeholder="9xxxxxxx" style="flex:1;">
+          </div>
+        </div>
+        <div class="field">
+          <label for="posDeliveryMapsLink">${dt('deliveryMapsLbl')}</label>
+          <input type="text" id="posDeliveryMapsLink" placeholder="${dt('deliveryMapsPlaceholder')}" dir="ltr" style="text-align:left;">
+        </div>
+        <div class="field">
+          <label for="posDeliveryWilayat">${dt('deliveryWilayatLbl')}</label>
+          <input type="text" id="posDeliveryWilayat">
+        </div>
+        <div class="field">
+          <label for="posDeliveryArea">${dt('deliveryAreaLbl')}</label>
+          <input type="text" id="posDeliveryArea">
+        </div>
+        <div class="field">
+          <label for="posDeliveryHouseNumber">${dt('deliveryHouseNumberLbl')}</label>
+          <input type="text" id="posDeliveryHouseNumber">
         </div>
       </div>
 
@@ -3087,10 +3127,13 @@ function setPosOrderType(type) {
   posSelectedOrderType = type;
   const tableBtn = document.getElementById('posTypeTableBtn');
   const carBtn = document.getElementById('posTypeCarBtn');
+  const deliveryBtn = document.getElementById('posTypeDeliveryBtn');
   if (tableBtn) tableBtn.classList.toggle('active', type === 'table');
   if (carBtn) carBtn.classList.toggle('active', type === 'car');
+  if (deliveryBtn) deliveryBtn.classList.toggle('active', type === 'delivery');
   document.getElementById('posTableFields').style.display = type === 'table' ? 'block' : 'none';
   document.getElementById('posCarFields').style.display = type === 'car' ? 'block' : 'none';
+  document.getElementById('posDeliveryFields').style.display = type === 'delivery' ? 'block' : 'none';
 }
 
 function renderPosQtyControl(itemId, name, nameEn, price, qty) {
@@ -3134,6 +3177,17 @@ async function submitPosOrder() {
   const tableNum = document.getElementById('posTableNum') ? document.getElementById('posTableNum').value.trim() : '';
   const carNum = document.getElementById('posCarNumber') ? document.getElementById('posCarNumber').value.trim() : '';
   const carColorVal = document.getElementById('posCarColorInput') ? document.getElementById('posCarColorInput').value.trim() : '';
+  const deliveryPhoneVal = document.getElementById('posDeliveryPhone') ? document.getElementById('posDeliveryPhone').value.trim() : '';
+  const deliveryMapsVal = document.getElementById('posDeliveryMapsLink') ? document.getElementById('posDeliveryMapsLink').value.trim() : '';
+  const deliveryWilayatVal = document.getElementById('posDeliveryWilayat') ? document.getElementById('posDeliveryWilayat').value.trim() : '';
+  const deliveryAreaVal = document.getElementById('posDeliveryArea') ? document.getElementById('posDeliveryArea').value.trim() : '';
+  const deliveryHouseVal = document.getElementById('posDeliveryHouseNumber') ? document.getElementById('posDeliveryHouseNumber').value.trim() : '';
+
+  if (posSelectedOrderType === 'delivery' && (!deliveryPhoneVal || !deliveryMapsVal || !deliveryWilayatVal || !deliveryAreaVal)) {
+    errorEl.textContent = dt('deliveryFieldsError');
+    return;
+  }
+
   const orderRef = db.collection('shops').doc(currentShopId).collection('orders').doc();
 
   submitBtn.disabled = true;
@@ -3171,6 +3225,11 @@ async function submitPosOrder() {
         tableNumber: posSelectedOrderType === 'table' ? (tableNum || null) : null,
         carNumber: posSelectedOrderType === 'car' ? (carNum || null) : null,
         carColor: posSelectedOrderType === 'car' ? (carColorVal || null) : null,
+        deliveryPhone: posSelectedOrderType === 'delivery' && deliveryPhoneVal ? `+968 ${deliveryPhoneVal}` : null,
+        deliveryMapsLink: posSelectedOrderType === 'delivery' ? (deliveryMapsVal || null) : null,
+        deliveryWilayat: posSelectedOrderType === 'delivery' ? (deliveryWilayatVal || null) : null,
+        deliveryArea: posSelectedOrderType === 'delivery' ? (deliveryAreaVal || null) : null,
+        deliveryHouseNumber: posSelectedOrderType === 'delivery' ? (deliveryHouseVal || null) : null,
         paymentMethod,
         notes: null,
         items,
