@@ -3013,11 +3013,7 @@ async function openNewOrderModal() {
         <div class="grid-card-img-wrap">
           ${item.image ? `<img src="${item.image}" class="grid-card-img" alt="">` : ''}
           ${outOfStock ? `<div class="grid-unavailable-tag">${dt('outOfStockLabel')}</div>` : `
-            <div class="qty-control" style="position:absolute; bottom:8px; left:8px; right:8px; background:white; border-radius:999px; box-shadow:0 2px 8px rgba(0,0,0,0.15);">
-              <button class="qty-btn" onclick='posChangeQty("${item.id}", "${nameSafe}", "${nameEnSafe}", ${item.price}, -1)'>−</button>
-              <span class="qty-count" id="pos-count-${item.id}">0</span>
-              <button class="qty-btn" onclick='posChangeQty("${item.id}", "${nameSafe}", "${nameEnSafe}", ${item.price}, 1)'>+</button>
-            </div>
+            <div class="grid-qty-container" id="pos-qtyctrl-${item.id}">${renderPosQtyControl(item.id, nameSafe, nameEnSafe, item.price, 0)}</div>
           `}
         </div>
         <div class="grid-card-body">
@@ -3097,12 +3093,27 @@ function setPosOrderType(type) {
   document.getElementById('posCarFields').style.display = type === 'car' ? 'block' : 'none';
 }
 
+function renderPosQtyControl(itemId, name, nameEn, price, qty) {
+  if (qty <= 0) {
+    return `<button class="grid-add-btn" onclick='event.stopPropagation(); posChangeQty("${itemId}", "${name}", "${nameEn}", ${price}, 1)'>+</button>`;
+  }
+  return `
+    <div class="grid-qty-stepper" onclick="event.stopPropagation()">
+      <button onclick='posChangeQty("${itemId}", "${name}", "${nameEn}", ${price}, -1)'>−</button>
+      <span class="grid-qty-num">${qty}</span>
+      <button onclick='posChangeQty("${itemId}", "${name}", "${nameEn}", ${price}, 1)'>+</button>
+    </div>
+  `;
+}
+
 function posChangeQty(id, name, nameEn, price, delta) {
   if (!posCart[id]) posCart[id] = { name, nameEn, price, qty: 0 };
   posCart[id].qty += delta;
+  const newQty = posCart[id].qty > 0 ? posCart[id].qty : 0;
   if (posCart[id].qty <= 0) delete posCart[id];
-  const el = document.getElementById(`pos-count-${id}`);
-  if (el) el.textContent = posCart[id] ? posCart[id].qty : 0;
+
+  const container = document.getElementById(`pos-qtyctrl-${id}`);
+  if (container) container.innerHTML = renderPosQtyControl(id, name, nameEn, price, newQty);
 }
 
 async function submitPosOrder() {
