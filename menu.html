@@ -117,6 +117,8 @@ const translations = {
   giftReadyTitle: { ar: 'هديتك جاهزة!', en: 'Your gift is ready!' },
   giftReadyMsg: { ar: 'شارك هذا الباركود مع', en: 'Share this barcode with' },
   giftShareHint: { ar: 'صديقك يوريه للكوفي وقت الاستلام.', en: 'Your friend shows it to the shop when picking it up.' },
+  giftEntryBtn: { ar: 'أهدِ صديق', en: 'Gift a friend' },
+  giftPickItemsHint: { ar: 'اختر الأصناف اللي تبي تهديها من القائمة تحت، وبعدين اضغط هذا الزر مرة ثانية.', en: 'Pick the items you want to gift from the menu below, then tap this button again.' },
   orderCancelledByShopMsg: { ar: 'تم إلغاء طلبك من قبل الكوفي', en: 'Your order was cancelled by the shop' },
   yourOrderStatus: { ar: 'حالة طلبك', en: 'Your order status' },
   etaText: { ar: 'الوقت المتوقع', en: 'Estimated time' },
@@ -386,6 +388,10 @@ async function loadMenu() {
       <div class="menu-search-wrap">
         <input type="text" id="menuSearchInput" class="menu-search-input" placeholder="${t('searchPlaceholder')}" oninput="filterMenuSearch(this.value)">
       </div>
+
+      ${shopInfo.paymentMethods && shopInfo.paymentMethods.transfer !== false ? `
+        <button type="button" onclick="openGiftEntryPoint()" style="display:block; width:100%; background:var(--paper-dim); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:14px; font-weight:600; font-size:0.9rem; color:var(--ink); cursor:pointer; font-family:inherit;">🎁 ${t('giftEntryBtn')}</button>
+      ` : ''}
     `;
 
     const categoryNames = Object.keys(categories);
@@ -682,6 +688,14 @@ async function submitReservation() {
       errorEl.textContent = t('orderSendError');
     }
   }
+}
+
+function openGiftEntryPoint() {
+  if (Object.keys(cart).length === 0) {
+    alert(t('giftPickItemsHint'));
+    return;
+  }
+  openGiftModal();
 }
 
 let giftReceiptUrl = null;
