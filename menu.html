@@ -101,10 +101,16 @@ const translations = {
   giftModalSubtitle: { ar: 'الدفع للهدية يكون بالتحويل البنكي بس.', en: 'Gift payments are by bank transfer only.' },
   giftRecipientNameLbl: { ar: 'اسم المُهدى له', en: "Recipient's name" },
   giftRecipientPhoneLbl: { ar: 'رقم جوال المُهدى له', en: "Recipient's phone" },
+  giftPersonalMessageLbl: { ar: 'رسالة لصديقك (اختياري)', en: 'A message for your friend (optional)' },
+  giftPersonalMessagePlaceholder: { ar: 'اكتب رسالتك هنا...', en: 'Write your message here...' },
   giftFieldsError: { ar: 'الرجاء إدخال اسم ورقم جوال المُهدى له.', en: "Please enter the recipient's name and phone number." },
   sendGiftBtn: { ar: 'إرسال الهدية', en: 'Send gift' },
   giftSentTitle: { ar: 'تم إرسال هديتك!', en: 'Your gift has been sent!' },
   giftSentMsg: { ar: 'المقهى بيتواصل مباشرة مع', en: 'The shop will contact' },
+  giftNotFound: { ar: 'هذي الهدية غير موجودة.', en: 'This gift could not be found.' },
+  giftBoxTitle: { ar: 'عندك هدية!', en: 'You have a gift!' },
+  giftContentsLbl: { ar: 'محتويات الهدية', en: 'Gift contents' },
+  giftFreeLabel: { ar: 'هدية مجانية', en: 'Free gift' },
   giftEntryBtn: { ar: 'أهدِ صديق', en: 'Gift a friend' },
   giftPickItemsHint: { ar: 'اختر الأصناف اللي تبي تهديها من القائمة تحت، وبعدين اضغط هذا الزر مرة ثانية.', en: 'Pick the items you want to gift from the menu below, then tap this button again.' },
   orderCancelledByShopMsg: { ar: 'تم إلغاء طلبك من قبل الكوفي', en: 'Your order was cancelled by the shop' },
@@ -175,6 +181,39 @@ function applyLangDirection() {
 }
 
 // Checks whether the currently signed-in user (if any) is allowed to redeem
+async function showGiftViewPage(giftId) {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="state-msg">${t('loadingMenu')}</div>`;
+
+  const giftDoc = await db.collection('shops').doc(shopId).collection('giftCards').doc(giftId).get();
+
+  if (!giftDoc.exists) {
+    app.innerHTML = `<div class="state-msg">${t('giftNotFound')}</div>`;
+    return;
+  }
+
+  const gift = giftDoc.data();
+  const shopName = (currentLang === 'en' && shopInfo.nameEn) ? shopInfo.nameEn : (shopInfo.name || '');
+  const itemsHtml = (gift.items || []).map(i => {
+    const iName = (currentLang === 'en' && i.nameEn) ? i.nameEn : i.name;
+    return `<div style="display:flex; justify-content:space-between; padding:6px 0; font-size:0.95rem;"><span>${iName}</span><span style="color:var(--stone);">×${i.qty}</span></div>`;
+  }).join('');
+
+  app.innerHTML = `
+    <div class="wrap" style="padding-top:50px; text-align:center;">
+      <div style="font-size:4rem; margin-bottom:6px;">🎁</div>
+      <h2 style="margin-bottom:4px;">${t('giftBoxTitle')}</h2>
+      <p style="color:var(--stone); margin-bottom:24px;">${shopName}</p>
+      <div class="card" style="text-align:right;">
+        ${gift.personalMessage ? `<p style="font-style:italic; color:var(--ink); margin-bottom:16px; padding-bottom:16px; border-bottom:1px dashed var(--line);">"${gift.personalMessage}"</p>` : ''}
+        <div style="font-weight:700; margin-bottom:8px;">${t('giftContentsLbl')}</div>
+        ${itemsHtml}
+        <div style="text-align:center; font-weight:700; color:#3D7A47; margin-top:16px; padding-top:12px; border-top:1px solid var(--line); font-size:1.1rem;">🎉 ${t('giftFreeLabel')}</div>
+      </div>
+    </div>
+  `;
+}
+
 async function loadMenu() {
   const app = document.getElementById('app');
   const params = new URLSearchParams(window.location.search);
@@ -196,6 +235,15 @@ async function loadMenu() {
 
     const shop = shopDoc.data();
     shopInfo = shop.info || {};
+
+    const giftId = params.get('gift');
+    if (giftId) {
+      if (shopInfo.primaryColor) {
+        document.documentElement.style.setProperty('--accent', shopInfo.primaryColor);
+      }
+      await showGiftViewPage(giftId);
+      return;
+    }
 
     const isManuallyActive = shopInfo.subscriptionStatus === 'active';
     const pastEndDate = shopInfo.subscriptionEndDate && new Date(shopInfo.subscriptionEndDate) < new Date(new Date().toDateString());
@@ -597,6 +645,10 @@ function openGiftModal() {
           <input type="text" inputmode="numeric" id="giftRecipientPhone" placeholder="9xxxxxxx" style="flex:1;">
         </div>
       </div>
+      <div class="field">
+        <label for="giftPersonalMessage">${t('giftPersonalMessageLbl')}</label>
+        <textarea id="giftPersonalMessage" rows="3" placeholder="${t('giftPersonalMessagePlaceholder')}" style="width:100%; padding:10px; border:1px solid var(--line); border-radius:var(--radius); font-family:inherit; resize:vertical;"></textarea>
+      </div>
 
       <div style="background:var(--paper-dim); border-radius:12px; padding:14px; margin-top:10px;">
         <div style="font-size:0.85rem; margin-bottom:8px;">${t('bankTransferInstructions')}</div>
@@ -643,6 +695,7 @@ async function submitGiftOrder() {
   const errorEl = document.getElementById('giftError');
   const recipientName = document.getElementById('giftRecipientName').value.trim();
   const recipientPhoneDigits = document.getElementById('giftRecipientPhone').value.trim();
+  const personalMessage = document.getElementById('giftPersonalMessage').value.trim();
 
   if (!recipientName || !recipientPhoneDigits) {
     errorEl.textContent = t('giftFieldsError');
@@ -666,6 +719,7 @@ async function submitGiftOrder() {
       total,
       recipientName,
       recipientPhone: `+968 ${recipientPhoneDigits}`,
+      personalMessage: personalMessage || null,
       receiptUrl: giftReceiptUrl,
       redeemed: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()

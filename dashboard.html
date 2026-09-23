@@ -2526,6 +2526,7 @@ function renderPendingGifts() {
         <div style="font-weight:700; margin-bottom:4px;">🎁 ${gift.recipientName || ''}</div>
         <div class="order-items-line">${gift.recipientPhone || ''}</div>
         <div class="order-items-line">${itemsText} — ${Number(gift.total).toFixed(2)} ${dt('currency')}</div>
+        ${gift.personalMessage ? `<div class="order-items-line" style="font-style:italic;">💬 "${gift.personalMessage}"</div>` : ''}
         <div class="order-actions" style="margin-top:10px;">
           <button class="btn btn-ghost" onclick='sendGiftWelcomeWhatsApp("${gift.id}")'>💬 ${dt('sendWhatsappBtn')}</button>
           <button class="btn" onclick='openGiftDeliverModal("${gift.id}")'>🎁 ${dt('deliverGiftBtn')}</button>
@@ -2535,13 +2536,15 @@ function renderPendingGifts() {
   }).join('');
 }
 
-// Sends a warm welcome message to the RECIPIENT — deliberately never
-// mentions who bought the gift, per the shop's request.
+// Sends a warm welcome message to the RECIPIENT, with a link to their
+// gift page — deliberately never mentions who bought the gift, per the
+// shop's request.
 function sendGiftWelcomeWhatsApp(giftId) {
   const gift = pendingGiftsData.find(g => g.id === giftId);
   if (!gift || !gift.recipientPhone) return;
 
-  const message = `${dt('giftWelcomeLine1')} ${gift.recipientName || ''}\n${dt('giftWelcomeLine2')}\n${dt('giftWelcomeLine3')} (${shopNameForReceipt})\n${dt('giftWelcomeLine4')}`;
+  const giftUrl = `${window.location.origin}/menu.html?shop=${currentShopId}&gift=${giftId}`;
+  const message = `${dt('giftWelcomeLine1')} ${gift.recipientName || ''}\n${dt('giftWelcomeLine2')}\n${dt('giftWelcomeLine3')} (${shopNameForReceipt})\n${dt('giftWelcomeLine4')}\n\n${giftUrl}`;
   const phoneDigits = gift.recipientPhone.replace(/\D/g, '');
   const waUrl = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(message)}`;
   window.open(waUrl, '_blank');
