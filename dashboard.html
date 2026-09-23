@@ -57,7 +57,7 @@
         <span class="icon-subnav-icon"><img src="icon-reservations.png" alt=""></span><span class="icon-subnav-label" data-i18n="subReservations">الحجوزات</span>
       </button>
       <button class="icon-subnav-btn" data-sub="gifts" onclick="switchSubView('gifts')">
-        <span class="icon-subnav-icon">🎁</span><span class="icon-subnav-label" data-i18n="subGifts">الهدايا</span>
+        <span class="icon-subnav-icon" style="position:relative;">🎁<span class="bell-badge" id="giftsBadge" style="display:none;">0</span></span><span class="icon-subnav-label" data-i18n="subGifts">الهدايا</span>
       </button>
     </div>
 
@@ -2447,11 +2447,27 @@ function listenToGiftCards() {
   if (giftsUnsub) giftsUnsub();
   giftsUnsub = db.collection('shops').doc(currentShopId).collection('giftCards')
     .where('redeemed', '==', false)
-    .orderBy('createdAt', 'desc')
     .onSnapshot(snap => {
       pendingGiftsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sort newest-first in JS instead of via orderBy() — avoids needing a
+      // composite index (redeemed + createdAt) that a brand-new collection
+      // wouldn't have yet, which was silently failing the whole query.
+      pendingGiftsData.sort((a, b) => {
+        const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return tb - ta;
+      });
       renderPendingGifts();
+      updateGiftsBadge();
     }, err => console.error('listenToGiftCards failed:', err));
+}
+
+function updateGiftsBadge() {
+  const badge = document.getElementById('giftsBadge');
+  if (!badge) return;
+  const count = pendingGiftsData.length;
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'flex' : 'none';
 }
 
 function renderPendingGifts() {
