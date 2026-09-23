@@ -348,12 +348,10 @@ async function loadMenu() {
     const shopName = (currentLang === 'en' && shopInfo.nameEn) ? shopInfo.nameEn : (shopInfo.name || 'Menu');
     document.title = shopName;
 
-    const menuSnap = await db.collection('shops').doc(shopId)
-                              .collection('menu')
-                              .orderBy('category')
-                              .get();
-
-    const roomsSnap = await db.collection('shops').doc(shopId).collection('rooms').get();
+    const [menuSnap, roomsSnap] = await Promise.all([
+      db.collection('shops').doc(shopId).collection('menu').orderBy('category').get(),
+      db.collection('shops').doc(shopId).collection('rooms').get()
+    ]);
     shopRooms = roomsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     const categories = {};
