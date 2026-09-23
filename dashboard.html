@@ -56,6 +56,9 @@
       <button class="icon-subnav-btn" data-sub="reservations" onclick="switchSubView('reservations')">
         <span class="icon-subnav-icon"><img src="icon-reservations.png" alt=""></span><span class="icon-subnav-label" data-i18n="subReservations">الحجوزات</span>
       </button>
+      <button class="icon-subnav-btn" data-sub="gifts" onclick="switchSubView('gifts')">
+        <span class="icon-subnav-icon">🎁</span><span class="icon-subnav-label" data-i18n="subGifts">الهدايا</span>
+      </button>
     </div>
 
     <!-- Sub-view: QR -->
@@ -178,6 +181,15 @@
 
       <h3 style="margin:28px 0 12px;" data-i18n="reservationsListTitle">الحجوزات الواردة</h3>
       <div class="card" id="reservationsList">
+        <div class="state-msg">جاري التحميل...</div>
+      </div>
+    </div>
+
+    <div id="sub-gifts" class="sub-view">
+      <p style="color:var(--stone); font-size:0.85rem; margin-bottom:16px;" data-i18n="giftsIntro">
+        الهدايا اللي اشتراها عملاء لأصدقائهم وما تسلّمت بعد.
+      </p>
+      <div id="pendingGiftsList">
         <div class="state-msg">جاري التحميل...</div>
       </div>
     </div>
@@ -661,6 +673,7 @@ auth.onAuthStateChanged(async user => {
     updatePublicRatingStats();
     loadLoyaltyCustomers();
     loadEmployees();
+    listenToGiftCards();
 
   } else {
     // ============================================================
@@ -698,6 +711,7 @@ auth.onAuthStateChanged(async user => {
     await loadShopInfo();
     loadLoyaltyCustomers();
     if (employeePermissions.dashboard || employeePermissions.inventory) await loadItems();
+    if (employeePermissions.dashboard) listenToGiftCards();
     loadCategoryManager();
     if (employeePermissions.pos || employeePermissions.sales) {
       listenToOrders();
@@ -1257,6 +1271,12 @@ const dashT = {
   exportGenericError: { ar: 'حدث خطأ أثناء التصدير', en: 'An error occurred while exporting' },
   hoursLbl: { ar: 'ساعات العمل', en: 'Opening hours' },
   subReservations: { ar: 'الحجوزات', en: 'Reservations' },
+  subGifts: { ar: 'الهدايا', en: 'Gifts' },
+  giftsIntro: { ar: 'الهدايا اللي اشتراها عملاء لأصدقائهم وما تسلّمت بعد.', en: "Gifts customers bought for friends that haven't been picked up yet." },
+  noPendingGifts: { ar: 'لا توجد هدايا حالياً.', en: 'No pending gifts right now.' },
+  deliverGiftBtn: { ar: 'تسليم الهدية', en: 'Deliver gift' },
+  giftWelcomeMsgLine1: { ar: 'مرحباً! 🎉 عندك هدية جاهزة من', en: 'Hello! 🎉 You have a gift ready from' },
+  giftWelcomeMsgLine2: { ar: 'تعال استلمها بأي وقت يناسبك ☕', en: 'Come pick it up whenever suits you ☕' },
   addRoomTitle: { ar: 'إضافة قاعة جديدة', en: 'Add new room' },
   editRoomTitle: { ar: 'تعديل القاعة', en: 'Edit room' },
   roomNameLbl: { ar: 'اسم القاعة (عربي)', en: 'Room name (Arabic)' },
@@ -2418,6 +2438,132 @@ let completedOrdersData = [];
 let completedOrdersUnsub = null;
 
 const alertedCancelIds = new Set();
+
+// ===================== Gifts (أهدِ صديق) =====================
+let giftsUnsub = null;
+let pendingGiftsData = [];
+
+function listenToGiftCards() {
+  if (giftsUnsub) giftsUnsub();
+  giftsUnsub = db.collection('shops').doc(currentShopId).collection('giftCards')
+    .where('redeemed', '==', false)
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(snap => {
+      pendingGiftsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderPendingGifts();
+    }, err => console.error('listenToGiftCards failed:', err));
+}
+
+function renderPendingGifts() {
+  const el = document.getElementById('pendingGiftsList');
+  if (!el) return;
+
+  if (pendingGiftsData.length === 0) {
+    el.innerHTML = `<div class="card"><div class="state-msg">${dt('noPendingGifts')}</div></div>`;
+    return;
+  }
+
+  el.innerHTML = pendingGiftsData.map(gift => {
+    const itemsText = (gift.items || []).map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
+    return `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-weight:700; margin-bottom:4px;">🎁 ${gift.recipientName || ''}</div>
+        <div class="order-items-line">${gift.recipientPhone || ''}</div>
+        <div class="order-items-line">${itemsText} — ${Number(gift.total).toFixed(2)} ${dt('currency')}</div>
+        <div class="order-actions" style="margin-top:10px;">
+          <button class="btn btn-ghost" onclick='sendGiftWelcomeWhatsApp("${gift.id}")'>💬 ${dt('sendWhatsappBtn')}</button>
+          <button class="btn" onclick='openGiftDeliverModal("${gift.id}")'>🎁 ${dt('deliverGiftBtn')}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Sends a warm welcome message to the RECIPIENT — deliberately never
+// mentions who bought the gift, per the shop's request.
+function sendGiftWelcomeWhatsApp(giftId) {
+  const gift = pendingGiftsData.find(g => g.id === giftId);
+  if (!gift || !gift.recipientPhone) return;
+
+  const message = `${dt('giftWelcomeMsgLine1')} ${shopNameForReceipt} 🎁\n${dt('giftWelcomeMsgLine2')}`;
+  const phoneDigits = gift.recipientPhone.replace(/\D/g, '');
+  const waUrl = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(message)}`;
+  window.open(waUrl, '_blank');
+}
+
+function openGiftDeliverModal(giftId) {
+  const gift = pendingGiftsData.find(g => g.id === giftId);
+  if (!gift) return;
+
+  const itemsHtml = (gift.items || []).map(i => {
+    const iName = (dashLang === 'en' && i.nameEn) ? i.nameEn : i.name;
+    return `<div class="order-item-row"><span class="order-item-qty">${i.qty}×</span><span class="order-item-name">${iName}</span><span class="order-item-price">${(i.price * i.qty).toFixed(2)}</span></div>`;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'giftDeliverOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="document.getElementById('giftDeliverOverlay').remove()">×</button>
+      <h3 style="margin:8px 0 4px; text-align:center;">🎁 ${gift.recipientName || ''}</h3>
+      <p style="text-align:center; color:var(--stone); margin-bottom:16px;">${gift.recipientPhone || ''}</p>
+      <div class="order-items-detail">
+        ${itemsHtml}
+        <div class="order-item-total-row"><span>${dt('total')}</span><span>${Number(gift.total).toFixed(2)} ${dt('currency')}</span></div>
+      </div>
+      ${gift.receiptUrl ? `<button class="btn btn-ghost" style="width:100%; margin-top:12px;" onclick='window.open("${gift.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
+      <button class="btn" id="confirmDeliverGiftBtn" style="width:100%; margin-top:12px;" onclick='deliverGift("${giftId}")'>✅ ${dt('deliverGiftBtn')}</button>
+      <div id="giftDeliverError" class="error-msg"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+async function deliverGift(giftId) {
+  const btn = document.getElementById('confirmDeliverGiftBtn');
+  const errorEl = document.getElementById('giftDeliverError');
+  if (btn && btn.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = dt('redeemingGift'); }
+
+  const giftRef = db.collection('shops').doc(currentShopId).collection('giftCards').doc(giftId);
+  const orderRef = db.collection('shops').doc(currentShopId).collection('orders').doc();
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const freshGift = await tx.get(giftRef);
+      if (!freshGift.exists || freshGift.data().redeemed) {
+        throw new Error('ALREADY_REDEEMED');
+      }
+      const g = freshGift.data();
+
+      tx.update(giftRef, { redeemed: true, redeemedAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+      tx.set(orderRef, {
+        orderType: 'table',
+        tableNumber: null,
+        carNumber: null,
+        carColor: null,
+        notes: `🎁 ${dt('giftOrderNote')}: ${g.recipientName || ''}`,
+        paymentMethod: 'transfer',
+        receiptUrl: g.receiptUrl || null,
+        loyaltyPhone: null,
+        loyaltyRewardReady: false,
+        items: g.items,
+        total: g.total,
+        soldBy: dt('shopOwnerLabel'),
+        status: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    document.getElementById('giftDeliverOverlay').remove();
+  } catch (err) {
+    console.error('Gift delivery failed:', err);
+    if (errorEl) errorEl.textContent = dt('giftAlreadyUsed');
+    if (btn) { btn.disabled = false; btn.textContent = `✅ ${dt('deliverGiftBtn')}`; }
+  }
+}
 
 function listenToOrders() {
   ordersUnsub = db.collection('shops').doc(currentShopId).collection('orders')

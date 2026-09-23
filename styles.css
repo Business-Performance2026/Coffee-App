@@ -1456,6 +1456,10 @@ button, input, select {
   background: none;
 }
 
+.icon-subnav-btn[data-sub="gifts"] .icon-subnav-icon {
+  background: #FBEAD1;
+}
+
 .icon-subnav-label { font-size: 0.75rem; }
 
 .icon-subnav-btn.active {
