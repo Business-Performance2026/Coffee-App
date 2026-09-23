@@ -96,6 +96,11 @@ function toggleLoginLang() {
 
 applyLoginLang();
 
+// Opens the connection to Firestore early (while the person is still
+// typing their email/password), so the first real read right after login
+// doesn't have to pay the full connection-setup cost on a slow network.
+db.collection('categoryIcons').limit(1).get().catch(() => {});
+
 // If already logged in, go straight to dashboard — otherwise, NOW reveal
 // the login form (kept hidden until this point so a quick bounce-through
 // after "back" navigation never flashes the form before redirecting).

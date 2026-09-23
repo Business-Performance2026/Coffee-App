@@ -57,6 +57,9 @@ window.addEventListener('pageshow', function (event) {
   }
 });
 
+// Opens the connection to Firestore early, same reasoning as login.html.
+db.collection('categoryIcons').limit(1).get().catch(() => {});
+
 // If already logged in, go straight to dashboard (dashboard.html detects
 // automatically whether this is an owner or a staff account). Otherwise,
 // NOW reveal the login form — kept hidden until this point so a quick
