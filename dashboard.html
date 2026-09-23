@@ -1502,9 +1502,14 @@ function showExitToast() {
 
 function switchTab(name, fromPopState) {
   // Defense in depth: even if a hidden nav button were somehow triggered,
-  // an employee can never switch into a tab they weren't granted.
-  if (isEmployee && employeePermissions && employeePermissions[name] !== true) {
-    return;
+  // an employee can never switch into a tab they weren't granted. The
+  // "لوحة التحكم" tab is the one exception — it also hosts the gifts
+  // feature, which only needs "نقطة البيع" access.
+  if (isEmployee && employeePermissions) {
+    const tabAllowed = name === 'dashboard'
+      ? (employeePermissions.dashboard === true || employeePermissions.pos === true)
+      : employeePermissions[name] === true;
+    if (!tabAllowed) return;
   }
 
   document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
