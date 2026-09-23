@@ -56,8 +56,8 @@
       <button class="icon-subnav-btn" data-sub="reservations" onclick="switchSubView('reservations')">
         <span class="icon-subnav-icon"><img src="icon-reservations.png" alt=""></span><span class="icon-subnav-label" data-i18n="subReservations">الحجوزات</span>
       </button>
-      <button class="icon-subnav-btn" data-sub="gifts" onclick="switchSubView('gifts')">
-        <span class="icon-subnav-icon" style="position:relative;">🎁<span class="bell-badge" id="giftsBadge" style="display:none;">0</span></span><span class="icon-subnav-label" data-i18n="subGifts">الهدايا</span>
+      <button class="icon-subnav-btn" data-sub="gifts" onclick="switchSubView('gifts')" style="position:relative;">
+        <span class="icon-subnav-icon">🎁</span><span class="bell-badge" id="giftsBadge" style="display:none; top:8px; left:8px;">0</span><span class="icon-subnav-label" data-i18n="subGifts">الهدايا</span>
       </button>
     </div>
 
@@ -1275,8 +1275,10 @@ const dashT = {
   giftsIntro: { ar: 'الهدايا اللي اشتراها عملاء لأصدقائهم وما تسلّمت بعد.', en: "Gifts customers bought for friends that haven't been picked up yet." },
   noPendingGifts: { ar: 'لا توجد هدايا حالياً.', en: 'No pending gifts right now.' },
   deliverGiftBtn: { ar: 'تسليم الهدية', en: 'Deliver gift' },
-  giftWelcomeMsgLine1: { ar: 'مرحباً! 🎉 عندك هدية جاهزة من', en: 'Hello! 🎉 You have a gift ready from' },
-  giftWelcomeMsgLine2: { ar: 'تعال استلمها بأي وقت يناسبك ☕', en: 'Come pick it up whenever suits you ☕' },
+  giftWelcomeLine1: { ar: 'مرحباً..', en: 'Hello..' },
+  giftWelcomeLine2: { ar: 'صديق أحب يهديك هدية', en: 'A friend wanted to gift you something' },
+  giftWelcomeLine3: { ar: 'تفضل استلمها', en: 'Please come pick it up from' },
+  giftWelcomeLine4: { ar: 'بامكانك تستلمها بأي وقت يناسبك', en: 'You can pick it up whenever suits you' },
   addRoomTitle: { ar: 'إضافة قاعة جديدة', en: 'Add new room' },
   editRoomTitle: { ar: 'تعديل القاعة', en: 'Edit room' },
   roomNameLbl: { ar: 'اسم القاعة (عربي)', en: 'Room name (Arabic)' },
@@ -2501,7 +2503,7 @@ function sendGiftWelcomeWhatsApp(giftId) {
   const gift = pendingGiftsData.find(g => g.id === giftId);
   if (!gift || !gift.recipientPhone) return;
 
-  const message = `${dt('giftWelcomeMsgLine1')} ${shopNameForReceipt} 🎁\n${dt('giftWelcomeMsgLine2')}`;
+  const message = `${dt('giftWelcomeLine1')} ${gift.recipientName || ''}\n${dt('giftWelcomeLine2')}\n${dt('giftWelcomeLine3')} (${shopNameForReceipt})\n${dt('giftWelcomeLine4')}`;
   const phoneDigits = gift.recipientPhone.replace(/\D/g, '');
   const waUrl = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(message)}`;
   window.open(waUrl, '_blank');
