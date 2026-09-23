@@ -719,7 +719,7 @@ auth.onAuthStateChanged(async user => {
     await loadShopInfo();
     loadLoyaltyCustomers();
     if (employeePermissions.dashboard || employeePermissions.inventory) await loadItems();
-    if (employeePermissions.dashboard) listenToGiftCards();
+    if (employeePermissions.pos) listenToGiftCards();
     loadCategoryManager();
     if (employeePermissions.pos || employeePermissions.sales) {
       listenToOrders();
@@ -737,10 +737,35 @@ function applyEmployeePermissionsUI() {
 
   document.querySelectorAll('.nav-item').forEach(btn => {
     const tab = btn.getAttribute('data-tab');
-    const allowed = employeePermissions[tabPermMap[tab]] === true;
+    // "لوحة التحكم" now also hosts the gifts feature, which only needs
+    // "نقطة البيع" access — so this ONE tab is visible with either
+    // permission, unlike the others which each need their own single permission.
+    const allowed = tab === 'dashboard'
+      ? (employeePermissions.dashboard === true || employeePermissions.pos === true)
+      : employeePermissions[tabPermMap[tab]] === true;
     btn.style.display = allowed ? '' : 'none';
     if (allowed && !firstAllowed) firstAllowed = tab;
   });
+
+  // Within "لوحة التحكم" itself: the menu/QR/reservations tools still need
+  // real "dashboard" access. The gifts icon needs "نقطة البيع" specifically
+  // — matching the Firestore rule for redeeming a gift exactly, so nobody
+  // ever sees a delivery button that would actually fail when pressed.
+  const hasDashboardAccess = employeePermissions.dashboard === true;
+  const hasGiftAccess = employeePermissions.pos === true;
+  ['qr', 'add', 'list', 'reservations'].forEach(sub => {
+    const subBtn = document.querySelector(`.icon-subnav-btn[data-sub="${sub}"]`);
+    if (subBtn) subBtn.style.display = hasDashboardAccess ? '' : 'none';
+  });
+  const giftsSubBtn = document.querySelector('.icon-subnav-btn[data-sub="gifts"]');
+  if (giftsSubBtn) giftsSubBtn.style.display = hasGiftAccess ? '' : 'none';
+
+  // If they only have gift access in this tab (no real dashboard
+  // permission), land them on the gifts screen itself rather than the
+  // default "قائمة الأصناف" view they have no access to.
+  if (!hasDashboardAccess && hasGiftAccess) {
+    switchSubView('gifts');
+  }
 
   if (!employeePermissions.dashboard && firstAllowed) {
     switchTab(firstAllowed);
