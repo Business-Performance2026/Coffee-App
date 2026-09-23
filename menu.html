@@ -111,6 +111,12 @@ const translations = {
   giftBoxTitle: { ar: 'عندك هدية!', en: 'You have a gift!' },
   giftContentsLbl: { ar: 'محتويات الهدية', en: 'Gift contents' },
   giftFreeLabel: { ar: 'هدية مجانية', en: 'Free gift' },
+  giftOrderNote: { ar: 'هدية إلى', en: 'Gift to' },
+  redeemingGift: { ar: 'جاري الاستلام...', en: 'Receiving...' },
+  claimGiftBtn: { ar: 'استلام الهدية', en: 'Receive gift' },
+  claimGiftHint: { ar: 'اضغط استلام الهدية عندما تصل إلى المقهى', en: 'Press receive gift when you arrive at the shop' },
+  giftClaimedSuccess: { ar: 'تم استلام هديتك، تفضل بالجلوس بانتظار تحضيرها ✓', en: 'Your gift has been received — please have a seat while it\'s prepared ✓' },
+  giftAlreadyClaimed: { ar: 'تم استلام هذي الهدية من قبل.', en: 'This gift has already been received.' },
   giftEntryBtn: { ar: 'أهدِ صديق', en: 'Gift a friend' },
   giftPickItemsHint: { ar: 'اختر الأصناف اللي تبي تهديها من القائمة تحت، وبعدين اضغط هذا الزر مرة ثانية.', en: 'Pick the items you want to gift from the menu below, then tap this button again.' },
   orderCancelledByShopMsg: { ar: 'تم إلغاء طلبك من قبل الكوفي', en: 'Your order was cancelled by the shop' },
@@ -180,7 +186,6 @@ function applyLangDirection() {
   document.getElementById('langToggle').style.display = 'block';
 }
 
-// Checks whether the currently signed-in user (if any) is allowed to redeem
 async function showGiftViewPage(giftId) {
   const app = document.getElementById('app');
   app.innerHTML = `<div class="state-msg">${t('loadingMenu')}</div>`;
@@ -209,9 +214,59 @@ async function showGiftViewPage(giftId) {
         <div style="font-weight:700; margin-bottom:8px;">${t('giftContentsLbl')}</div>
         ${itemsHtml}
         <div style="text-align:center; font-weight:700; color:#3D7A47; margin-top:16px; padding-top:12px; border-top:1px solid var(--line); font-size:1.1rem;">🎉 ${t('giftFreeLabel')}</div>
+        <div id="giftClaimArea" style="margin-top:20px;">
+          ${gift.redeemed
+            ? `<div style="color:#B3441E; font-weight:700;">✓ ${t('giftAlreadyClaimed')}</div>`
+            : `<button class="btn" id="claimGiftBtn" style="width:100%;" onclick="claimGift('${giftId}')">✅ ${t('claimGiftBtn')}</button>
+               <p style="font-size:0.78rem; color:var(--stone); margin-top:8px;">${t('claimGiftHint')}</p>`}
+        </div>
       </div>
     </div>
   `;
+}
+
+async function claimGift(giftId) {
+  const btn = document.getElementById('claimGiftBtn');
+  const claimArea = document.getElementById('giftClaimArea');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = t('redeemingGift');
+
+  const giftRef = db.collection('shops').doc(shopId).collection('giftCards').doc(giftId);
+  const orderRef = db.collection('shops').doc(shopId).collection('orders').doc();
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const freshGift = await tx.get(giftRef);
+      if (!freshGift.exists || freshGift.data().redeemed) {
+        throw new Error('ALREADY_REDEEMED');
+      }
+      const g = freshGift.data();
+
+      tx.update(giftRef, { redeemed: true, redeemedAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+      tx.set(orderRef, {
+        orderType: 'table',
+        tableNumber: null,
+        carNumber: null,
+        carColor: null,
+        notes: `${t('giftOrderNote')}: ${g.recipientName || ''}`,
+        paymentMethod: 'transfer',
+        receiptUrl: g.receiptUrl || null,
+        loyaltyPhone: null,
+        loyaltyRewardReady: false,
+        items: g.items,
+        total: g.total,
+        status: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    claimArea.innerHTML = `<div style="color:#3D7A47; font-weight:700;">✅ ${t('giftClaimedSuccess')}</div>`;
+  } catch (err) {
+    console.error('Gift claim failed:', err);
+    claimArea.innerHTML = `<div style="color:#B3441E; font-weight:700;">✓ ${t('giftAlreadyClaimed')}</div>`;
+  }
 }
 
 async function loadMenu() {
