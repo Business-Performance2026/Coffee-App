@@ -686,10 +686,24 @@ async function submitReservation() {
 
 function openGiftEntryPoint() {
   if (Object.keys(cart).length === 0) {
-    alert(t('giftPickItemsHint'));
+    showGiftHintModal();
     return;
   }
   openGiftModal();
+}
+
+function showGiftHintModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'giftHintOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">🎁</div>
+      <p style="margin-bottom:20px;">${t('giftPickItemsHint')}</p>
+      <button class="btn" style="width:100%;" onclick="document.getElementById('giftHintOverlay').remove()">${t('close')}</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
 }
 
 let giftReceiptUrl = null;
