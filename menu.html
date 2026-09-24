@@ -798,7 +798,8 @@ async function submitGiftOrder() {
   errorEl.textContent = '';
 
   try {
-    const giftRef = await db.collection('shops').doc(shopId).collection('giftCards').add({
+    const shortId = await generateUniqueShortGiftId();
+    await db.collection('shops').doc(shopId).collection('giftCards').doc(shortId).set({
       items,
       total,
       recipientName,
@@ -820,6 +821,27 @@ async function submitGiftOrder() {
     submitBtn.disabled = false;
     submitBtn.textContent = `🎁 ${t('sendGiftBtn')}`;
   }
+}
+
+// Generates a short (7-character) random ID for a gift instead of
+// Firestore's normal long auto-ID, for a much shorter shareable link.
+// Checks for a collision before using it — the ID space (36^7, over 78
+// billion combinations) makes a collision astronomically unlikely, but
+// this guarantees it can never silently overwrite an existing gift.
+async function generateUniqueShortGiftId() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let id = '';
+    for (let i = 0; i < 7; i++) {
+      id += chars[Math.floor(Math.random() * chars.length)];
+    }
+    const existing = await db.collection('shops').doc(shopId).collection('giftCards').doc(id).get();
+    if (!existing.exists) return id;
+  }
+  // Extremely unlikely fallback: if 5 random attempts somehow all
+  // collided, fall back to Firestore's own guaranteed-unique long ID
+  // rather than failing the purchase.
+  return db.collection('shops').doc(shopId).collection('giftCards').doc().id;
 }
 
 function showGiftSentConfirmation(recipientName) {
