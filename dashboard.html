@@ -1251,6 +1251,7 @@ const dashT = {
   staffBreakdownTitle: { ar: 'حسب البائع', en: 'By staff member' },
   shopOwnerLabel: { ar: 'صاحب الكوفي', en: 'Shop owner' },
   soldByLabel: { ar: 'بواسطة', en: 'By' },
+  giftPaidLabel: { ar: 'مدفوعة', en: 'Paid' },
   noCounterSalesYet: { ar: 'لا توجد مبيعات كاونتر بهذي الفترة.', en: 'No counter sales in this period.' },
   addOneItemError: { ar: 'أضف صنف واحد على الأقل.', en: 'Add at least one item.' },
   orderSendErrorGeneric: { ar: 'حدث خطأ أثناء إرسال الطلب.', en: 'An error occurred while sending the order.' },
@@ -2605,6 +2606,7 @@ async function deliverGift(giftId) {
         carColor: null,
         notes: `🎁 ${dt('giftOrderNote')}: ${g.recipientName || ''}`,
         paymentMethod: 'transfer',
+        isGiftOrder: true,
         receiptUrl: g.receiptUrl || null,
         loyaltyPhone: null,
         loyaltyRewardReady: false,
@@ -2753,7 +2755,9 @@ function renderFullOrderCardHtml(order) {
   const isUrgent = elapsedMin !== null && elapsedMin >= 10;
 
   const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
-  const paymentLabel = paymentLabels[order.paymentMethod] || '';
+  const paymentLabel = order.isGiftOrder
+    ? `<span style="color:#B3441E; font-weight:700;">✅ ${dt('giftPaidLabel')}</span>`
+    : (paymentLabels[order.paymentMethod] || '');
 
   return `
     <div class="order-card ${isUrgent ? 'order-urgent' : ''}" style="border:none; padding:0; margin:0;">
@@ -2782,13 +2786,13 @@ function renderFullOrderCardHtml(order) {
           <div class="order-item-row">
             <span class="order-item-qty">${i.qty}×</span>
             <span class="order-item-name">${iName}</span>
-            <span class="order-item-price">${(i.price * i.qty).toFixed(2)}</span>
+            ${order.isGiftOrder ? '' : `<span class="order-item-price">${(i.price * i.qty).toFixed(2)}</span>`}
           </div>
         `;
         }).join('')}
         <div class="order-item-total-row">
           <span>${dt('total')}</span>
-          <span>${Number(order.total).toFixed(2)} ${dt('currency')}</span>
+          <span>${order.isGiftOrder ? '0.00' : Number(order.total).toFixed(2)} ${dt('currency')}</span>
         </div>
       </div>
       ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
@@ -3016,15 +3020,16 @@ function renderCompletedOrders() {
             <div class="order-item-row">
               <span class="order-item-qty">${i.qty}×</span>
               <span class="order-item-name">${iName}</span>
-              <span class="order-item-price">${(i.price * i.qty).toFixed(2)}</span>
+              ${order.isGiftOrder ? '' : `<span class="order-item-price">${(i.price * i.qty).toFixed(2)}</span>`}
             </div>
           `;
           }).join('')}
           <div class="order-item-total-row">
             <span>${dt('total')}</span>
-            <span>${Number(order.total).toFixed(2)} ${dt('currency')}</span>
+            <span>${order.isGiftOrder ? '0.00' : Number(order.total).toFixed(2)} ${dt('currency')}</span>
           </div>
         </div>
+        ${order.isGiftOrder ? `<div class="order-items-line"><span style="color:#B3441E; font-weight:700;">✅ ${dt('giftPaidLabel')}</span></div>` : ''}
         <div class="order-actions">
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
           ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
@@ -3625,13 +3630,13 @@ async function exportSalesExcel() {
       reportTitle: 'تقرير المبيعات', period: 'الفترة', to: 'إلى', totalSales: 'إجمالي المبيعات (ر.ع)',
       orderCount: 'عدد الطلبات', topSelling: 'الأكثر مبيعاً', qty: 'الكمية', date: 'التاريخ', time: 'الوقت',
       type: 'النوع', items: 'الأصناف', payment: 'طريقة الدفع', total: 'الإجمالي (ر.ع)', table: 'طاولة',
-      cash: 'نقداً', transfer: 'تحويل بنكي', card: 'فيزا/بطاقة', sheetName: 'المبيعات'
+      cash: 'نقداً', transfer: 'تحويل بنكي', card: 'فيزا/بطاقة', sheetName: 'المبيعات', giftLabel: 'هدية'
     },
     en: {
       reportTitle: 'Sales Report', period: 'Period', to: 'to', totalSales: 'Total Sales (OMR)',
       orderCount: 'Order Count', topSelling: 'Top Selling', qty: 'Qty', date: 'Date', time: 'Time',
       type: 'Type', items: 'Items', payment: 'Payment Method', total: 'Total (OMR)', table: 'Table',
-      cash: 'Cash', transfer: 'Bank Transfer', card: 'Visa/Card', sheetName: 'Sales'
+      cash: 'Cash', transfer: 'Bank Transfer', card: 'Visa/Card', sheetName: 'Sales', giftLabel: 'Gift'
     }
   }[exportLang] || {};
 
@@ -3667,7 +3672,7 @@ async function exportSalesExcel() {
         return `${itemLabel} ×${i.qty}`;
       }).join('، ');
       const paymentLabels = { cash: EL.cash, transfer: EL.transfer, card: EL.card };
-      const paymentText = paymentLabels[o.paymentMethod] || '-';
+      const paymentText = o.isGiftOrder ? `🎁 ${EL.giftLabel}` : (paymentLabels[o.paymentMethod] || '-');
 
       rows.push([
         created ? created.toLocaleDateString('en-GB') : '',

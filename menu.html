@@ -252,6 +252,7 @@ async function claimGift(giftId) {
         carColor: null,
         notes: `${t('giftOrderNote')}: ${g.recipientName || ''}`,
         paymentMethod: 'transfer',
+        isGiftOrder: true,
         receiptUrl: g.receiptUrl || null,
         loyaltyPhone: null,
         loyaltyRewardReady: false,
