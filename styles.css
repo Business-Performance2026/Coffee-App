@@ -813,6 +813,42 @@ button, input, select {
   z-index: 2;
 }
 
+/* ---- Gift box open animation (menu.html gift viewing page only) ---- */
+@keyframes giftBoxPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.gift-box-pulse {
+  animation: giftBoxPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes giftBoxOpen {
+  0% { transform: rotate(0deg) scale(1); opacity: 1; }
+  20% { transform: rotate(-10deg) scale(1.05); }
+  40% { transform: rotate(10deg) scale(1.08); }
+  60% { transform: rotate(-8deg) scale(1.12); }
+  80% { transform: rotate(6deg) scale(1.2); }
+  100% { transform: rotate(0deg) scale(0); opacity: 0; }
+}
+
+.gift-box-opening {
+  animation: giftBoxOpen 0.55s ease-in forwards;
+}
+
+#giftTapHint {
+  transition: opacity 0.3s ease;
+}
+
+@keyframes giftContentsReveal {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.gift-contents-reveal {
+  animation: giftContentsReveal 0.5s ease-out forwards;
+}
+
 .grid-add-btn {
   width: 30px;
   height: 30px;
