@@ -47,6 +47,10 @@ let cart = {}; // { itemId: { name, price, qty } }
 let itemMeta = {}; // { itemId: { name, price } } — used to safely rebuild controls without re-escaping strings
 let suggestedItemIds = [];
 let currentLang = localStorage.getItem('menuLang') || 'ar';
+let orderTypePreset = false; // true once the person picked table/car/delivery from the entry screen
+let giftEntryMode = false;   // true if they picked "أهدِ صديق" from the entry screen
+let pendingMenuCategories = null; // holds the fetched/grouped items while the entry screen is showing
+let pendingMenuShopName = '';
 
 const translations = {
   loadingMenu: { ar: 'جاري تحميل القائمة...', en: 'Loading menu...' },
@@ -363,6 +367,115 @@ async function loadMenu() {
 
     const coverStyle = shopInfo.coverImage ? `style="background-image:url('${shopInfo.coverImage}')"` : '';
 
+    // Only worth asking upfront if there's an actual choice to make —
+    // more than one order type, or a gift option alongside at least one type.
+    const entryTypesEnabled = {
+      table: (shopInfo.orderTypes ? shopInfo.orderTypes.table !== false : true),
+      car: (shopInfo.orderTypes ? shopInfo.orderTypes.car !== false : true),
+      delivery: (shopInfo.orderTypes ? shopInfo.orderTypes.delivery === true : false)
+    };
+    const entryGiftAvailable = shopInfo.paymentMethods && shopInfo.paymentMethods.transfer !== false;
+    const entryTypeCount = Object.values(entryTypesEnabled).filter(Boolean).length;
+    const showEntryChoice = entryTypeCount > 1 || (entryTypeCount >= 1 && entryGiftAvailable);
+
+    pendingMenuCategories = categories;
+    pendingMenuShopName = shopName;
+
+    if (showEntryChoice) {
+      renderEntryChoiceScreen(entryTypesEnabled, entryGiftAvailable, coverStyle);
+      return;
+    }
+
+    // No real choice to make — same default behavior as before this feature existed.
+    if (entryTypesEnabled.table) selectedOrderType = 'table';
+    else if (entryTypesEnabled.car) selectedOrderType = 'car';
+    else if (entryTypesEnabled.delivery) selectedOrderType = 'delivery';
+    orderTypePreset = true;
+    renderMenuGridAndHero(coverStyle);
+    return;
+
+  } catch (err) {
+    console.error(err);
+    app.innerHTML = `<div class="state-msg">${t('loadError')}<br><small style="color:#B3441E;">${err.code || ''} ${err.message || err}</small></div>`;
+  }
+}
+
+// Shows the "Dine-in / Car Pickup / Send a Gift" choice screen, matching
+// the reference design — this is the very first thing the customer sees
+// after scanning the QR code (when there's an actual choice to make).
+function renderEntryChoiceScreen(entryTypesEnabled, entryGiftAvailable, coverStyle) {
+  const app = document.getElementById('app');
+  const shopName = pendingMenuShopName;
+
+  let optionsHtml = '';
+  if (entryTypesEnabled.table) {
+    optionsHtml += `
+      <button type="button" class="entry-choice-btn" onclick="proceedToMenuAfterEntryChoice('table')">
+        <span class="entry-choice-icon">🍽️</span>
+        <span class="entry-choice-label">${t('orderFromTable')}</span>
+        <span class="entry-choice-arrow">‹</span>
+      </button>`;
+  }
+  if (entryTypesEnabled.car) {
+    optionsHtml += `
+      <button type="button" class="entry-choice-btn" onclick="proceedToMenuAfterEntryChoice('car')">
+        <span class="entry-choice-icon">🚗</span>
+        <span class="entry-choice-label">${t('orderFromCar')}</span>
+        <span class="entry-choice-arrow">‹</span>
+      </button>`;
+  }
+  if (entryTypesEnabled.delivery) {
+    optionsHtml += `
+      <button type="button" class="entry-choice-btn" onclick="proceedToMenuAfterEntryChoice('delivery')">
+        <span class="entry-choice-icon">🛵</span>
+        <span class="entry-choice-label">${t('orderFromDelivery')}</span>
+        <span class="entry-choice-arrow">‹</span>
+      </button>`;
+  }
+  if (entryGiftAvailable) {
+    optionsHtml += `
+      <button type="button" class="entry-choice-btn" onclick="proceedToMenuAfterEntryChoice('gift')">
+        <span class="entry-choice-icon">🎁</span>
+        <span class="entry-choice-label">${t('giftEntryBtn')}</span>
+        <span class="entry-choice-arrow">‹</span>
+      </button>`;
+  }
+
+  app.innerHTML = `
+    <div class="menu-hero" ${coverStyle}>
+      ${shopInfo.logo ? `<img src="${shopInfo.logo}" class="menu-hero-logo" alt="${shopName}">` : ''}
+      <div class="menu-hero-name display">${shopName}</div>
+      ${(currentLang === 'en' && shopInfo.taglineEn) ? `<div class="menu-hero-tagline">${shopInfo.taglineEn}</div>` : (shopInfo.tagline ? `<div class="menu-hero-tagline">${shopInfo.tagline}</div>` : '')}
+    </div>
+    <div class="wrap" style="padding-top:20px;">
+      ${optionsHtml}
+    </div>
+  `;
+}
+
+function proceedToMenuAfterEntryChoice(choice) {
+  if (choice === 'gift') {
+    giftEntryMode = true;
+    orderTypePreset = false;
+  } else {
+    selectedOrderType = choice;
+    orderTypePreset = true;
+    giftEntryMode = false;
+  }
+  const coverStyle = shopInfo.coverImage ? `style="background-image:url('${shopInfo.coverImage}')"` : '';
+  renderMenuGridAndHero(coverStyle);
+}
+
+// Builds the hero header + category pills + item grid — exactly the same
+// markup and logic that used to run directly inside loadMenu(), just moved
+// into its own function so it can run either immediately (shops with only
+// one possible order type) or after the entry-choice screen.
+function renderMenuGridAndHero(coverStyle) {
+  const app = document.getElementById('app');
+  const categories = pendingMenuCategories;
+  const shopName = pendingMenuShopName;
+
+  try {
     let html = `
       <div class="menu-hero" ${coverStyle}>
         ${shopInfo.logo ? `<img src="${shopInfo.logo}" class="menu-hero-logo" alt="${shopName}">` : ''}
@@ -382,10 +495,6 @@ async function loadMenu() {
       <div class="menu-search-wrap">
         <input type="text" id="menuSearchInput" class="menu-search-input" placeholder="${t('searchPlaceholder')}" oninput="filterMenuSearch(this.value)">
       </div>
-
-      ${shopInfo.paymentMethods && shopInfo.paymentMethods.transfer !== false ? `
-        <button type="button" onclick="openGiftEntryPoint()" style="display:block; width:100%; background:var(--paper-dim); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:14px; font-weight:600; font-size:0.9rem; color:var(--ink); cursor:pointer; font-family:inherit;">🎁 ${t('giftEntryBtn')}</button>
-      ` : ''}
     `;
 
     const categoryNames = Object.keys(categories);
@@ -876,39 +985,52 @@ function openCartModal() {
   const items = Object.entries(cart);
   if (items.length === 0) return;
 
-  const orderTypesEnabled = {
-    table: (shopInfo.orderTypes ? shopInfo.orderTypes.table !== false : true),
-    car: (shopInfo.orderTypes ? shopInfo.orderTypes.car !== false : true),
-    delivery: (shopInfo.orderTypes ? shopInfo.orderTypes.delivery === true : false)
-  };
-  // If all got disabled somehow, fall back to table so ordering still works
-  if (!orderTypesEnabled.table && !orderTypesEnabled.car && !orderTypesEnabled.delivery) orderTypesEnabled.table = true;
+  // Came in through "أهدِ صديق" on the entry screen — go straight to the
+  // gift flow instead of the normal order review.
+  if (giftEntryMode) {
+    openGiftModal();
+    return;
+  }
 
-  selectedOrderType = orderTypesEnabled.table ? 'table' : (orderTypesEnabled.car ? 'car' : 'delivery');
+  let orderTypeHtml = '';
+  if (orderTypePreset) {
+    // Already decided on the entry screen — don't ask again, just keep
+    // using the selectedOrderType that was set there.
+  } else {
+    const orderTypesEnabled = {
+      table: (shopInfo.orderTypes ? shopInfo.orderTypes.table !== false : true),
+      car: (shopInfo.orderTypes ? shopInfo.orderTypes.car !== false : true),
+      delivery: (shopInfo.orderTypes ? shopInfo.orderTypes.delivery === true : false)
+    };
+    // If all got disabled somehow, fall back to table so ordering still works
+    if (!orderTypesEnabled.table && !orderTypesEnabled.car && !orderTypesEnabled.delivery) orderTypesEnabled.table = true;
 
-  let orderTypeHtml = '<div class="order-type-toggle">';
-  if (orderTypesEnabled.table) {
-    orderTypeHtml += `
-      <button class="order-type-btn ${selectedOrderType === 'table' ? 'active' : ''}" id="typeTableBtn" onclick="setOrderType('table')">
-        <span class="order-type-icon">🍽️</span><span>${t('orderFromTable')}</span>
-      </button>
-    `;
+    selectedOrderType = orderTypesEnabled.table ? 'table' : (orderTypesEnabled.car ? 'car' : 'delivery');
+
+    orderTypeHtml = '<div class="order-type-toggle">';
+    if (orderTypesEnabled.table) {
+      orderTypeHtml += `
+        <button class="order-type-btn ${selectedOrderType === 'table' ? 'active' : ''}" id="typeTableBtn" onclick="setOrderType('table')">
+          <span class="order-type-icon">🍽️</span><span>${t('orderFromTable')}</span>
+        </button>
+      `;
+    }
+    if (orderTypesEnabled.car) {
+      orderTypeHtml += `
+        <button class="order-type-btn ${selectedOrderType === 'car' ? 'active' : ''}" id="typeCarBtn" onclick="setOrderType('car')">
+          <span class="order-type-icon">🚗</span><span>${t('orderFromCar')}</span>
+        </button>
+      `;
+    }
+    if (orderTypesEnabled.delivery) {
+      orderTypeHtml += `
+        <button class="order-type-btn ${selectedOrderType === 'delivery' ? 'active' : ''}" id="typeDeliveryBtn" onclick="setOrderType('delivery')">
+          <span class="order-type-icon">🛵</span><span>${t('orderFromDelivery')}</span>
+        </button>
+      `;
+    }
+    orderTypeHtml += '</div>';
   }
-  if (orderTypesEnabled.car) {
-    orderTypeHtml += `
-      <button class="order-type-btn ${selectedOrderType === 'car' ? 'active' : ''}" id="typeCarBtn" onclick="setOrderType('car')">
-        <span class="order-type-icon">🚗</span><span>${t('orderFromCar')}</span>
-      </button>
-    `;
-  }
-  if (orderTypesEnabled.delivery) {
-    orderTypeHtml += `
-      <button class="order-type-btn ${selectedOrderType === 'delivery' ? 'active' : ''}" id="typeDeliveryBtn" onclick="setOrderType('delivery')">
-        <span class="order-type-icon">🛵</span><span>${t('orderFromDelivery')}</span>
-      </button>
-    `;
-  }
-  orderTypeHtml += '</div>';
 
   const paymentMethodsEnabled = shopInfo.paymentMethods || { cash: true, transfer: true, card: true };
   const paymentOptionDefs = [
