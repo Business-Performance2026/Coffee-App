@@ -1033,6 +1033,57 @@ function showGiftSentConfirmation(recipientName) {
   `;
 }
 
+// Builds each cart-review line with a quantity stepper and a remove (×)
+// button — used both when the modal first opens and whenever a line
+// changes, so the review screen never needs a full re-open.
+function buildCartLinesHtml(items) {
+  return items.map(([id, i]) => {
+    const dispName = (currentLang === 'en' && i.nameEn) ? i.nameEn : i.name;
+    return `
+      <div class="cart-line">
+        <button type="button" class="cart-line-remove" onclick='removeCartLine("${id}")'>×</button>
+        <span class="cart-line-name">${dispName}</span>
+        <div class="cart-line-qty">
+          <button type="button" onclick='cartLineChangeQty("${id}", -1)'>−</button>
+          <span>${i.qty}</span>
+          <button type="button" onclick='cartLineChangeQty("${id}", 1)'>+</button>
+        </div>
+        <span class="cart-line-price">${(i.qty * i.price).toFixed(2)} ${t('currency')}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// Changing quantity or removing a line reuses changeQty() exactly as the
+// main grid's +/- buttons do — same cart object, same grid-control sync,
+// same cart-bar update — just followed by refreshing this modal's own display.
+function cartLineChangeQty(itemId, delta) {
+  changeQty(itemId, delta);
+  refreshCartReviewDisplay();
+}
+
+function removeCartLine(itemId) {
+  if (cart[itemId]) {
+    changeQty(itemId, -cart[itemId].qty);
+  }
+  refreshCartReviewDisplay();
+}
+
+function refreshCartReviewDisplay() {
+  const items = Object.entries(cart);
+  if (items.length === 0) {
+    closeCartModal();
+    return;
+  }
+  const linesContainer = document.getElementById('cartLinesContainer');
+  const totalLineEl = document.getElementById('cartTotalLine');
+  if (linesContainer) linesContainer.innerHTML = buildCartLinesHtml(items);
+  if (totalLineEl) {
+    const total = items.reduce((sum, [, i]) => sum + i.qty * i.price, 0);
+    totalLineEl.innerHTML = `<span>${t('total')}</span><span>${total.toFixed(2)} ${t('currency')}</span>`;
+  }
+}
+
 function openCartModal() {
   const items = Object.entries(cart);
   if (items.length === 0) return;
@@ -1098,16 +1149,7 @@ function openCartModal() {
 
   const total = items.reduce((sum, [, i]) => sum + i.qty * i.price, 0);
 
-  let linesHtml = '';
-  items.forEach(([id, i]) => {
-    const dispName = (currentLang === 'en' && i.nameEn) ? i.nameEn : i.name;
-    linesHtml += `
-      <div class="cart-line">
-        <span>${dispName} × ${i.qty}</span>
-        <span>${(i.qty * i.price).toFixed(2)} ${t('currency')}</span>
-      </div>
-    `;
-  });
+  let linesHtml = buildCartLinesHtml(items);
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
