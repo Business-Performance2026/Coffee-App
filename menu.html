@@ -51,6 +51,9 @@ let orderTypePreset = false; // true once the person picked table/car/delivery f
 let giftEntryMode = false;   // true if they picked "أهدِ صديق" from the entry screen
 let pendingMenuCategories = null; // holds the fetched/grouped items while the entry screen is showing
 let pendingMenuShopName = '';
+let pendingEntryTypesEnabled = null;
+let pendingEntryGiftAvailable = false;
+let pendingCoverStyle = '';
 
 const translations = {
   loadingMenu: { ar: 'جاري تحميل القائمة...', en: 'Loading menu...' },
@@ -380,8 +383,12 @@ async function loadMenu() {
 
     pendingMenuCategories = categories;
     pendingMenuShopName = shopName;
+    pendingEntryTypesEnabled = entryTypesEnabled;
+    pendingEntryGiftAvailable = entryGiftAvailable;
+    pendingCoverStyle = coverStyle;
 
     if (showEntryChoice) {
+      history.replaceState({ menuView: 'entryChoice' }, '', '');
       renderEntryChoiceScreen(entryTypesEnabled, entryGiftAvailable, coverStyle);
       return;
     }
@@ -464,16 +471,22 @@ function renderSocialIconsHtml() {
   const hasWhatsapp = !!shopInfo.whatsapp;
   if (!hasLocation && !hasInstagram && !hasWhatsapp) return '';
 
+  const icons = {
+    instagram: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="0.6" fill="currentColor" stroke="none"/></svg>`,
+    location: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.2a7 7 0 1 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.4"/></svg>`,
+    whatsapp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a8.5 8.5 0 0 0-7.4 12.7L3.5 20l4.4-1.1A8.5 8.5 0 1 0 12 3z"/><path d="M8.8 8.6c.2-.5.5-.5.7-.5h.5c.2 0 .4 0 .6.4.2.5.6 1.4.7 1.5.1.1.1.3 0 .5-.1.2-.2.3-.3.4l-.4.5c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.6-.7c.2-.2.4-.2.6-.1l1.4.7c.2.1.4.2.4.4 0 .2 0 1-.4 1.4-.4.4-1.1.8-1.9.8-1.9 0-3.9-1.1-5.3-2.4-1.4-1.4-2.4-3.2-2.5-4.9 0-.7.2-1.5.7-1.9z"/></svg>`
+  };
+
   let iconsHtml = '';
-  if (hasLocation) {
-    iconsHtml += `<a href="${shopInfo.locationLink}" target="_blank" class="social-icon-btn">📍</a>`;
-  }
   if (hasInstagram) {
-    iconsHtml += `<a href="${shopInfo.instagramLink}" target="_blank" class="social-icon-btn">📷</a>`;
+    iconsHtml += `<a href="${shopInfo.instagramLink}" target="_blank" class="social-icon-btn">${icons.instagram}</a>`;
+  }
+  if (hasLocation) {
+    iconsHtml += `<a href="${shopInfo.locationLink}" target="_blank" class="social-icon-btn">${icons.location}</a>`;
   }
   if (hasWhatsapp) {
     const waDigits = shopInfo.whatsapp.replace(/\D/g, '');
-    iconsHtml += `<a href="https://wa.me/${waDigits}" target="_blank" class="social-icon-btn">💬</a>`;
+    iconsHtml += `<a href="https://wa.me/${waDigits}" target="_blank" class="social-icon-btn">${icons.whatsapp}</a>`;
   }
   return `<div class="social-icons-row">${iconsHtml}</div>`;
 }
@@ -488,8 +501,20 @@ function proceedToMenuAfterEntryChoice(choice) {
     giftEntryMode = false;
   }
   const coverStyle = shopInfo.coverImage ? `style="background-image:url('${shopInfo.coverImage}')"` : '';
+  history.pushState({ menuView: 'menuGrid' }, '', '');
   renderMenuGridAndHero(coverStyle);
 }
+
+// Makes the phone/browser back button return to the entry-choice screen
+// (Dine-in / Car Pickup / Send a Gift) instead of exiting the page
+// entirely, whenever that screen was shown in the first place.
+window.addEventListener('popstate', (event) => {
+  if (!pendingEntryTypesEnabled) return; // this shop never had an entry-choice screen to begin with
+  const onMenuGrid = event.state && event.state.menuView === 'menuGrid';
+  if (!onMenuGrid) {
+    renderEntryChoiceScreen(pendingEntryTypesEnabled, pendingEntryGiftAvailable, pendingCoverStyle);
+  }
+});
 
 // Builds the hero header + category pills + item grid — exactly the same
 // markup and logic that used to run directly inside loadMenu(), just moved

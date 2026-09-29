@@ -1267,8 +1267,9 @@ button, input, select {
 .social-icons-row {
   display: flex;
   justify-content: center;
-  gap: 14px;
-  margin: 20px 0;
+  align-items: center;
+  gap: 22px;
+  margin: 22px 0;
 }
 
 .social-icon-btn {
@@ -1277,12 +1278,17 @@ button, input, select {
   justify-content: center;
   width: 52px;
   height: 52px;
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  font-size: 1.4rem;
+  background: transparent;
+  border: 1.6px solid var(--ink);
+  border-radius: 50%;
+  color: var(--ink);
   text-decoration: none;
-  box-shadow: 0 2px 8px rgba(36,27,21,0.05);
+  flex-shrink: 0;
+}
+
+.social-icon-btn svg {
+  width: 24px;
+  height: 24px;
 }
 
 .entry-choice-btn {
