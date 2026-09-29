@@ -1263,6 +1263,28 @@ button, input, select {
 
 /* ---- Order type toggle (car / table) ---- */
 /* ---- Entry choice screen (Dine-in / Car Pickup / Send a Gift) ---- */
+/* ---- Social contact icons (location / Instagram / WhatsApp) ---- */
+.social-icons-row {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.social-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  font-size: 1.4rem;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(36,27,21,0.05);
+}
+
 .entry-choice-btn {
   display: flex;
   align-items: center;

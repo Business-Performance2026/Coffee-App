@@ -449,8 +449,33 @@ function renderEntryChoiceScreen(entryTypesEnabled, entryGiftAvailable, coverSty
     </div>
     <div class="wrap" style="padding-top:20px;">
       ${optionsHtml}
+      ${renderSocialIconsHtml()}
     </div>
   `;
+}
+
+// Small row of contact icons (location / Instagram / WhatsApp) — only
+// shows the ones the shop owner actually filled in, hidden entirely if
+// none are set. Shared between the entry-choice screen and the regular
+// menu page (for shops that skip straight to the grid).
+function renderSocialIconsHtml() {
+  const hasLocation = !!shopInfo.locationLink;
+  const hasInstagram = !!shopInfo.instagramLink;
+  const hasWhatsapp = !!shopInfo.whatsapp;
+  if (!hasLocation && !hasInstagram && !hasWhatsapp) return '';
+
+  let iconsHtml = '';
+  if (hasLocation) {
+    iconsHtml += `<a href="${shopInfo.locationLink}" target="_blank" class="social-icon-btn">📍</a>`;
+  }
+  if (hasInstagram) {
+    iconsHtml += `<a href="${shopInfo.instagramLink}" target="_blank" class="social-icon-btn">📷</a>`;
+  }
+  if (hasWhatsapp) {
+    const waDigits = shopInfo.whatsapp.replace(/\D/g, '');
+    iconsHtml += `<a href="https://wa.me/${waDigits}" target="_blank" class="social-icon-btn">💬</a>`;
+  }
+  return `<div class="social-icons-row">${iconsHtml}</div>`;
 }
 
 function proceedToMenuAfterEntryChoice(choice) {
@@ -491,6 +516,8 @@ function renderMenuGridAndHero(coverStyle) {
           <div class="hours-content" id="hoursContent" style="display:none;">${shopInfo.openingHours}</div>
         ` : ''}
       </div>
+
+      ${renderSocialIconsHtml()}
 
       <div class="menu-search-wrap">
         <input type="text" id="menuSearchInput" class="menu-search-input" placeholder="${t('searchPlaceholder')}" oninput="filterMenuSearch(this.value)">

@@ -384,6 +384,16 @@
       </div>
 
       <div class="field">
+        <label for="shopLocationLinkInput" data-i18n="locationLinkLbl">رابط الموقع (خرائط جوجل)</label>
+        <input type="text" id="shopLocationLinkInput" placeholder="https://maps.google.com/..." dir="ltr" style="text-align:left;">
+      </div>
+
+      <div class="field">
+        <label for="shopInstagramLinkInput" data-i18n="instagramLinkLbl">رابط انستقرام</label>
+        <input type="text" id="shopInstagramLinkInput" placeholder="https://instagram.com/..." dir="ltr" style="text-align:left;">
+      </div>
+
+      <div class="field">
         <label for="shopEmailInput" data-i18n="emailLbl">البريد الإلكتروني</label>
         <input type="email" id="shopEmailInput">
       </div>
@@ -1137,6 +1147,8 @@ const dashT = {
   locationLbl: { ar: 'الموقع', en: 'Location' },
   phoneLbl: { ar: 'رقم الهاتف', en: 'Phone number' },
   whatsappLbl: { ar: 'رقم الواتساب', en: 'WhatsApp number' },
+  locationLinkLbl: { ar: 'رابط الموقع (خرائط جوجل)', en: 'Location link (Google Maps)' },
+  instagramLinkLbl: { ar: 'رابط انستقرام', en: 'Instagram link' },
   emailLbl: { ar: 'البريد الإلكتروني', en: 'Email' },
   colorLbl: { ar: 'اللون المميز', en: 'Accent color' },
   prepTimeLbl: { ar: 'الوقت التقريبي للتحضير (دقائق)', en: 'Estimated prep time (minutes)' },
@@ -1623,6 +1635,8 @@ async function loadShopInfo() {
     renderWeeklyHoursEditor(info.hours || {});
     document.getElementById('shopPhoneInput').value = info.phone || '';
     document.getElementById('shopWhatsappInput').value = info.whatsapp || '';
+    document.getElementById('shopLocationLinkInput').value = info.locationLink || '';
+    document.getElementById('shopInstagramLinkInput').value = info.instagramLink || '';
     document.getElementById('shopEmailInput').value = info.email || '';
     document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
     document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
@@ -1966,6 +1980,8 @@ async function saveShopInfo() {
   const hours = collectWeeklyHours();
   const phone = document.getElementById('shopPhoneInput').value.trim();
   const whatsapp = document.getElementById('shopWhatsappInput').value.trim();
+  const locationLink = document.getElementById('shopLocationLinkInput').value.trim();
+  const instagramLink = document.getElementById('shopInstagramLinkInput').value.trim();
   const email = document.getElementById('shopEmailInput').value.trim();
   const color = document.getElementById('shopColorInput').value;
   const prepTime = parseInt(document.getElementById('shopPrepTimeInput').value) || 10;
@@ -2024,6 +2040,8 @@ async function saveShopInfo() {
       'info.openingHours': formatHoursForDisplay(hours),
       'info.phone': phone,
       'info.whatsapp': whatsapp,
+      'info.locationLink': locationLink,
+      'info.instagramLink': instagramLink,
       'info.email': email,
       'info.primaryColor': color,
       'info.estimatedMinutes': prepTime,
