@@ -256,6 +256,11 @@
       </div>
     </div>
 
+    <div class="card" id="netProfitCard" style="display:none; margin-bottom:16px;">
+      <div class="top-item-row"><span data-i18n="totalExpensesLbl">إجمالي المصاريف</span><span id="periodExpensesTotal">0.00</span></div>
+      <div class="top-item-row" style="font-weight:700; border-top:1px solid var(--line); padding-top:10px; margin-top:4px;"><span data-i18n="netProfitLbl">صافي الربح</span><span id="netProfitTotal">0.00</span></div>
+    </div>
+
     <h3 style="margin:0 0 12px;" data-i18n="paymentBreakdownTitle">حسب طريقة الدفع</h3>
     <div class="card" id="paymentBreakdown">
       <div class="state-msg">جاري التحميل...</div>
@@ -317,6 +322,9 @@
       </button>
       <button class="acc-icon-subnav-btn" data-accsub="session" onclick="switchAccountSub('session')">
         <span class="icon-subnav-icon">🔑</span><span class="icon-subnav-label" data-i18n="accSubSession">الجلسة</span>
+      </button>
+      <button class="acc-icon-subnav-btn" data-accsub="expenses" onclick="switchAccountSub('expenses')" id="expensesSubBtn">
+        <span class="icon-subnav-icon">💸</span><span class="icon-subnav-label" data-i18n="accSubExpenses">المصاريف</span>
       </button>
     </div>
 
@@ -575,6 +583,30 @@
     </div>
     </div>
 
+    <div id="acc-sub-expenses" class="acc-sub-view">
+      <div class="card">
+        <div class="field">
+          <label for="expenseDescInput" data-i18n="expenseDescLbl">وصف المصروف</label>
+          <input type="text" id="expenseDescInput" placeholder="مثال: إيجار شهر أكتوبر">
+        </div>
+        <div class="field">
+          <label for="expenseAmountInput" data-i18n="expenseAmountLbl">المبلغ (ر.ع)</label>
+          <input type="number" step="0.001" min="0" id="expenseAmountInput">
+        </div>
+        <div class="field">
+          <label for="expenseDateInput" data-i18n="expenseDateLbl">التاريخ</label>
+          <input type="date" id="expenseDateInput">
+        </div>
+        <button class="btn" style="width:100%;" onclick="addExpense()" data-i18n="addExpenseBtn">إضافة المصروف</button>
+        <div id="expenseFormError" class="error-msg"></div>
+      </div>
+
+      <h3 style="margin:20px 0 12px;" data-i18n="expensesListTitle">المصاريف المسجّلة</h3>
+      <div id="expensesList">
+        <div class="state-msg">جاري التحميل...</div>
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -742,6 +774,12 @@ auth.onAuthStateChanged(async user => {
 // "لوحة التحكم" tab, so hiding that whole tab covers it) that this
 // employee wasn't granted. Also jumps to their first allowed tab.
 function applyEmployeePermissionsUI() {
+  // Expenses are strictly owner-only, regardless of any permission an
+  // employee might have — this function only ever runs for employees, so
+  // hiding it here unconditionally is safe and never affects the owner.
+  const expensesBtn = document.getElementById('expensesSubBtn');
+  if (expensesBtn) expensesBtn.style.display = 'none';
+
   const tabPermMap = { dashboard: 'dashboard', pos: 'pos', inventory: 'inventory', sales: 'sales', account: 'account' };
   let firstAllowed = null;
 
@@ -1138,6 +1176,19 @@ const dashT = {
   accSubOrderTypes: { ar: 'أنواع الطلب', en: 'Order types' },
   accSubStaff: { ar: 'الموظفين', en: 'Staff' },
   accSubSession: { ar: 'الجلسة', en: 'Session' },
+  accSubExpenses: { ar: 'المصاريف', en: 'Expenses' },
+  expenseDescLbl: { ar: 'وصف المصروف', en: 'Expense description' },
+  expenseAmountLbl: { ar: 'المبلغ (ر.ع)', en: 'Amount (OMR)' },
+  expenseDateLbl: { ar: 'التاريخ', en: 'Date' },
+  addExpenseBtn: { ar: 'إضافة المصروف', en: 'Add expense' },
+  expensesListTitle: { ar: 'المصاريف المسجّلة', en: 'Logged expenses' },
+  noExpensesYet: { ar: 'ما فيه مصاريف مسجّلة بعد.', en: 'No expenses logged yet.' },
+  expenseFieldsError: { ar: 'الرجاء تعبئة الوصف والمبلغ والتاريخ.', en: 'Please fill in the description, amount, and date.' },
+  expenseSaveError: { ar: 'صار خطأ أثناء حفظ المصروف.', en: 'Something went wrong saving the expense.' },
+  loadingExpenses: { ar: 'جاري التحميل...', en: 'Loading...' },
+  expenseLoadError: { ar: 'صار خطأ أثناء تحميل المصاريف.', en: 'Something went wrong loading expenses.' },
+  totalExpensesLbl: { ar: 'إجمالي المصاريف', en: 'Total expenses' },
+  netProfitLbl: { ar: 'صافي الربح', en: 'Net profit' },
   logoLbl: { ar: 'شعار الكوفي', en: 'Shop logo' },
   coverLbl: { ar: 'صورة الغلاف', en: 'Cover photo' },
   shopNameArLbl: { ar: 'اسم المحل (عربي)', en: 'Shop name (Arabic)' },
@@ -1571,11 +1622,96 @@ function switchSubView(name) {
 // Completely separate from switchSubView above — uses its own class names
 // (.acc-sub-view / .acc-icon-subnav-btn) so the two subnavs never interfere
 // with each other's active-button state, regardless of which tab is open.
+// ===================== Expenses (owner-only) =====================
+let expensesData = [];
+
+async function loadExpenses() {
+  const el = document.getElementById('expensesList');
+  if (el) el.innerHTML = `<div class="state-msg">${dt('loadingExpenses')}</div>`;
+  try {
+    const snap = await db.collection('shops').doc(currentShopId).collection('expenses').get();
+    expensesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    expensesData.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    renderExpensesList();
+  } catch (err) {
+    console.error('loadExpenses failed:', err);
+    if (el) el.innerHTML = `<div class="state-msg">${dt('expenseLoadError')}</div>`;
+  }
+}
+
+function renderExpensesList() {
+  const el = document.getElementById('expensesList');
+  if (!el) return;
+  if (expensesData.length === 0) {
+    el.innerHTML = `<div class="card"><div class="state-msg">${dt('noExpensesYet')}</div></div>`;
+    return;
+  }
+  el.innerHTML = expensesData.map(exp => `
+    <div class="card" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-weight:600;">${escapeHtml(exp.description || '')}</div>
+        <div class="order-items-line">${exp.date || ''}</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="font-weight:700;">${Number(exp.amount).toFixed(3)} ${dt('currency')}</div>
+        <button class="btn btn-ghost" style="color:#B3441E; padding:6px 10px;" onclick='deleteExpense("${exp.id}")'>🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addExpense() {
+  const errorEl = document.getElementById('expenseFormError');
+  const descInput = document.getElementById('expenseDescInput');
+  const amountInput = document.getElementById('expenseAmountInput');
+  const dateInput = document.getElementById('expenseDateInput');
+
+  const description = descInput.value.trim();
+  const amount = parseFloat(amountInput.value);
+  const date = dateInput.value;
+
+  if (!description || !amount || amount <= 0 || !date) {
+    errorEl.textContent = dt('expenseFieldsError');
+    return;
+  }
+  errorEl.textContent = '';
+
+  try {
+    await db.collection('shops').doc(currentShopId).collection('expenses').add({
+      description,
+      amount,
+      date,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    descInput.value = '';
+    amountInput.value = '';
+    loadExpenses();
+  } catch (err) {
+    console.error('addExpense failed:', err);
+    errorEl.textContent = dt('expenseSaveError');
+  }
+}
+
+async function deleteExpense(expenseId) {
+  try {
+    await db.collection('shops').doc(currentShopId).collection('expenses').doc(expenseId).delete();
+    loadExpenses();
+  } catch (err) {
+    console.error('deleteExpense failed:', err);
+  }
+}
+
 function switchAccountSub(name) {
   document.querySelectorAll('.acc-sub-view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.acc-icon-subnav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`acc-sub-${name}`).classList.add('active');
   document.querySelector(`.acc-icon-subnav-btn[data-accsub="${name}"]`).classList.add('active');
+
+  if (name === 'expenses') {
+    const dateInput = document.getElementById('expenseDateInput');
+    if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    loadExpenses();
+  }
 }
 
 // ===================== Sound alert system: "ding-ding" x3 =====================
@@ -3699,13 +3835,15 @@ async function exportSalesExcel() {
       reportTitle: 'تقرير المبيعات', period: 'الفترة', to: 'إلى', totalSales: 'إجمالي المبيعات (ر.ع)',
       orderCount: 'عدد الطلبات', topSelling: 'الأكثر مبيعاً', qty: 'الكمية', date: 'التاريخ', time: 'الوقت',
       type: 'النوع', items: 'الأصناف', payment: 'طريقة الدفع', total: 'الإجمالي (ر.ع)', table: 'طاولة',
-      cash: 'نقداً', transfer: 'تحويل بنكي', card: 'فيزا/بطاقة', sheetName: 'المبيعات', giftLabel: 'هدية'
+      cash: 'نقداً', transfer: 'تحويل بنكي', card: 'فيزا/بطاقة', sheetName: 'المبيعات', giftLabel: 'هدية',
+      totalExpenses: 'إجمالي المصاريف (ر.ع)', netProfit: 'صافي الربح (ر.ع)'
     },
     en: {
       reportTitle: 'Sales Report', period: 'Period', to: 'to', totalSales: 'Total Sales (OMR)',
       orderCount: 'Order Count', topSelling: 'Top Selling', qty: 'Qty', date: 'Date', time: 'Time',
       type: 'Type', items: 'Items', payment: 'Payment Method', total: 'Total (OMR)', table: 'Table',
-      cash: 'Cash', transfer: 'Bank Transfer', card: 'Visa/Card', sheetName: 'Sales', giftLabel: 'Gift'
+      cash: 'Cash', transfer: 'Bank Transfer', card: 'Visa/Card', sheetName: 'Sales', giftLabel: 'Gift',
+      totalExpenses: 'Total Expenses (OMR)', netProfit: 'Net Profit (OMR)'
     }
   }[exportLang] || {};
 
@@ -3762,6 +3900,24 @@ async function exportSalesExcel() {
     data.push([]);
     data.push([EL.totalSales, totalSales.toFixed(2)]);
     data.push([EL.orderCount, snap.size]);
+
+    // Expenses are strictly owner-only — never included in an export run
+    // by an employee, even one with "sales" permission for everything else.
+    if (!isEmployee) {
+      try {
+        const expSnap = await db.collection('shops').doc(currentShopId).collection('expenses')
+          .where('date', '>=', fromStr)
+          .where('date', '<=', toStr)
+          .get();
+        let expensesTotal = 0;
+        expSnap.forEach(doc => { expensesTotal += Number(doc.data().amount) || 0; });
+        data.push([EL.totalExpenses, expensesTotal.toFixed(3)]);
+        data.push([EL.netProfit, (totalSales - expensesTotal).toFixed(3)]);
+      } catch (err) {
+        console.error('Loading expenses for export failed:', err);
+      }
+    }
+
     data.push([]);
     data.push([EL.topSelling, EL.qty]);
     topItems.forEach(([name, qty]) => data.push([name, qty]));
@@ -3857,6 +4013,29 @@ async function loadSales(range, btnEl) {
   document.getElementById('avgRating').textContent = ratingCount > 0
     ? `${(ratingSum / ratingCount).toFixed(1)} ⭐`
     : '—';
+
+  // Expenses are strictly owner-only data — never fetched or shown for an
+  // employee, even one with "sales" permission to view everything else here.
+  const netProfitCard = document.getElementById('netProfitCard');
+  if (!isEmployee && netProfitCard) {
+    try {
+      const startDateStr = startDate.toISOString().slice(0, 10);
+      const expSnap = await db.collection('shops').doc(currentShopId).collection('expenses')
+        .where('date', '>=', startDateStr)
+        .get();
+      let expensesTotal = 0;
+      expSnap.forEach(doc => { expensesTotal += Number(doc.data().amount) || 0; });
+
+      document.getElementById('periodExpensesTotal').textContent = `${expensesTotal.toFixed(3)} ${dt('currency')}`;
+      document.getElementById('netProfitTotal').textContent = `${(total - expensesTotal).toFixed(3)} ${dt('currency')}`;
+      netProfitCard.style.display = 'block';
+    } catch (err) {
+      console.error('Loading expenses for net profit failed:', err);
+      netProfitCard.style.display = 'none';
+    }
+  } else if (netProfitCard) {
+    netProfitCard.style.display = 'none';
+  }
 
   const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
   const paymentEl = document.getElementById('paymentBreakdown');
