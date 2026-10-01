@@ -123,6 +123,10 @@ const translations = {
   redeemingGift: { ar: 'جاري الاستلام...', en: 'Receiving...' },
   claimGiftBtn: { ar: 'استلام الهدية', en: 'Receive gift' },
   claimGiftHint: { ar: 'اضغط استلام الهدية عندما تصل إلى المقهى', en: 'Press receive gift when you arrive at the shop' },
+  confirmClaimGiftTitle: { ar: 'متأكد تبي تستلمها الحين؟', en: 'Are you sure you want to receive it now?' },
+  confirmClaimGiftMsg: { ar: 'استلم هديتك بس وأنت واصل للمقهى فعلياً — ما تقدر تتراجع بعدها.', en: "Only receive your gift once you've actually arrived at the shop — you can't undo this after." },
+  yesClaimNowBtn: { ar: 'نعم، استلمها الحين', en: 'Yes, receive it now' },
+  noGoBackBtn: { ar: 'رجوع', en: 'Go back' },
   giftClaimedSuccess: { ar: 'تم استلام هديتك، تفضل بالجلوس بانتظار تحضيرها ✓', en: 'Your gift has been received — please have a seat while it\'s prepared ✓' },
   giftAlreadyClaimed: { ar: 'تم استلام هذي الهدية من قبل.', en: 'This gift has already been received.' },
   giftEntryBtn: { ar: 'أهدِ صديق', en: 'Gift a friend' },
@@ -223,7 +227,7 @@ async function showGiftViewPage(giftId) {
         <h2 style="margin-bottom:4px;">${t('giftBoxTitle')}</h2>
         <p style="color:var(--stone); margin-bottom:24px;">${shopName}</p>
         <div class="card" style="text-align:right;">
-          ${gift.personalMessage ? `<p style="font-style:italic; color:var(--ink); margin-bottom:16px; padding-bottom:16px; border-bottom:1px dashed var(--line);">"${gift.personalMessage}"</p>` : ''}
+          ${gift.personalMessage ? `<p style="font-style:italic; color:var(--ink); margin-bottom:16px; padding-bottom:16px; border-bottom:1px dashed var(--line);">"${escapeHtml(gift.personalMessage)}"</p>` : ''}
           <div style="font-weight:700; margin-bottom:8px;">${t('giftContentsLbl')}</div>
           ${itemsHtml}
           <div style="text-align:center; font-weight:700; color:#3D7A47; margin-top:16px; padding-top:12px; border-top:1px solid var(--line); font-size:1.1rem;">🎉 ${t('giftFreeLabel')}</div>
@@ -237,7 +241,7 @@ async function showGiftViewPage(giftId) {
   // keeping this exactly the same as before — just revealed after the tap.
   const claimAreaHtml = gift.redeemed
     ? `<div style="color:#B3441E; font-weight:700;">✓ ${t('giftAlreadyClaimed')}</div>`
-    : `<button class="btn" id="claimGiftBtn" style="width:100%;" onclick="claimGift('${giftId}')">✅ ${t('claimGiftBtn')}</button>
+    : `<button class="btn" id="claimGiftBtn" style="width:100%;" onclick="confirmClaimGift('${giftId}')">✅ ${t('claimGiftBtn')}</button>
        <p style="font-size:0.78rem; color:var(--stone); margin-top:8px;">${t('claimGiftHint')}</p>`;
   document.getElementById('giftClaimArea').innerHTML = claimAreaHtml;
 }
@@ -258,6 +262,30 @@ function openGiftBox() {
     contentsWrap.style.display = 'block';
     contentsWrap.classList.add('gift-contents-reveal');
   }, 550);
+}
+
+function confirmClaimGift(giftId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'claimConfirmOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">🎁</div>
+      <h3 style="margin-bottom:8px;">${t('confirmClaimGiftTitle')}</h3>
+      <p style="color:var(--stone); margin-bottom:20px;">${t('confirmClaimGiftMsg')}</p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" style="flex:1;" id="confirmClaimYesBtn">${t('yesClaimNowBtn')}</button>
+        <button class="btn btn-ghost" style="flex:1;" id="confirmClaimNoBtn">${t('noGoBackBtn')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('confirmClaimNoBtn').addEventListener('click', () => overlay.remove());
+  document.getElementById('confirmClaimYesBtn').addEventListener('click', () => {
+    overlay.remove();
+    claimGift(giftId);
+  });
 }
 
 async function claimGift(giftId) {
@@ -288,6 +316,7 @@ async function claimGift(giftId) {
         notes: `${t('giftOrderNote')}: ${g.recipientName || ''}`,
         paymentMethod: 'transfer',
         isGiftOrder: true,
+        giftId: giftId,
         receiptUrl: g.receiptUrl || null,
         loyaltyPhone: null,
         loyaltyRewardReady: false,
@@ -607,6 +636,19 @@ function renderMenuGridAndHero(coverStyle) {
 
 function escapeStr(str) {
   return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// Escapes text before inserting it as HTML content (not inside an
+// attribute) — used for any text a customer typed themselves so it can
+// never be interpreted as HTML/script when someone else views it.
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function toggleHours() {

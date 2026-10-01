@@ -1255,6 +1255,10 @@ const dashT = {
   orderCancelledTitle: { ar: 'العميل ألغى الطلب', en: 'Customer cancelled the order' },
   cancelOrderBtn: { ar: 'إلغاء الطلب', en: 'Cancel order' },
   confirmStaffCancelOrder: { ar: 'متأكد تريد تلغي هذا الطلب؟', en: 'Are you sure you want to cancel this order?' },
+  cancelAndReturnGiftBtn: { ar: 'إلغاء الطلب وإرجاع الهدية', en: 'Cancel order and return gift' },
+  cancelOnlyBtn: { ar: 'إلغاء الطلب بس (الهدية تفضل مستخدمة)', en: 'Cancel order only (gift stays used)' },
+  cancelAndReturnGiftHint: { ar: 'استخدم "إرجاع الهدية" لو الطلب صار بالغلط أو ما فيه زبون جاي ياخذه — الهدية ترجع تنعرض من جديد ويقدر يستلمها مرة ثانية.', en: "Use \"return gift\" if the order happened by mistake or there's no customer coming to pick it up — the gift goes back to showing as available and can be claimed again." },
+  cancelReturnGiftError: { ar: 'صار خطأ أثناء إرجاع الهدية. حاول مرة ثانية.', en: 'Something went wrong returning the gift. Please try again.' },
   yesCancelBtn: { ar: 'نعم، ألغِ الطلب', en: 'Yes, cancel it' },
   noKeepBtn: { ar: 'تراجع', en: 'No, keep it' },
   okBtn: { ar: 'حسناً', en: 'OK' },
@@ -2184,8 +2188,8 @@ async function loadReservations() {
         <div class="order-card-top">
           <strong>${r.roomName} — ${r.date} ${r.time}</strong>
         </div>
-        <div class="order-items-line">${r.customerName} · ${r.phone} · ${r.guests} ${dt('guestsWord')}</div>
-        ${r.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${r.notes}</div>` : ''}
+        <div class="order-items-line">${escapeHtml(r.customerName)} · ${escapeHtml(r.phone)} · ${r.guests} ${dt('guestsWord')}</div>
+        ${r.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${escapeHtml(r.notes)}</div>` : ''}
         <div class="order-actions">
           <button class="btn btn-danger" onclick='cancelReservation("${doc.id}", "${r.roomId}", "${r.date}", "${r.time}")'>${dt('cancelReservationBtn')}</button>
         </div>
@@ -2239,6 +2243,20 @@ async function loadCategoryManager() {
 
 function escapeStrJs(str) {
   return String(str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// Escapes text before inserting it as HTML content (not inside an
+// attribute) — used for any text a customer typed themselves (order
+// notes, gift messages, delivery address fields, names) so it can never
+// be interpreted as HTML/script when a staff member views it.
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function openRenameCategoryModal(oldName, oldNameEn) {
@@ -2542,10 +2560,10 @@ function renderPendingGifts() {
     const itemsText = (gift.items || []).map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
     return `
       <div class="card" style="margin-bottom:12px;">
-        <div style="font-weight:700; margin-bottom:4px;">🎁 ${gift.recipientName || ''}</div>
+        <div style="font-weight:700; margin-bottom:4px;">🎁 ${escapeHtml(gift.recipientName || '')}</div>
         <div class="order-items-line">${gift.recipientPhone || ''}</div>
         <div class="order-items-line">${itemsText} — ${Number(gift.total).toFixed(2)} ${dt('currency')}</div>
-        ${gift.personalMessage ? `<div class="order-items-line" style="font-style:italic;">💬 "${gift.personalMessage}"</div>` : ''}
+        ${gift.personalMessage ? `<div class="order-items-line" style="font-style:italic;">💬 "${escapeHtml(gift.personalMessage)}"</div>` : ''}
         <div class="order-actions" style="margin-top:10px;">
           <button class="btn btn-ghost" onclick='sendGiftWelcomeWhatsApp("${gift.id}")'>💬 ${dt('sendWhatsappBtn')}</button>
           <button class="btn" onclick='openGiftDeliverModal("${gift.id}")'>🎁 ${dt('deliverGiftBtn')}</button>
@@ -2584,7 +2602,7 @@ function openGiftDeliverModal(giftId) {
   overlay.innerHTML = `
     <div class="modal-sheet">
       <button class="close-x" onclick="document.getElementById('giftDeliverOverlay').remove()">×</button>
-      <h3 style="margin:8px 0 4px; text-align:center;">🎁 ${gift.recipientName || ''}</h3>
+      <h3 style="margin:8px 0 4px; text-align:center;">🎁 ${escapeHtml(gift.recipientName || '')}</h3>
       <p style="text-align:center; color:var(--stone); margin-bottom:16px;">${gift.recipientPhone || ''}</p>
       <div class="order-items-detail">
         ${itemsHtml}
@@ -2625,6 +2643,7 @@ async function deliverGift(giftId) {
         notes: `🎁 ${dt('giftOrderNote')}: ${g.recipientName || ''}`,
         paymentMethod: 'transfer',
         isGiftOrder: true,
+        giftId: giftId,
         receiptUrl: g.receiptUrl || null,
         loyaltyPhone: null,
         loyaltyRewardReady: false,
@@ -2732,10 +2751,10 @@ function renderOrdersColumns() {
     }
     const isUrgent = elapsedMin !== null && elapsedMin >= 10;
     const label = order.orderType === 'car'
-      ? `🚗 ${order.carNumber || '-'}`
+      ? `🚗 ${escapeHtml(order.carNumber || '-')}`
       : order.orderType === 'delivery'
-        ? `🛵 ${order.deliveryWilayat || '—'}`
-        : `🍽️ ${order.tableNumber || '-'}`;
+        ? `🛵 ${escapeHtml(order.deliveryWilayat || '—')}`
+        : `🍽️ ${escapeHtml(order.tableNumber || '-')}`;
 
     return `
       <button type="button" class="order-tile ${isUrgent ? 'order-tile-urgent' : ''}" onclick='openOrderDetailModal("${order.id}")'>
@@ -2786,14 +2805,14 @@ function renderFullOrderCardHtml(order) {
         </div>
       ` : ''}
       <div class="order-card-top">
-        <strong>${order.orderType === 'car' ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})` : order.orderType === 'delivery' ? dt('orderFromDelivery') : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
+        <strong>${order.orderType === 'car' ? `🚗 ${escapeHtml(translateCarColor(order.carColor) || '')} (${escapeHtml(order.carNumber || '')})` : order.orderType === 'delivery' ? dt('orderFromDelivery') : (`🍽️ ${dt('tableLabel')} ` + (order.tableNumber || '—'))}</strong>
         <span class="order-status ${statusClasses[status]}">${statusLabels[status]}</span>
       </div>
       ${order.orderType === 'delivery' ? `
         <div class="delivery-details-box">
-          <a href="https://wa.me/${(order.deliveryPhone || '').replace(/\D/g, '')}" target="_blank" class="delivery-link-row">📱 ${order.deliveryPhone || ''}</a>
+          <a href="https://wa.me/${(order.deliveryPhone || '').replace(/\D/g, '')}" target="_blank" class="delivery-link-row">📱 ${escapeHtml(order.deliveryPhone || '')}</a>
           ${order.deliveryMapsLink ? `<a href="${order.deliveryMapsLink}" target="_blank" class="delivery-link-row">📍 ${dt('openMapsBtn')}</a>` : ''}
-          <div class="order-items-line">${order.deliveryWilayat || ''}${order.deliveryArea ? ' - ' + order.deliveryArea : ''}${order.deliveryHouseNumber ? ' - ' + dt('houseNoShort') + ' ' + order.deliveryHouseNumber : ''}</div>
+          <div class="order-items-line">${escapeHtml(order.deliveryWilayat || '')}${order.deliveryArea ? ' - ' + escapeHtml(order.deliveryArea) : ''}${order.deliveryHouseNumber ? ' - ' + dt('houseNoShort') + ' ' + escapeHtml(order.deliveryHouseNumber) : ''}</div>
         </div>
       ` : ''}
       ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
@@ -2814,14 +2833,14 @@ function renderFullOrderCardHtml(order) {
         </div>
       </div>
       ${paymentLabel ? `<div class="order-items-line">${paymentLabel}</div>` : ''}
-      ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${order.notes}</div>` : ''}
+      ${order.notes ? `<div class="order-items-line" style="font-style:italic;">📝 ${escapeHtml(order.notes)}</div>` : ''}
       ${order.soldBy ? `<div class="order-items-line">👤 ${dt('soldByLabel')}: ${order.soldBy}</div>` : ''}
       <div class="order-actions">
         ${nextStatus[status] ? `<button class="btn" onclick='advanceOrder("${order.id}", "${nextStatus[status]}"); closeOrderDetailModalIfOpen();'>${nextLabel[status]}</button>` : ''}
         <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
         ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
         ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
-        <button class="btn btn-ghost" style="color:#B3441E;" onclick='staffCancelOrder("${order.id}"); closeOrderDetailModalIfOpen();'>❌ ${dt('cancelOrderBtn')}</button>
+        <button class="btn btn-ghost" style="color:#B3441E;" onclick='staffCancelOrder("${order.id}", ${order.isGiftOrder ? 'true' : 'false'}, "${order.giftId || ''}"); closeOrderDetailModalIfOpen();'>❌ ${dt('cancelOrderBtn')}</button>
       </div>
     </div>
   `;
@@ -2860,18 +2879,30 @@ function sendWhatsAppInvoice(orderId) {
   window.open(waUrl, '_blank');
 }
 
-function staffCancelOrder(orderId) {
+function staffCancelOrder(orderId, isGiftOrderFlag, giftId) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'staffCancelOverlay';
+
+  const isGift = isGiftOrderFlag === true && giftId;
+
   overlay.innerHTML = `
     <div class="modal-sheet" style="text-align:center;">
       <div style="font-size:2.5rem; margin-bottom:10px;">❌</div>
       <h3 style="margin-bottom:20px;">${dt('confirmStaffCancelOrder')}</h3>
-      <div style="display:flex; gap:10px;">
-        <button class="btn" style="flex:1; background:#B3441E;" id="staffCancelYesBtn">${dt('yesCancelBtn')}</button>
-        <button class="btn btn-ghost" style="flex:1;" id="staffCancelNoBtn">${dt('noKeepBtn')}</button>
-      </div>
+      ${isGift ? `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button class="btn" style="background:#B3441E;" id="staffCancelReturnGiftBtn">🎁 ${dt('cancelAndReturnGiftBtn')}</button>
+          <button class="btn btn-ghost" id="staffCancelYesBtn">${dt('cancelOnlyBtn')}</button>
+          <button class="btn btn-ghost" id="staffCancelNoBtn">${dt('noKeepBtn')}</button>
+        </div>
+        <p style="font-size:0.78rem; color:var(--stone); margin-top:12px;">${dt('cancelAndReturnGiftHint')}</p>
+      ` : `
+        <div style="display:flex; gap:10px;">
+          <button class="btn" style="flex:1; background:#B3441E;" id="staffCancelYesBtn">${dt('yesCancelBtn')}</button>
+          <button class="btn btn-ghost" style="flex:1;" id="staffCancelNoBtn">${dt('noKeepBtn')}</button>
+        </div>
+      `}
     </div>
   `;
   document.body.appendChild(overlay);
@@ -2885,6 +2916,23 @@ function staffCancelOrder(orderId) {
       console.error('Staff cancel order failed:', err);
     }
   });
+
+  if (isGift) {
+    document.getElementById('staffCancelReturnGiftBtn').addEventListener('click', async () => {
+      overlay.remove();
+      try {
+        const orderRef = db.collection('shops').doc(currentShopId).collection('orders').doc(orderId);
+        const giftRef = db.collection('shops').doc(currentShopId).collection('giftCards').doc(giftId);
+        await db.runTransaction(async (tx) => {
+          tx.update(orderRef, { status: 'cancelled' });
+          tx.update(giftRef, { redeemed: false, redeemedAt: null });
+        });
+      } catch (err) {
+        console.error('Cancel and return gift failed:', err);
+        alert(dt('cancelReturnGiftError'));
+      }
+    });
+  }
 }
 
 function printReceipt(orderId) {
@@ -2899,10 +2947,10 @@ function printReceiptFromOrder(order) {
   const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
   const paymentLabel = paymentLabels[order.paymentMethod] || '-';
   const typeLine = order.orderType === 'car'
-    ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
+    ? `🚗 ${escapeHtml(translateCarColor(order.carColor) || '')} (${escapeHtml(order.carNumber || '')})`
     : order.orderType === 'delivery'
-      ? `🛵 ${order.deliveryWilayat || ''} ${order.deliveryArea || ''}`
-      : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '-'}`;
+      ? `🛵 ${escapeHtml(order.deliveryWilayat || '')} ${escapeHtml(order.deliveryArea || '')}`
+      : `🍽️ ${dt('tableLabel')} ${escapeHtml(order.tableNumber || '-')}`;
   const dateStr = order.createdAt && order.createdAt.toDate
     ? order.createdAt.toDate().toLocaleString('ar-OM')
     : new Date().toLocaleString('ar-OM');
@@ -2922,7 +2970,7 @@ function printReceiptFromOrder(order) {
       totalLabel: dt('total'),
       totalValue: `${Number(order.total).toFixed(2)} ${dt('currency')}`,
       paymentLine: `${dt('paymentMethodLbl')}: ${paymentLabel}`,
-      notesLine: order.notes ? `📝 ${order.notes}` : '',
+      notesLine: order.notes ? `📝 ${escapeHtml(order.notes)}` : '',
       thankYou: dt('thankYouMsg')
     };
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(receiptData))));
@@ -2971,7 +3019,7 @@ function printReceiptFromOrder(order) {
     </table>
     <div class="receipt-line"></div>
     <div>${dt('paymentMethodLbl')}: ${paymentLabel}</div>
-    ${order.notes ? `<div>📝 ${order.notes}</div>` : ''}
+    ${order.notes ? `<div>📝 ${escapeHtml(order.notes)}</div>` : ''}
     <div class="receipt-line"></div>
     <div class="receipt-center receipt-small">${dt('thankYouMsg')}</div>
   `;
@@ -3014,10 +3062,10 @@ function renderCompletedOrders() {
 
   el.innerHTML = completedOrdersData.map(order => {
     const typeLabel = order.orderType === 'car'
-      ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
+      ? `🚗 ${escapeHtml(translateCarColor(order.carColor) || '')} (${escapeHtml(order.carNumber || '')})`
       : order.orderType === 'delivery'
         ? dt('orderFromDelivery')
-        : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '—'}`;
+        : `🍽️ ${dt('tableLabel')} ${escapeHtml(order.tableNumber || '—')}`;
     return `
       <div class="order-card">
         <div class="order-card-top">
@@ -3026,9 +3074,9 @@ function renderCompletedOrders() {
         </div>
         ${order.orderType === 'delivery' ? `
           <div class="delivery-details-box">
-            <a href="https://wa.me/${(order.deliveryPhone || '').replace(/\D/g, '')}" target="_blank" class="delivery-link-row">📱 ${order.deliveryPhone || ''}</a>
+            <a href="https://wa.me/${(order.deliveryPhone || '').replace(/\D/g, '')}" target="_blank" class="delivery-link-row">📱 ${escapeHtml(order.deliveryPhone || '')}</a>
             ${order.deliveryMapsLink ? `<a href="${order.deliveryMapsLink}" target="_blank" class="delivery-link-row">📍 ${dt('openMapsBtn')}</a>` : ''}
-            <div class="order-items-line">${order.deliveryWilayat || ''}${order.deliveryArea ? ' - ' + order.deliveryArea : ''}${order.deliveryHouseNumber ? ' - ' + dt('houseNoShort') + ' ' + order.deliveryHouseNumber : ''}</div>
+            <div class="order-items-line">${escapeHtml(order.deliveryWilayat || '')}${order.deliveryArea ? ' - ' + escapeHtml(order.deliveryArea) : ''}${order.deliveryHouseNumber ? ' - ' + dt('houseNoShort') + ' ' + escapeHtml(order.deliveryHouseNumber) : ''}</div>
           </div>
         ` : ''}
         <div class="order-items-detail">
@@ -3095,10 +3143,10 @@ async function advanceOrder(orderId, newStatus) {
 // cancellation is never missed or mistaken for a normal completion.
 function showCancelledOrderPopup(order) {
   const typeLabel = order.orderType === 'car'
-    ? `🚗 ${translateCarColor(order.carColor) || ''} (${order.carNumber || ''})`
+    ? `🚗 ${escapeHtml(translateCarColor(order.carColor) || '')} (${escapeHtml(order.carNumber || '')})`
     : order.orderType === 'delivery'
       ? dt('orderFromDelivery')
-      : `🍽️ ${dt('tableLabel')} ${order.tableNumber || '-'}`;
+      : `🍽️ ${dt('tableLabel')} ${escapeHtml(order.tableNumber || '-')}`;
   const itemsText = (order.items || []).map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
 
   const overlay = document.createElement('div');
