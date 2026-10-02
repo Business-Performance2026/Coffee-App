@@ -39,6 +39,22 @@
     <button class="btn btn-ghost" onclick="adminLogout()">تسجيل خروج</button>
   </div>
 
+  <!-- Quick-access icons: new signups, expiring soon, expired -->
+  <div class="icon-subnav" style="margin-bottom:16px;">
+    <button class="icon-subnav-btn" style="position:relative;" onclick="setStatusFilter('pending', document.querySelector('.range-tab[data-filter=\'pending\']'))">
+      <span class="icon-subnav-icon" style="background:#E8EEF7;">🆕</span><span class="bell-badge" id="iconBadgePending" style="display:none; top:8px; left:8px;">0</span>
+      <span class="icon-subnav-label">كوفيات جديدة</span>
+    </button>
+    <button class="icon-subnav-btn" style="position:relative;" onclick="setStatusFilter('expiringSoon', document.querySelector('.range-tab[data-filter=\'expiringSoon\']'))">
+      <span class="icon-subnav-icon" style="background:#FBEAD1;">⏰</span><span class="bell-badge" id="iconBadgeExpiringSoon" style="display:none; top:8px; left:8px;">0</span>
+      <span class="icon-subnav-label">قاربت تنتهي</span>
+    </button>
+    <button class="icon-subnav-btn" style="position:relative;" onclick="setStatusFilter('expired', document.querySelector('.range-tab[data-filter=\'expired\']'))">
+      <span class="icon-subnav-icon" style="background:#FBE4E0;">❌</span><span class="bell-badge" id="iconBadgeExpired" style="display:none; top:8px; left:8px;">0</span>
+      <span class="icon-subnav-label">منتهية</span>
+    </button>
+  </div>
+
   <!-- Expiring-soon alert (auto-computed on load) -->
   <div id="expiringBanner"></div>
 
@@ -200,8 +216,29 @@ async function loadShops() {
   document.getElementById('statPending').textContent = pending;
   document.getElementById('statExpired').textContent = expired;
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiringSoonCount = allShopsData.filter(s => {
+    if (s.info.subscriptionStatus !== 'active' || !s.info.subscriptionEndDate) return false;
+    const end = new Date(s.info.subscriptionEndDate);
+    end.setHours(0, 0, 0, 0);
+    const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
+    return daysLeft <= 3;
+  }).length;
+
+  updateIconBadge('iconBadgePending', pending);
+  updateIconBadge('iconBadgeExpiringSoon', expiringSoonCount);
+  updateIconBadge('iconBadgeExpired', expired);
+
   renderExpiringBanner();
   renderShopsList();
+}
+
+function updateIconBadge(elId, count) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = count;
+  el.style.display = count > 0 ? 'flex' : 'none';
 }
 
 function renderExpiringBanner() {
@@ -245,9 +282,8 @@ function renderExpiringBanner() {
 
 function setStatusFilter(filter, btnEl) {
   statusFilter = filter;
-  document.querySelectorAll('#shopsList').length; // no-op guard
   document.querySelectorAll('.range-tab').forEach(b => b.classList.remove('active'));
-  btnEl.classList.add('active');
+  if (btnEl) btnEl.classList.add('active');
   renderShopsList();
 }
 
@@ -255,8 +291,19 @@ function renderShopsList() {
   const listEl = document.getElementById('shopsList');
   const query = (document.getElementById('shopSearchInput').value || '').trim().toLowerCase();
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   let filtered = allShopsData.filter(s => {
-    if (statusFilter !== 'all' && (s.info.subscriptionStatus || 'expired') !== statusFilter) return false;
+    if (statusFilter === 'expiringSoon') {
+      if (s.info.subscriptionStatus !== 'active' || !s.info.subscriptionEndDate) return false;
+      const end = new Date(s.info.subscriptionEndDate);
+      end.setHours(0, 0, 0, 0);
+      const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
+      if (daysLeft > 3) return false;
+    } else if (statusFilter !== 'all' && (s.info.subscriptionStatus || 'expired') !== statusFilter) {
+      return false;
+    }
     if (query && !(s.info.name || '').toLowerCase().includes(query) && !(s.info.nameEn || '').toLowerCase().includes(query)) return false;
     return true;
   });
