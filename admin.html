@@ -281,7 +281,7 @@ function renderShopsList() {
           ${!active && info.suspensionReason ? `<div class="item-desc" style="color:#B3441E;">السبب: ${info.suspensionReason}</div>` : ''}
           <div class="field" style="margin:8px 0 0;">
             <label style="font-size:0.75rem;">تاريخ انتهاء الاشتراك</label>
-            <input type="date" value="${info.subscriptionEndDate || ''}" onchange="updateEndDate('${id}', this.value)" style="padding:6px 8px;">
+            <input type="date" value="${info.subscriptionEndDate || new Date().toISOString().slice(0, 10)}" onchange="updateEndDate('${id}', this.value)" style="padding:6px 8px;">
           </div>
 
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
@@ -332,7 +332,12 @@ function getActivityBadge(info) {
 }
 
 async function updateEndDate(shopId, value) {
-  await db.collection('shops').doc(shopId).update({ 'info.subscriptionEndDate': value || null });
+  try {
+    await db.collection('shops').doc(shopId).update({ 'info.subscriptionEndDate': value || null });
+  } catch (err) {
+    console.error('updateEndDate failed:', err);
+    alert('صار خطأ: ' + (err.message || err));
+  }
 }
 
 // ---- Private admin notes per shop ----
@@ -607,8 +612,13 @@ async function toggleSubscription(shopId, currentlyActive) {
     updateData['info.suspensionReason'] = firebase.firestore.FieldValue.delete();
   }
 
-  await db.collection('shops').doc(shopId).update(updateData);
-  await loadShops();
+  try {
+    await db.collection('shops').doc(shopId).update(updateData);
+    await loadShops();
+  } catch (err) {
+    console.error('toggleSubscription failed:', err);
+    alert('صار خطأ: ' + (err.message || err));
+  }
 }
 
 // ---- Create a brand new shop (auth account + Firestore doc) ----
