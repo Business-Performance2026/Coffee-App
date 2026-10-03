@@ -39,91 +39,99 @@
     <button class="btn btn-ghost" onclick="adminLogout()">تسجيل خروج</button>
   </div>
 
-  <!-- Quick-access icons: new signups, expiring soon, expired -->
-  <div class="icon-subnav" style="margin-bottom:16px;">
-    <button class="icon-subnav-btn" style="position:relative;" onclick="setStatusFilter('pending', document.querySelector('.range-tab[data-filter=\'pending\']'))">
-      <span class="icon-subnav-icon" style="background:#E8EEF7;">🆕</span><span class="bell-badge" id="iconBadgePending" style="display:none; top:8px; left:8px;">0</span>
-      <span class="icon-subnav-label">كوفيات جديدة</span>
-    </button>
-    <button class="icon-subnav-btn" style="position:relative;" onclick="setStatusFilter('expiringSoon', document.querySelector('.range-tab[data-filter=\'expiringSoon\']'))">
-      <span class="icon-subnav-icon" style="background:#FBEAD1;">⏰</span><span class="bell-badge" id="iconBadgeExpiringSoon" style="display:none; top:8px; left:8px;">0</span>
-      <span class="icon-subnav-label">قاربت تنتهي</span>
-    </button>
-    <button class="icon-subnav-btn" style="position:relative;" onclick="setStatusFilter('expired', document.querySelector('.range-tab[data-filter=\'expired\']'))">
-      <span class="icon-subnav-icon" style="background:#FBE4E0;">❌</span><span class="bell-badge" id="iconBadgeExpired" style="display:none; top:8px; left:8px;">0</span>
-      <span class="icon-subnav-label">منتهية</span>
-    </button>
+  <div id="adminHomeView">
+    <!-- Quick-access icons: new signups, expiring soon, expired -->
+    <div class="icon-subnav" style="margin-bottom:16px;">
+      <button class="icon-subnav-btn" style="position:relative;" onclick="openFilteredView('pending', 'كوفيات جديدة')">
+        <span class="icon-subnav-icon" style="background:#E8EEF7;">🆕</span><span class="bell-badge" id="iconBadgePending" style="display:none; top:8px; left:8px;">0</span>
+        <span class="icon-subnav-label">كوفيات جديدة</span>
+      </button>
+      <button class="icon-subnav-btn" style="position:relative;" onclick="openFilteredView('expiringSoon', 'قاربت تنتهي')">
+        <span class="icon-subnav-icon" style="background:#FBEAD1;">⏰</span><span class="bell-badge" id="iconBadgeExpiringSoon" style="display:none; top:8px; left:8px;">0</span>
+        <span class="icon-subnav-label">قاربت تنتهي</span>
+      </button>
+      <button class="icon-subnav-btn" style="position:relative;" onclick="openFilteredView('expired', 'منتهية')">
+        <span class="icon-subnav-icon" style="background:#FBE4E0;">❌</span><span class="bell-badge" id="iconBadgeExpired" style="display:none; top:8px; left:8px;">0</span>
+        <span class="icon-subnav-label">منتهية</span>
+      </button>
+    </div>
+
+    <!-- Expiring-soon alert (auto-computed on load) -->
+    <div id="expiringBanner"></div>
+
+    <!-- Overview stats -->
+    <div class="sales-summary" style="flex-wrap:wrap; margin-bottom:16px;">
+      <div class="sales-summary-box">
+        <span class="big-num" id="statTotal">0</span>
+        <span class="label">إجمالي الكوفيات</span>
+      </div>
+      <div class="sales-summary-box">
+        <span class="big-num" id="statActive">0</span>
+        <span class="label">نشط</span>
+      </div>
+      <div class="sales-summary-box">
+        <span class="big-num" id="statPending">0</span>
+        <span class="label">بانتظار التفعيل</span>
+      </div>
+      <div class="sales-summary-box">
+        <span class="big-num" id="statExpired">0</span>
+        <span class="label">موقوف</span>
+      </div>
+    </div>
+
+    <!-- Add new shop -->
+    <div class="card">
+      <h3 style="margin-bottom:16px;">إضافة كوفي جديد</h3>
+
+      <div class="field">
+        <label for="newShopName">اسم الكوفي</label>
+        <input type="text" id="newShopName" placeholder="مثال: قهوة الروضة">
+      </div>
+      <div class="field">
+        <label for="newShopLocation">الموقع (اختياري)</label>
+        <input type="text" id="newShopLocation" placeholder="مثال: مسقط">
+      </div>
+      <div class="field">
+        <label for="newShopColor">اللون المميز</label>
+        <input type="color" id="newShopColor" value="#8B5A2B" style="width:80px; padding:4px;">
+      </div>
+      <div class="field">
+        <label for="newOwnerEmail">إيميل صاحب الكوفي (لتسجيل دخوله)</label>
+        <input type="email" id="newOwnerEmail" placeholder="owner@example.com">
+      </div>
+      <div class="field">
+        <label for="newOwnerPassword">كلمة مرور مؤقتة له</label>
+        <input type="text" id="newOwnerPassword" placeholder="8 أحرف على الأقل">
+      </div>
+
+      <button class="btn" onclick="createShop()">إنشاء الكوفي</button>
+      <div id="createError" class="error-msg"></div>
+      <div id="createSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
+      <div id="qrResult" style="margin-top:16px; text-align:center;"></div>
+    </div>
+
+    <!-- Browse all shops, from the home view -->
+    <button class="btn btn-ghost" style="width:100%; margin-top:8px;" onclick="openFilteredView('all', 'كل الكوفيات')">📋 عرض كل الكوفيات المسجّلة</button>
   </div>
 
-  <!-- Expiring-soon alert (auto-computed on load) -->
-  <div id="expiringBanner"></div>
-
-  <!-- Overview stats -->
-  <div class="sales-summary" style="flex-wrap:wrap; margin-bottom:16px;">
-    <div class="sales-summary-box">
-      <span class="big-num" id="statTotal">0</span>
-      <span class="label">إجمالي الكوفيات</span>
-    </div>
-    <div class="sales-summary-box">
-      <span class="big-num" id="statActive">0</span>
-      <span class="label">نشط</span>
-    </div>
-    <div class="sales-summary-box">
-      <span class="big-num" id="statPending">0</span>
-      <span class="label">بانتظار التفعيل</span>
-    </div>
-    <div class="sales-summary-box">
-      <span class="big-num" id="statExpired">0</span>
-      <span class="label">موقوف</span>
-    </div>
-  </div>
-
-  <!-- Add new shop -->
-  <div class="card">
-    <h3 style="margin-bottom:16px;">إضافة كوفي جديد</h3>
+  <div id="adminFilteredView" style="display:none;">
+    <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="closeFilteredView()">→ رجوع</button>
+    <h3 id="filteredViewTitle" style="margin:0 0 16px;">الكوفيات</h3>
 
     <div class="field">
-      <label for="newShopName">اسم الكوفي</label>
-      <input type="text" id="newShopName" placeholder="مثال: قهوة الروضة">
+      <input type="text" id="shopSearchInput" placeholder="🔍 ابحث بالاسم..." oninput="renderShopsList()">
     </div>
-    <div class="field">
-      <label for="newShopLocation">الموقع (اختياري)</label>
-      <input type="text" id="newShopLocation" placeholder="مثال: مسقط">
-    </div>
-    <div class="field">
-      <label for="newShopColor">اللون المميز</label>
-      <input type="color" id="newShopColor" value="#8B5A2B" style="width:80px; padding:4px;">
-    </div>
-    <div class="field">
-      <label for="newOwnerEmail">إيميل صاحب الكوفي (لتسجيل دخوله)</label>
-      <input type="email" id="newOwnerEmail" placeholder="owner@example.com">
-    </div>
-    <div class="field">
-      <label for="newOwnerPassword">كلمة مرور مؤقتة له</label>
-      <input type="text" id="newOwnerPassword" placeholder="8 أحرف على الأقل">
+    <div class="range-tabs" style="margin-bottom:16px;">
+      <button class="range-tab" data-filter="all" onclick="setStatusFilter('all', this)">الكل</button>
+      <button class="range-tab" data-filter="active" onclick="setStatusFilter('active', this)">نشط</button>
+      <button class="range-tab" data-filter="pending" onclick="setStatusFilter('pending', this)">بانتظار</button>
+      <button class="range-tab" data-filter="expiringSoon" onclick="setStatusFilter('expiringSoon', this)">قاربت تنتهي</button>
+      <button class="range-tab" data-filter="expired" onclick="setStatusFilter('expired', this)">موقوف</button>
     </div>
 
-    <button class="btn" onclick="createShop()">إنشاء الكوفي</button>
-    <div id="createError" class="error-msg"></div>
-    <div id="createSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
-    <div id="qrResult" style="margin-top:16px; text-align:center;"></div>
-  </div>
-
-  <!-- Shops list -->
-  <h3 style="margin:28px 0 12px;">الكوفيات المسجّلة</h3>
-
-  <div class="field">
-    <input type="text" id="shopSearchInput" placeholder="🔍 ابحث بالاسم..." oninput="renderShopsList()">
-  </div>
-  <div class="range-tabs" style="margin-bottom:16px;">
-    <button class="range-tab active" data-filter="all" onclick="setStatusFilter('all', this)">الكل</button>
-    <button class="range-tab" data-filter="active" onclick="setStatusFilter('active', this)">نشط</button>
-    <button class="range-tab" data-filter="pending" onclick="setStatusFilter('pending', this)">بانتظار</button>
-    <button class="range-tab" data-filter="expired" onclick="setStatusFilter('expired', this)">موقوف</button>
-  </div>
-
-  <div class="card" id="shopsList">
-    <div class="state-msg">جاري التحميل...</div>
+    <div class="card" id="shopsList">
+      <div class="state-msg">جاري التحميل...</div>
+    </div>
   </div>
 </div>
 
@@ -170,6 +178,7 @@ auth.onAuthStateChanged(async user => {
   }
 
   isAdmin = true;
+  document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('adminScreen').style.display = 'block';
   await loadShops();
 });
@@ -278,6 +287,19 @@ function renderExpiringBanner() {
       <div style="margin-top:8px;">${rows}</div>
     </div>
   `;
+}
+
+function openFilteredView(filter, title) {
+  document.getElementById('adminHomeView').style.display = 'none';
+  document.getElementById('adminFilteredView').style.display = 'block';
+  document.getElementById('filteredViewTitle').textContent = title;
+  document.getElementById('shopSearchInput').value = '';
+  setStatusFilter(filter, document.querySelector(`.range-tab[data-filter="${filter}"]`));
+}
+
+function closeFilteredView() {
+  document.getElementById('adminFilteredView').style.display = 'none';
+  document.getElementById('adminHomeView').style.display = 'block';
 }
 
 function setStatusFilter(filter, btnEl) {
