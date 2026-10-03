@@ -109,7 +109,8 @@ async function signup() {
         whatsapp,
         email,
         subscriptionStatus: 'pending',
-        selfSignup: true
+        selfSignup: true,
+        registeredAt: firebase.firestore.FieldValue.serverTimestamp()
       }
     });
 

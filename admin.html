@@ -134,7 +134,7 @@
     <div class="range-tabs" style="margin-bottom:16px;">
       <button class="range-tab" data-filter="all" onclick="setStatusFilter('all', this)">الكل</button>
       <button class="range-tab" data-filter="active" onclick="setStatusFilter('active', this)">نشط</button>
-      <button class="range-tab" data-filter="pending" onclick="setStatusFilter('pending', this)">بانتظار</button>
+      <button class="range-tab" data-filter="pending" onclick="setStatusFilter('pending', this)">جديدة</button>
       <button class="range-tab" data-filter="expiringSoon" onclick="setStatusFilter('expiringSoon', this)">قاربت تنتهي</button>
       <button class="range-tab" data-filter="expired" onclick="setStatusFilter('expired', this)">موقوف</button>
     </div>
@@ -237,17 +237,33 @@ async function loadShops() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const now = Date.now();
+
+  const newCount = allShopsData.filter(s => {
+    if (!s.info.registeredAt || typeof s.info.registeredAt.toDate !== 'function') return false;
+    const diffDays = (now - s.info.registeredAt.toDate().getTime()) / (1000 * 60 * 60 * 24);
+    return diffDays <= 2;
+  }).length;
+
   const expiringSoonCount = allShopsData.filter(s => {
-    if (s.info.subscriptionStatus !== 'active' || !s.info.subscriptionEndDate) return false;
+    if (!s.info.subscriptionEndDate) return false;
     const end = new Date(s.info.subscriptionEndDate);
     end.setHours(0, 0, 0, 0);
     const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
-    return daysLeft <= 3;
+    return daysLeft >= 0 && daysLeft <= 3;
   }).length;
 
-  updateIconBadge('iconBadgePending', pending);
+  const expiredCount = allShopsData.filter(s => {
+    if (!s.info.subscriptionEndDate) return false;
+    const end = new Date(s.info.subscriptionEndDate);
+    end.setHours(0, 0, 0, 0);
+    const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
+    return daysLeft < 0;
+  }).length;
+
+  updateIconBadge('iconBadgePending', newCount);
   updateIconBadge('iconBadgeExpiringSoon', expiringSoonCount);
-  updateIconBadge('iconBadgeExpired', expired);
+  updateIconBadge('iconBadgeExpired', expiredCount);
 
   renderShopsList();
 }
@@ -335,18 +351,45 @@ function renderShopsList() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const now = Date.now();
 
   let filtered = allShopsData.filter(s => {
-    if (statusFilter === 'expiringSoon') {
-      if (s.info.subscriptionStatus !== 'active' || !s.info.subscriptionEndDate) return false;
-      const end = new Date(s.info.subscriptionEndDate);
+    const info = s.info;
+
+    if (statusFilter === 'active') {
+      // "نشطة": had a real order in the last 3 days — regardless of
+      // subscriptionStatus. A shop can be subscribed but unused, or vice versa.
+      if (!info.lastOrderAt || typeof info.lastOrderAt.toDate !== 'function') return false;
+      const diffDays = (now - info.lastOrderAt.toDate().getTime()) / (1000 * 60 * 60 * 24);
+      if (diffDays > 3) return false;
+
+    } else if (statusFilter === 'pending') {
+      // "كوفيات جديدة": registered within the last 2 days — regardless of
+      // whether they've been activated yet or not.
+      if (!info.registeredAt || typeof info.registeredAt.toDate !== 'function') return false;
+      const diffDays = (now - info.registeredAt.toDate().getTime()) / (1000 * 60 * 60 * 24);
+      if (diffDays > 2) return false;
+
+    } else if (statusFilter === 'expiringSoon') {
+      // "قاربت تنتهي": has an end date, 3 days or fewer left, but not yet passed.
+      if (!info.subscriptionEndDate) return false;
+      const end = new Date(info.subscriptionEndDate);
       end.setHours(0, 0, 0, 0);
       const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
-      if (daysLeft > 3) return false;
-    } else if (statusFilter !== 'all' && (s.info.subscriptionStatus || 'expired') !== statusFilter) {
-      return false;
+      if (daysLeft < 0 || daysLeft > 3) return false;
+
+    } else if (statusFilter === 'expired') {
+      // "منتهية": has an end date that has already passed — based on the
+      // actual date, not the stored subscriptionStatus field.
+      if (!info.subscriptionEndDate) return false;
+      const end = new Date(info.subscriptionEndDate);
+      end.setHours(0, 0, 0, 0);
+      const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
+      if (daysLeft >= 0) return false;
     }
-    if (query && !(s.info.name || '').toLowerCase().includes(query) && !(s.info.nameEn || '').toLowerCase().includes(query)) return false;
+    // statusFilter === 'all' → no filtering by status at all
+
+    if (query && !(info.name || '').toLowerCase().includes(query) && !(info.nameEn || '').toLowerCase().includes(query)) return false;
     return true;
   });
 
@@ -749,7 +792,8 @@ async function createShop() {
         location,
         primaryColor: color,
         logo: '',
-        subscriptionStatus: 'active'
+        subscriptionStatus: 'active',
+        registeredAt: firebase.firestore.FieldValue.serverTimestamp()
       }
     });
 
