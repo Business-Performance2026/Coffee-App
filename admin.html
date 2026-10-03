@@ -40,25 +40,6 @@
   </div>
 
   <div id="adminHomeView">
-    <!-- Quick-access icons: new signups, expiring soon, expired -->
-    <div class="icon-subnav" style="margin-bottom:16px;">
-      <button class="icon-subnav-btn" style="position:relative;" onclick="openFilteredView('pending', 'كوفيات جديدة')">
-        <span class="icon-subnav-icon" style="background:#E8EEF7;">🆕</span><span class="bell-badge" id="iconBadgePending" style="display:none; top:8px; left:8px;">0</span>
-        <span class="icon-subnav-label">كوفيات جديدة</span>
-      </button>
-      <button class="icon-subnav-btn" style="position:relative;" onclick="openFilteredView('expiringSoon', 'قاربت تنتهي')">
-        <span class="icon-subnav-icon" style="background:#FBEAD1;">⏰</span><span class="bell-badge" id="iconBadgeExpiringSoon" style="display:none; top:8px; left:8px;">0</span>
-        <span class="icon-subnav-label">قاربت تنتهي</span>
-      </button>
-      <button class="icon-subnav-btn" style="position:relative;" onclick="openFilteredView('expired', 'منتهية')">
-        <span class="icon-subnav-icon" style="background:#FBE4E0;">❌</span><span class="bell-badge" id="iconBadgeExpired" style="display:none; top:8px; left:8px;">0</span>
-        <span class="icon-subnav-label">منتهية</span>
-      </button>
-    </div>
-
-    <!-- Expiring-soon alert (auto-computed on load) -->
-    <div id="expiringBanner"></div>
-
     <!-- Overview stats -->
     <div class="sales-summary" style="flex-wrap:wrap; margin-bottom:16px;">
       <div class="sales-summary-box">
@@ -78,6 +59,38 @@
         <span class="label">موقوف</span>
       </div>
     </div>
+
+    <!-- Everything else is an icon: filtered views + adding a new shop -->
+    <div class="icon-subnav" style="margin-bottom:16px; flex-wrap:wrap;">
+      <button class="icon-subnav-btn" style="position:relative; flex:1 1 28%; min-width:100px;" onclick="openFilteredView('active', 'نشطة')">
+        <span class="icon-subnav-icon" style="background:#E3F2E8;">⭐</span>
+        <span class="icon-subnav-label">نشطة</span>
+      </button>
+      <button class="icon-subnav-btn" style="position:relative; flex:1 1 28%; min-width:100px;" onclick="openFilteredView('pending', 'كوفيات جديدة')">
+        <span class="icon-subnav-icon" style="background:#E8EEF7;">🆕</span><span class="bell-badge" id="iconBadgePending" style="display:none; top:8px; left:8px;">0</span>
+        <span class="icon-subnav-label">كوفيات جديدة</span>
+      </button>
+      <button class="icon-subnav-btn" style="position:relative; flex:1 1 28%; min-width:100px;" onclick="openFilteredView('expiringSoon', 'قاربت تنتهي')">
+        <span class="icon-subnav-icon" style="background:#FBEAD1;">⏰</span><span class="bell-badge" id="iconBadgeExpiringSoon" style="display:none; top:8px; left:8px;">0</span>
+        <span class="icon-subnav-label">قاربت تنتهي</span>
+      </button>
+      <button class="icon-subnav-btn" style="position:relative; flex:1 1 28%; min-width:100px;" onclick="openFilteredView('expired', 'منتهية')">
+        <span class="icon-subnav-icon" style="background:#FBE4E0;">❌</span><span class="bell-badge" id="iconBadgeExpired" style="display:none; top:8px; left:8px;">0</span>
+        <span class="icon-subnav-label">منتهية</span>
+      </button>
+      <button class="icon-subnav-btn" style="position:relative; flex:1 1 28%; min-width:100px;" onclick="openFilteredView('all', 'كل الكوفيات')">
+        <span class="icon-subnav-icon" style="background:#EDEDED;">📋</span>
+        <span class="icon-subnav-label">كل الكوفيات</span>
+      </button>
+      <button class="icon-subnav-btn" style="position:relative; flex:1 1 28%; min-width:100px;" onclick="openAddShopView()">
+        <span class="icon-subnav-icon" style="background:#E8DFF5;">➕</span>
+        <span class="icon-subnav-label">إضافة كوفي</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="adminAddShopView" style="display:none;">
+    <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="closeAddShopView()">→ رجوع</button>
 
     <!-- Add new shop -->
     <div class="card">
@@ -109,9 +122,6 @@
       <div id="createSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
       <div id="qrResult" style="margin-top:16px; text-align:center;"></div>
     </div>
-
-    <!-- Browse all shops, from the home view -->
-    <button class="btn btn-ghost" style="width:100%; margin-top:8px;" onclick="openFilteredView('all', 'كل الكوفيات')">📋 عرض كل الكوفيات المسجّلة</button>
   </div>
 
   <div id="adminFilteredView" style="display:none;">
@@ -239,7 +249,6 @@ async function loadShops() {
   updateIconBadge('iconBadgeExpiringSoon', expiringSoonCount);
   updateIconBadge('iconBadgeExpired', expired);
 
-  renderExpiringBanner();
   renderShopsList();
 }
 
@@ -252,6 +261,7 @@ function updateIconBadge(elId, count) {
 
 function renderExpiringBanner() {
   const bannerEl = document.getElementById('expiringBanner');
+  if (!bannerEl) return;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -287,6 +297,16 @@ function renderExpiringBanner() {
       <div style="margin-top:8px;">${rows}</div>
     </div>
   `;
+}
+
+function openAddShopView() {
+  document.getElementById('adminHomeView').style.display = 'none';
+  document.getElementById('adminAddShopView').style.display = 'block';
+}
+
+function closeAddShopView() {
+  document.getElementById('adminAddShopView').style.display = 'none';
+  document.getElementById('adminHomeView').style.display = 'block';
 }
 
 function openFilteredView(filter, title) {
