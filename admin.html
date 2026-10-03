@@ -785,6 +785,11 @@ async function createShop() {
     // Immediately sign out of the secondary instance (cleanup)
     await secondaryAuth.signOut();
 
+    // 14-day free trial, same length as the self-signup trial in dashboard.html
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 14);
+    const trialEndStr = trialEnd.toISOString().split('T')[0];
+
     // Create the shop's Firestore document, ID = new owner's UID
     await db.collection('shops').doc(newUid).set({
       info: {
@@ -793,6 +798,7 @@ async function createShop() {
         primaryColor: color,
         logo: '',
         subscriptionStatus: 'active',
+        subscriptionEndDate: trialEndStr,
         registeredAt: firebase.firestore.FieldValue.serverTimestamp()
       }
     });
