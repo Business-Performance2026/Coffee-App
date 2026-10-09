@@ -1264,6 +1264,8 @@ const dashT = {
   printReceiptBtn: { ar: 'طباعة الفاتورة', en: 'Print receipt' },
   viewReceiptBtn: { ar: 'عرض الوصل', en: 'View receipt' },
   sendWhatsappBtn: { ar: 'واتساب', en: 'WhatsApp' },
+  waSentTitle: { ar: 'تم إرسال رسالة واتساب', en: 'WhatsApp message sent' },
+  waNotSentTitle: { ar: 'لم يتم إرسال رسالة واتساب', en: 'WhatsApp message not sent' },
   waInvoiceItemsLabel: { ar: 'الأصناف', en: 'Items' },
   waInvoiceThankYou: { ar: 'شكراً لطلبك ☕', en: 'Thank you for your order ☕' },
   tapToOpenPrintPage: { ar: 'اضغط الزر تحت عشان تفتح صفحة الطباعة (بتفتح بمتصفح Safari)', en: 'Tap the button below to open the print page (it opens in Safari)' },
@@ -2696,7 +2698,8 @@ function renderPendingGifts() {
   el.innerHTML = pendingGiftsData.map(gift => {
     const itemsText = (gift.items || []).map(i => `${(dashLang === 'en' && i.nameEn) ? i.nameEn : i.name} ×${i.qty}`).join('، ');
     return `
-      <div class="card" style="margin-bottom:12px;">
+      <div class="card" style="margin-bottom:12px; position:relative;">
+        <span title="${gift.whatsappSent ? dt('waSentTitle') : dt('waNotSentTitle')}" style="position:absolute; top:10px; left:10px; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:0.9rem; background:${gift.whatsappSent ? '#2E9E5B' : '#D64545'};">${gift.whatsappSent ? '✓' : '✕'}</span>
         <div style="font-weight:700; margin-bottom:4px;">🎁 ${escapeHtml(gift.recipientName || '')}</div>
         <div class="order-items-line">${escapeHtml(gift.recipientPhone || '')}</div>
         <div class="order-items-line">${itemsText} — ${Number(gift.total).toFixed(2)} ${dt('currency')}</div>
@@ -2723,6 +2726,10 @@ function sendGiftWelcomeWhatsApp(giftId) {
   const phoneDigits = gift.recipientPhone.replace(/\D/g, '');
   const waUrl = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(message)}`;
   window.open(waUrl, '_blank');
+  // Record that the message was sent so the card shows a green check
+  db.collection('shops').doc(currentShopId).collection('giftCards').doc(giftId)
+    .update({ whatsappSent: true, whatsappSentAt: firebase.firestore.FieldValue.serverTimestamp() })
+    .catch(e => console.warn('whatsappSent flag failed', e));
 }
 
 function openGiftDeliverModal(giftId) {
