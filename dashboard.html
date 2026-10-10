@@ -1344,6 +1344,17 @@ const dashT = {
   coverUploading: { ar: 'جاري تجهيز ورفع صورة الغلاف...', en: 'Preparing and uploading cover photo...' },
   coverUploaded: { ar: 'تم رفع الغلاف ✓ — لا تنسى تضغط "حفظ التغييرات"', en: 'Cover uploaded ✓ — don\'t forget to click "Save changes"' },
   coverUploadFailed: { ar: 'فشل رفع الغلاف، حاول مرة أخرى.', en: 'Cover upload failed, please try again.' },
+  total: { ar: 'الإجمالي', en: 'Total' },
+  editOrderBtn: { ar: 'تعديل الطلب', en: 'Edit order' },
+  editOrderTitle: { ar: 'تعديل الطلب', en: 'Edit order' },
+  editOrderSave: { ar: 'حفظ التعديل', en: 'Save changes' },
+  editOrderNoItems: { ar: 'لازم يبقى صنف واحد على الأقل — لو تبي تلغي الطلب استخدم الحذف', en: 'At least one item must remain — use delete to remove the order' },
+  editOrderError: { ar: 'تعذر حفظ التعديل، حاول مرة ثانية', en: 'Could not save the changes, please try again' },
+  deleteOrderBtn: { ar: 'حذف الطلب', en: 'Delete order' },
+  confirmDeleteOrder: { ar: 'تبي تحذف هذا الطلب نهائياً؟', en: 'Delete this order permanently?' },
+  deleteOrderHint: { ar: 'بيُحذف من التقارير والمبيعات ولا يمكن التراجع', en: 'It will be removed from reports and sales, and cannot be undone' },
+  deleteOrderYes: { ar: 'نعم، احذف', en: 'Yes, delete' },
+  deleteOrderError: { ar: 'تعذر حذف الطلب', en: 'Could not delete the order' },
   cropTitle: { ar: 'اضبط الصورة', en: 'Adjust the photo' },
   cropHint: { ar: 'حرّك الصورة وكبّرها داخل الإطار المربع', en: 'Drag and zoom the photo inside the square frame' },
   cropDone: { ar: 'تم', en: 'Done' },
@@ -3362,10 +3373,121 @@ function renderCompletedOrders() {
           <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
           ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
           ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
+          ${order.isGiftOrder ? '' : `<button class="btn btn-ghost" title="${dt('editOrderBtn')}" onclick='openEditOrderModal("${order.id}")'>✏️</button>`}
+          ${(order.isGiftOrder || isEmployee) ? '' : `<button class="btn btn-ghost" style="color:#B3441E;" title="${dt('deleteOrderBtn')}" onclick='deleteCompletedOrder("${order.id}")'>🗑️</button>`}
         </div>
       </div>
     `;
   }).join('');
+}
+
+// Edit a completed order (item quantities + payment method). The total is
+// recomputed from the items, and since every report reads the orders live,
+// the sales figures update automatically.
+function openEditOrderModal(orderId) {
+  const order = completedOrdersData.find(o => o.id === orderId);
+  if (!order || order.isGiftOrder) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'editOrderOverlay';
+  const pm = order.paymentMethod || '';
+  const rows = (order.items || []).map((i, idx) => {
+    const iName = (dashLang === 'en' && i.nameEn) ? i.nameEn : i.name;
+    return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+      <span style="flex:1;">${escapeHtml(iName)} <span style="color:var(--stone); font-size:0.82rem;">(${Number(i.price).toFixed(2)})</span></span>
+      <input type="number" min="0" step="1" value="${i.qty}" data-idx="${idx}" class="edit-order-qty" style="width:70px;">
+    </div>`;
+  }).join('');
+
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="document.getElementById('editOrderOverlay').remove()">×</button>
+      <h3 style="margin:8px 0 12px; text-align:center;">✏️ ${dt('editOrderTitle')}</h3>
+      ${rows}
+      <div class="field" style="margin-top:10px;">
+        <label>${dt('paymentMethodLbl')}</label>
+        <select id="editOrderPayment">
+          <option value="cash" ${pm === 'cash' ? 'selected' : ''}>${dt('payCash')}</option>
+          <option value="transfer" ${pm === 'transfer' ? 'selected' : ''}>${dt('payTransfer')}</option>
+          <option value="card" ${pm === 'card' ? 'selected' : ''}>${dt('payCard')}</option>
+        </select>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-weight:700; margin:12px 0;">
+        <span>${dt('total')}</span><span id="editOrderTotal">0.00</span>
+      </div>
+      <div id="editOrderError" style="color:#B3441E; font-size:0.85rem; min-height:18px;"></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" style="flex:1;" id="editOrderSaveBtn">${dt('editOrderSave')}</button>
+        <button class="btn btn-ghost" style="flex:1;" onclick="document.getElementById('editOrderOverlay').remove()">${dt('cropCancel')}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const inputs = Array.from(overlay.querySelectorAll('.edit-order-qty'));
+  const calc = () => inputs.reduce((sum, inp) => {
+    const q = Math.max(0, parseInt(inp.value, 10) || 0);
+    return sum + q * Number(order.items[inp.dataset.idx].price);
+  }, 0);
+  const totalEl = overlay.querySelector('#editOrderTotal');
+  const refresh = () => { totalEl.textContent = `${calc().toFixed(2)} ${dt('currency')}`; };
+  inputs.forEach(inp => inp.addEventListener('input', refresh));
+  refresh();
+
+  overlay.querySelector('#editOrderSaveBtn').addEventListener('click', async () => {
+    const errEl = overlay.querySelector('#editOrderError');
+    const newItems = [];
+    inputs.forEach(inp => {
+      const q = Math.max(0, parseInt(inp.value, 10) || 0);
+      if (q > 0) newItems.push({ ...order.items[inp.dataset.idx], qty: q });
+    });
+    if (newItems.length === 0) { errEl.textContent = dt('editOrderNoItems'); return; }
+    const newTotal = newItems.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
+    const btn = overlay.querySelector('#editOrderSaveBtn');
+    btn.disabled = true;
+    try {
+      await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({
+        items: newItems,
+        total: Math.round(newTotal * 1000) / 1000,
+        paymentMethod: overlay.querySelector('#editOrderPayment').value,
+        editedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      overlay.remove();
+    } catch (err) {
+      console.error('Edit order failed:', err);
+      errEl.textContent = dt('editOrderError');
+      btn.disabled = false;
+    }
+  });
+}
+
+// Permanently deletes a completed order (owner only — enforced by the
+// Firestore rules too). It disappears from every report immediately.
+function deleteCompletedOrder(orderId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'deleteOrderOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">🗑️</div>
+      <h3 style="margin-bottom:8px;">${dt('confirmDeleteOrder')}</h3>
+      <p style="font-size:0.85rem; color:var(--stone); margin-bottom:18px;">${dt('deleteOrderHint')}</p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" style="flex:1; background:#B3441E;" id="deleteOrderYesBtn">${dt('deleteOrderYes')}</button>
+        <button class="btn btn-ghost" style="flex:1;" id="deleteOrderNoBtn">${dt('noKeepBtn')}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('deleteOrderNoBtn').addEventListener('click', () => overlay.remove());
+  document.getElementById('deleteOrderYesBtn').addEventListener('click', async () => {
+    overlay.remove();
+    try {
+      await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).delete();
+    } catch (err) {
+      console.error('Delete order failed:', err);
+      alert(dt('deleteOrderError'));
+    }
+  });
 }
 
 async function advanceOrder(orderId, newStatus) {
@@ -3895,6 +4017,7 @@ async function updateBestSellerFlag() {
 
     const itemCounts = {};
     ordersSnap.forEach(doc => {
+      if (doc.data().status === 'cancelled') return;
       (doc.data().items || []).forEach(i => {
         itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty;
       });
@@ -3987,6 +4110,7 @@ async function exportSalesExcel() {
 
     snap.forEach(doc => {
       const o = doc.data();
+      if (o.status === 'cancelled') return; // cancelled orders are excluded from the report
       totalSales += Number(o.total) || 0;
       (o.items || []).forEach(i => {
         const itemLabel = (exportLang === 'en' && i.nameEn) ? i.nameEn : i.name;
@@ -4112,8 +4236,11 @@ async function loadSales(range, btnEl) {
   let ratingSum = 0;
   let ratingCount = 0;
 
+  let validCount = 0;
   snap.forEach(doc => {
     const order = doc.data();
+    if (order.status === 'cancelled') return; // cancelled orders never count as sales
+    validCount++;
     total += Number(order.total) || 0;
     (order.items || []).forEach(i => {
       itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty;
@@ -4132,7 +4259,7 @@ async function loadSales(range, btnEl) {
   });
 
   document.getElementById('salesTotal').textContent = total.toFixed(2);
-  document.getElementById('salesCount').textContent = snap.size;
+  document.getElementById('salesCount').textContent = validCount;
   document.getElementById('avgRating').textContent = ratingCount > 0
     ? `${(ratingSum / ratingCount).toFixed(1)} ⭐`
     : '—';
