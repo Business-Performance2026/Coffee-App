@@ -1486,7 +1486,7 @@ async function submitOrder() {
   const loyaltyPhone = (loyaltyPhoneInput && loyaltyPhoneInput.value.trim()) ? loyaltyPhoneInput.value.trim() : null;
 
   const cartEntries = Object.entries(cart); // [itemId, {name, nameEn, price, qty}]
-  const items = cartEntries.map(([, i]) => ({ name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
+  const items = cartEntries.map(([id, i]) => ({ id, name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
   const total = items.reduce((sum, i) => sum + i.qty * i.price, 0);
   const orderRef = db.collection('shops').doc(shopId).collection('orders').doc();
 
@@ -1536,6 +1536,7 @@ async function submitOrder() {
         loyaltyRewardReady: loyaltyPhone ? currentLoyaltyRewardReady : false,
         items,
         total,
+        stockTracked: true,
         status: 'pending',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });

@@ -2936,7 +2936,58 @@ async function deliverGift(giftId) {
   }
 }
 
+// ===================== Stock restore (cancelled / deleted / edited orders) =====================
+// Orders created from now on carry stockTracked:true and an id per item, so we
+// know exactly which menu items had stock taken. The "stockRestored" flag
+// plus a transaction make sure stock is given back ONLY ONCE, even if several
+// devices see the cancellation at the same time.
+async function restoreOrderStock(orderId) {
+  const orderRef = db.collection('shops').doc(currentShopId).collection('orders').doc(orderId);
+  await db.runTransaction(async (tx) => {
+    const orderDoc = await tx.get(orderRef);
+    if (!orderDoc.exists) return;
+    const order = orderDoc.data();
+    if (!order.stockTracked || order.stockRestored || order.isGiftOrder) return;
+
+    // Sum quantities per menu item id
+    const qtyById = {};
+    (order.items || []).forEach(i => { if (i.id) qtyById[i.id] = (qtyById[i.id] || 0) + (Number(i.qty) || 0); });
+    const ids = Object.keys(qtyById);
+    const refs = ids.map(id => db.collection('shops').doc(currentShopId).collection('menu').doc(id));
+    const docs = await Promise.all(refs.map(r => tx.get(r)));
+
+    docs.forEach((d, idx) => {
+      if (!d.exists) return;
+      const cur = d.data().stock;
+      if (typeof cur === 'number') { // untracked (unlimited) items stay untouched
+        tx.update(refs[idx], { stock: cur + qtyById[ids[idx]] });
+      }
+    });
+    tx.update(orderRef, { stockRestored: true });
+  });
+}
+
+// Safety net: gives back stock for any tracked order that was cancelled
+// (e.g. by the customer) while no dashboard was open to notice it.
+async function sweepCancelledOrdersStock() {
+  try {
+    const snap = await db.collection('shops').doc(currentShopId).collection('orders')
+      .where('status', '==', 'cancelled')
+      .where('stockTracked', '==', true)
+      .limit(100)
+      .get();
+    for (const d of snap.docs) {
+      if (!d.data().stockRestored) {
+        try { await restoreOrderStock(d.id); } catch (e) { console.error('Stock restore failed:', e); }
+      }
+    }
+  } catch (err) {
+    console.error('Cancelled-orders stock sweep failed (non-blocking):', err);
+  }
+}
+
 function listenToOrders() {
+  sweepCancelledOrdersStock();
   ordersUnsub = db.collection('shops').doc(currentShopId).collection('orders')
     .where('status', 'in', ['pending', 'preparing'])
     .orderBy('createdAt', 'desc')
@@ -2966,6 +3017,7 @@ function listenToOrders() {
             alertedCancelIds.add(change.doc.id);
             playCancelSound();
             showCancelledOrderPopup(data);
+            restoreOrderStock(change.doc.id).catch(e => console.error('Stock restore failed:', e));
           }
         });
       }
@@ -3187,7 +3239,9 @@ function staffCancelOrder(orderId, isGiftOrderFlag, giftId) {
       await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({ status: 'cancelled' });
     } catch (err) {
       console.error('Staff cancel order failed:', err);
+      return;
     }
+    restoreOrderStock(orderId).catch(e => console.error('Stock restore failed:', e));
   });
 
   if (isGift) {
@@ -3446,11 +3500,33 @@ function openEditOrderModal(orderId) {
     const btn = overlay.querySelector('#editOrderSaveBtn');
     btn.disabled = true;
     try {
-      await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({
-        items: newItems,
-        total: Math.round(newTotal * 1000) / 1000,
-        paymentMethod: overlay.querySelector('#editOrderPayment').value,
-        editedAt: firebase.firestore.FieldValue.serverTimestamp()
+      const orderRef = db.collection('shops').doc(currentShopId).collection('orders').doc(orderId);
+      await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(orderRef);
+        if (!fresh.exists) throw new Error('missing');
+        const cur = fresh.data();
+        // Stock difference (old qty - new qty) per menu item, for tracked orders only
+        const delta = {};
+        if (cur.stockTracked && !cur.stockRestored) {
+          (cur.items || []).forEach(i => { if (i.id) delta[i.id] = (delta[i.id] || 0) + (Number(i.qty) || 0); });
+          newItems.forEach(i => { if (i.id) delta[i.id] = (delta[i.id] || 0) - (Number(i.qty) || 0); });
+        }
+        const ids = Object.keys(delta).filter(id => delta[id] !== 0);
+        const refs = ids.map(id => db.collection('shops').doc(currentShopId).collection('menu').doc(id));
+        const docs = await Promise.all(refs.map(r => tx.get(r)));
+        docs.forEach((d, idx) => {
+          if (!d.exists) return;
+          const stock = d.data().stock;
+          if (typeof stock === 'number') {
+            tx.update(refs[idx], { stock: Math.max(0, stock + delta[ids[idx]]) });
+          }
+        });
+        tx.update(orderRef, {
+          items: newItems,
+          total: Math.round(newTotal * 1000) / 1000,
+          paymentMethod: overlay.querySelector('#editOrderPayment').value,
+          editedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
       });
       overlay.remove();
     } catch (err) {
@@ -3482,6 +3558,7 @@ function deleteCompletedOrder(orderId) {
   document.getElementById('deleteOrderYesBtn').addEventListener('click', async () => {
     overlay.remove();
     try {
+      await restoreOrderStock(orderId); // give the stock back before the order disappears
       await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).delete();
     } catch (err) {
       console.error('Delete order failed:', err);
@@ -3825,7 +3902,7 @@ async function submitPosOrder() {
 
   const errorEl = document.getElementById('posError');
   const cartEntries = Object.entries(posCart); // [itemId, {name, nameEn, price, qty}]
-  const items = cartEntries.map(([, i]) => ({ name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
+  const items = cartEntries.map(([id, i]) => ({ id, name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
   if (items.length === 0) {
     errorEl.textContent = dt('addOneItemError');
     return;
@@ -3895,6 +3972,7 @@ async function submitPosOrder() {
         items,
         total,
         soldBy,
+        stockTracked: true,
         status: 'pending',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
