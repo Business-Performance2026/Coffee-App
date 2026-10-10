@@ -114,7 +114,7 @@
         <div class="field">
           <label for="itemImage" data-i18n="itemImageLbl">صورة المنتج</label>
           <input type="file" id="itemImage" accept="image/*">
-          <img id="itemImagePreview" src="" alt="" style="width:100%; max-height:140px; object-fit:cover; border-radius:8px; margin-top:8px; display:none;">
+          <img id="itemImagePreview" src="" alt="" style="width:140px; height:140px; object-fit:cover; border-radius:8px; margin-top:8px; display:none;">
           <div id="uploadStatus" style="font-size:0.85rem; color:var(--stone); margin-top:6px;"></div>
         </div>
 
@@ -1344,6 +1344,10 @@ const dashT = {
   coverUploading: { ar: 'جاري تجهيز ورفع صورة الغلاف...', en: 'Preparing and uploading cover photo...' },
   coverUploaded: { ar: 'تم رفع الغلاف ✓ — لا تنسى تضغط "حفظ التغييرات"', en: 'Cover uploaded ✓ — don\'t forget to click "Save changes"' },
   coverUploadFailed: { ar: 'فشل رفع الغلاف، حاول مرة أخرى.', en: 'Cover upload failed, please try again.' },
+  cropTitle: { ar: 'اضبط الصورة', en: 'Adjust the photo' },
+  cropHint: { ar: 'حرّك الصورة وكبّرها داخل الإطار المربع', en: 'Drag and zoom the photo inside the square frame' },
+  cropDone: { ar: 'تم', en: 'Done' },
+  cropCancel: { ar: 'إلغاء', en: 'Cancel' },
   itemImageUploading: { ar: 'جاري تجهيز ورفع الصورة...', en: 'Preparing and uploading photo...' },
   itemImageUploaded: { ar: 'تم رفع الصورة ✓', en: 'Photo uploaded ✓' },
   itemImageUploadFailed: { ar: 'فشل رفع الصورة، حاول مرة أخرى.', en: 'Photo upload failed, please try again.' },
@@ -1524,6 +1528,104 @@ function resizeImage(file, maxDimension = 900, quality = 0.82) {
     img.onerror = reject;
 
     reader.readAsDataURL(file);
+  });
+}
+
+// ===================== Square (1:1) crop dialog =====================
+// Shows the chosen photo inside a fixed square frame (Instagram-post size).
+// The owner drags to reposition and uses the slider to zoom, then confirms.
+// Resolves with a JPEG Blob (outSize x outSize), or null if cancelled.
+function cropImageSquare(file, outSize = 1080, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image load failed')); };
+    img.onload = () => {
+      const V = Math.min(320, Math.floor(window.innerWidth * 0.8));
+      const baseScale = Math.max(V / img.naturalWidth, V / img.naturalHeight);
+      let zoom = 1, x = 0, y = 0;
+      const scale = () => baseScale * zoom;
+      const clamp = () => {
+        const w = img.naturalWidth * scale(), h = img.naturalHeight * scale();
+        x = Math.min(0, Math.max(V - w, x));
+        y = Math.min(0, Math.max(V - h, y));
+      };
+      // start centered
+      x = (V - img.naturalWidth * scale()) / 2;
+      y = (V - img.naturalHeight * scale()) / 2;
+
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; padding:16px;';
+      overlay.innerHTML = `
+        <div style="background:var(--paper, #fff); border-radius:16px; padding:16px; width:${V + 32}px; max-width:100%; text-align:center;">
+          <div style="font-weight:700; margin-bottom:4px;">${dt('cropTitle')}</div>
+          <div style="font-size:0.82rem; color:var(--stone); margin-bottom:10px;">${dt('cropHint')}</div>
+          <div id="cropViewport" style="position:relative; width:${V}px; height:${V}px; overflow:hidden; border-radius:10px; background:#000; touch-action:none; cursor:grab; margin:0 auto;">
+            <img id="cropImg" src="${url}" draggable="false" style="position:absolute; top:0; left:0; max-width:none; transform-origin:0 0; user-select:none; -webkit-user-drag:none;">
+          </div>
+          <input type="range" id="cropZoom" min="1" max="3" step="0.01" value="1" style="width:100%; margin:12px 0;">
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn btn-ghost" id="cropCancelBtn" style="flex:1;">${dt('cropCancel')}</button>
+            <button type="button" class="btn" id="cropDoneBtn" style="flex:1;">${dt('cropDone')}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      const vp = overlay.querySelector('#cropViewport');
+      const imgEl = overlay.querySelector('#cropImg');
+      const zoomEl = overlay.querySelector('#cropZoom');
+      const apply = () => {
+        clamp();
+        imgEl.style.transform = `translate(${x}px, ${y}px) scale(${scale()})`;
+      };
+      apply();
+
+      let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+      vp.addEventListener('pointerdown', (e) => {
+        dragging = true; sx = e.clientX; sy = e.clientY; ox = x; oy = y;
+        vp.setPointerCapture(e.pointerId);
+        vp.style.cursor = 'grabbing';
+      });
+      vp.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        x = ox + (e.clientX - sx);
+        y = oy + (e.clientY - sy);
+        apply();
+      });
+      const endDrag = () => { dragging = false; vp.style.cursor = 'grab'; };
+      vp.addEventListener('pointerup', endDrag);
+      vp.addEventListener('pointercancel', endDrag);
+
+      zoomEl.addEventListener('input', () => {
+        // zoom around the center of the frame
+        const cx = (V / 2 - x) / scale();
+        const cy = (V / 2 - y) / scale();
+        zoom = parseFloat(zoomEl.value);
+        x = V / 2 - cx * scale();
+        y = V / 2 - cy * scale();
+        apply();
+      });
+
+      const close = (result) => {
+        overlay.remove();
+        URL.revokeObjectURL(url);
+        resolve(result);
+      };
+      overlay.querySelector('#cropCancelBtn').onclick = () => close(null);
+      overlay.querySelector('#cropDoneBtn').onclick = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = outSize;
+        canvas.height = outSize;
+        const sc = scale();
+        canvas.getContext('2d').drawImage(img, -x / sc, -y / sc, V / sc, V / sc, 0, 0, outSize, outSize);
+        canvas.toBlob(
+          (blob) => blob ? close(blob) : reject(new Error('crop failed')),
+          'image/jpeg',
+          quality
+        );
+      };
+    };
+    img.src = url;
   });
 }
 
@@ -2024,9 +2126,16 @@ document.getElementById('shopLogoInput').addEventListener('change', async (e) =>
     const oldUrl = uploadedLogoUrl;
     let uploadBlob = file;
     try {
-      uploadBlob = await resizeImage(file, 500, 0.85);
+      uploadBlob = await cropImageSquare(file, 600, 0.88);
+      if (!uploadBlob) { // owner cancelled the crop
+        e.target.value = '';
+        statusEl.textContent = '';
+        return;
+      }
     } catch (resizeErr) {
-      console.error('Resize failed, uploading original file instead:', resizeErr);
+      console.error('Crop failed, falling back to plain resize:', resizeErr);
+      uploadBlob = file;
+      try { uploadBlob = await resizeImage(file, 500, 0.85); } catch (e2) { console.error(e2); }
     }
     const path = `shops/${currentShopId}/logo_${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
@@ -2526,9 +2635,16 @@ document.getElementById('itemImage').addEventListener('change', async (e) => {
     const oldUrl = uploadedImageUrl;
     let uploadBlob = file;
     try {
-      uploadBlob = await resizeImage(file, 900, 0.82);
+      uploadBlob = await cropImageSquare(file, 1080, 0.85);
+      if (!uploadBlob) { // owner cancelled the crop
+        e.target.value = '';
+        statusEl.textContent = '';
+        return;
+      }
     } catch (resizeErr) {
-      console.error('Resize failed, uploading original file instead:', resizeErr);
+      console.error('Crop failed, falling back to plain resize:', resizeErr);
+      uploadBlob = file;
+      try { uploadBlob = await resizeImage(file, 900, 0.82); } catch (e2) { console.error(e2); }
     }
     const path = `shops/${currentShopId}/${Date.now()}_${file.name}`;
     const ref = storage.ref().child(path);
