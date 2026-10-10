@@ -691,7 +691,7 @@ function openItemDetail(itemId) {
   overlay.innerHTML = `
     <div class="modal-sheet">
       <button class="close-x" onclick="document.getElementById('detailOverlay').remove()">×</button>
-      ${meta.image ? `<img src="${meta.image}" style="width:100%; border-radius:12px; margin-bottom:16px; max-height:260px; object-fit:cover;">` : ''}
+      ${meta.image ? `<img src="${meta.image}" style="display:block; width:100%; max-width:320px; aspect-ratio:1 / 1; margin:0 auto 16px; border-radius:12px; object-fit:cover;">` : ''}
       <h3 style="margin-bottom:8px;">${meta.name}</h3>
       <div class="item-price" style="margin-bottom:12px;">${Number(meta.price).toFixed(2)} ${t('currency')}</div>
       ${meta.description ? `<p style="color:var(--stone); line-height:1.6;">${meta.description}</p>` : ''}
