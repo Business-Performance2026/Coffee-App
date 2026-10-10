@@ -3537,6 +3537,23 @@ function openEditOrderModal(orderId) {
   });
 }
 
+// A completed order earned its customer one loyalty point when it became
+// "ready". Deleting that order takes the point back (never below zero).
+// Orders that were a reward redemption (points were reset to 0) are left
+// alone, since the previous balance can't be known exactly.
+async function reverseLoyaltyPoint(orderId) {
+  const order = completedOrdersData.find(o => o.id === orderId);
+  if (!order || !order.loyaltyPhone || order.loyaltyRewardReady || order.status !== 'ready') return;
+  const loyaltyRef = db.collection('shops').doc(currentShopId).collection('loyaltyCustomers').doc(order.loyaltyPhone);
+  await db.runTransaction(async (tx) => {
+    const d = await tx.get(loyaltyRef);
+    if (!d.exists) return;
+    const pts = Number(d.data().points) || 0;
+    tx.update(loyaltyRef, { points: Math.max(0, pts - 1) });
+  });
+  loadLoyaltyCustomers();
+}
+
 // Permanently deletes a completed order (owner only — enforced by the
 // Firestore rules too). It disappears from every report immediately.
 function deleteCompletedOrder(orderId) {
@@ -3559,6 +3576,7 @@ function deleteCompletedOrder(orderId) {
     overlay.remove();
     try {
       await restoreOrderStock(orderId); // give the stock back before the order disappears
+      await reverseLoyaltyPoint(orderId); // and take back the loyalty point this order earned
       await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).delete();
     } catch (err) {
       console.error('Delete order failed:', err);
