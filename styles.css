@@ -1776,3 +1776,20 @@ button, input, select {
   color: var(--ink);
   font-weight: 500;
 }
+
+
+/* Date inputs: the native empty-state placeholder follows the phone's UI
+   language (Arabic letters). While empty we hide it and show an English one. */
+.date-wrap { position: relative; }
+.date-wrap.date-empty::before {
+  content: "DD / MM / YYYY";
+  position: absolute;
+  left: 52px;
+  top: 50%;
+  transform: translateY(-50%);
+  direction: ltr;
+  color: var(--stone);
+  pointer-events: none;
+  z-index: 1;
+}
+.date-wrap.date-empty input[type="date"]::-webkit-datetime-edit { opacity: 0; }

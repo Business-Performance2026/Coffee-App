@@ -4392,6 +4392,32 @@ async function loadSales(range, btnEl) {
     `).join('');
   }
 }
+
+// ===================== Date inputs: English placeholder =====================
+// Wraps every date input so that, while it's empty, an English "DD / MM / YYYY"
+// hint is shown instead of the browser's own (Arabic-letter) placeholder.
+(function initDateInputs() {
+  function sync(input) {
+    const wrap = input.parentElement;
+    if (wrap && wrap.classList.contains('date-wrap')) {
+      wrap.classList.toggle('date-empty', !input.value);
+    }
+  }
+  document.querySelectorAll('input[type="date"]').forEach(input => {
+    if (input.parentElement.classList.contains('date-wrap')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'date-wrap';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    sync(input);
+    ['input', 'change', 'blur'].forEach(ev => input.addEventListener(ev, () => sync(input)));
+  });
+  // Values set from code (e.g. today's date as default) don't fire events,
+  // so re-check whenever the user touches the page.
+  ['click', 'focusin', 'touchstart'].forEach(ev => document.addEventListener(ev, () => {
+    document.querySelectorAll('.date-wrap input[type="date"]').forEach(sync);
+  }, true));
+})();
 </script>
 
 </body>
