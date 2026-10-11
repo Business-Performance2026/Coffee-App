@@ -858,6 +858,10 @@ button, input, select {
 }
 
 .grid-card-img {
+  /* Absolutely positioned so a tall/wide photo can never stretch the square
+     frame — the frame stays exactly 1:1 and the photo is cropped to fit. */
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
