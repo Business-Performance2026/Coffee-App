@@ -563,6 +563,10 @@
             <input type="checkbox" id="permAccount" style="width:auto;">
             <label for="permAccount" style="margin:0;" data-i18n="navAccount">الحساب</label>
           </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="permExpenses" style="width:auto;">
+            <label for="permExpenses" style="margin:0;" data-i18n="accSubExpenses">المصاريف</label>
+          </div>
         </div>
         <p style="color:var(--stone); font-size:0.78rem; margin-top:8px;" data-i18n="posPrintNote">صلاحية "نقطة البيع" تشمل تلقائياً إمكانية طباعة الفواتير.</p>
       </div>
@@ -777,8 +781,19 @@ function applyEmployeePermissionsUI() {
   // Expenses are strictly owner-only, regardless of any permission an
   // employee might have — this function only ever runs for employees, so
   // hiding it here unconditionally is safe and never affects the owner.
+  // (Recording expenses is the one exception: an employee can be granted the
+  // separate "المصاريف" permission, handled just below.)
+  const hasAccountAccess = employeePermissions.account === true;
+  const hasExpensesAccess = employeePermissions.expenses === true;
   const expensesBtn = document.getElementById('expensesSubBtn');
-  if (expensesBtn) expensesBtn.style.display = 'none';
+  if (expensesBtn) expensesBtn.style.display = hasExpensesAccess ? '' : 'none';
+  // Expenses-only employee: the Account tab shows ONLY the expenses screen —
+  // every other account section stays hidden.
+  if (hasExpensesAccess && !hasAccountAccess) {
+    document.querySelectorAll('.acc-icon-subnav-btn').forEach(b => {
+      if (b.getAttribute('data-accsub') !== 'expenses') b.style.display = 'none';
+    });
+  }
 
   const tabPermMap = { dashboard: 'dashboard', pos: 'pos', inventory: 'inventory', sales: 'sales', account: 'account' };
   let firstAllowed = null;
@@ -790,7 +805,9 @@ function applyEmployeePermissionsUI() {
     // permission, unlike the others which each need their own single permission.
     const allowed = tab === 'dashboard'
       ? (employeePermissions.dashboard === true || employeePermissions.pos === true)
-      : employeePermissions[tabPermMap[tab]] === true;
+      : tab === 'account'
+        ? (employeePermissions.account === true || employeePermissions.expenses === true)
+        : employeePermissions[tabPermMap[tab]] === true;
     btn.style.display = allowed ? '' : 'none';
     if (allowed && !firstAllowed) firstAllowed = tab;
   });
@@ -817,6 +834,7 @@ function applyEmployeePermissionsUI() {
 
   if (!employeePermissions.dashboard && firstAllowed) {
     switchTab(firstAllowed);
+    if (firstAllowed === 'account' && hasExpensesAccess && !hasAccountAccess) switchAccountSub('expenses');
   } else if (!firstAllowed) {
     // Employee has no permissions at all — hide the tabs and bottom nav,
     // show a clear message, but NEVER touch the top bar (that's where the
@@ -984,7 +1002,7 @@ async function loadEmployees() {
     return;
   }
 
-  const permLabels = { dashboard: dt('navDashboard'), pos: dt('navPos'), inventory: dt('navInventory'), sales: dt('navSales'), account: dt('navAccount') };
+  const permLabels = { dashboard: dt('navDashboard'), pos: dt('navPos'), inventory: dt('navInventory'), sales: dt('navSales'), account: dt('navAccount'), expenses: dt('accSubExpenses') };
 
   let html = '';
   snap.forEach(doc => {
@@ -1010,7 +1028,8 @@ function readPermsFromForm() {
     pos: document.getElementById('permPos').checked,
     inventory: document.getElementById('permInventory').checked,
     sales: document.getElementById('permSales').checked,
-    account: document.getElementById('permAccount').checked
+    account: document.getElementById('permAccount').checked,
+    expenses: document.getElementById('permExpenses').checked
   };
 }
 
@@ -1055,7 +1074,7 @@ async function saveEmployee() {
     errorEl.textContent = dt('empPinTooShort');
     return;
   }
-  if (!permissions.dashboard && !permissions.pos && !permissions.inventory && !permissions.sales && !permissions.account) {
+  if (!permissions.dashboard && !permissions.pos && !permissions.inventory && !permissions.sales && !permissions.account && !permissions.expenses) {
     errorEl.textContent = dt('atLeastOnePermissionError');
     return;
   }
@@ -1103,6 +1122,7 @@ async function editEmployeePerms(empUid) {
   document.getElementById('permInventory').checked = !!p.inventory;
   document.getElementById('permSales').checked = !!p.sales;
   document.getElementById('permAccount').checked = !!p.account;
+  document.getElementById('permExpenses').checked = !!p.expenses;
 
   document.getElementById('saveEmpBtn').textContent = dt('saveChangesBtn');
   window.scrollTo({ top: document.getElementById('employeesCard').offsetTop, behavior: 'smooth' });
@@ -1123,7 +1143,7 @@ function resetEmployeeForm() {
   document.getElementById('empPin').value = '';
   document.getElementById('empPin').disabled = false;
   document.getElementById('empPin').placeholder = '••••••';
-  ['permDashboard', 'permPos', 'permInventory', 'permSales', 'permAccount'].forEach(id => {
+  ['permDashboard', 'permPos', 'permInventory', 'permSales', 'permAccount', 'permExpenses'].forEach(id => {
     document.getElementById(id).checked = false;
   });
   document.getElementById('saveEmpBtn').textContent = dt('addEmployeeBtn');
@@ -1692,7 +1712,9 @@ function switchTab(name, fromPopState) {
   if (isEmployee && employeePermissions) {
     const tabAllowed = name === 'dashboard'
       ? (employeePermissions.dashboard === true || employeePermissions.pos === true)
-      : employeePermissions[name] === true;
+      : name === 'account'
+        ? (employeePermissions.account === true || employeePermissions.expenses === true)
+        : employeePermissions[name] === true;
     if (!tabAllowed) return;
   }
 
@@ -1717,6 +1739,10 @@ function switchTab(name, fromPopState) {
     wakeLock = null;
   }
 
+  // Expenses-only employee: the Account tab must open straight on expenses
+  if (name === 'account' && isEmployee && employeePermissions.expenses === true && employeePermissions.account !== true) {
+    switchAccountSub('expenses');
+  }
   if (name === 'inventory') loadInventory();
   if (name === 'sales') loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
 }
@@ -1769,7 +1795,7 @@ function renderExpensesList() {
       </div>
       <div style="display:flex; align-items:center; gap:10px;">
         <div style="font-weight:700;">${Number(exp.amount).toFixed(3)} ${dt('currency')}</div>
-        <button class="btn btn-ghost" style="color:#B3441E; padding:6px 10px;" onclick='deleteExpense("${exp.id}")'>🗑️</button>
+        ${isEmployee ? '' : `<button class="btn btn-ghost" style="color:#B3441E; padding:6px 10px;" onclick='deleteExpense("${exp.id}")'>🗑️</button>`}
       </div>
     </div>
   `).join('');
@@ -1808,6 +1834,7 @@ async function addExpense() {
 }
 
 async function deleteExpense(expenseId) {
+  if (isEmployee) return; // only the owner can delete expenses (also enforced by the rules)
   try {
     await db.collection('shops').doc(currentShopId).collection('expenses').doc(expenseId).delete();
     loadExpenses();
