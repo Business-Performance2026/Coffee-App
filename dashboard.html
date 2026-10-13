@@ -1380,6 +1380,10 @@ const dashT = {
   coverUploaded: { ar: 'تم رفع الغلاف ✓ — لا تنسى تضغط "حفظ التغييرات"', en: 'Cover uploaded ✓ — don\'t forget to click "Save changes"' },
   coverUploadFailed: { ar: 'فشل رفع الغلاف، حاول مرة أخرى.', en: 'Cover upload failed, please try again.' },
   total: { ar: 'الإجمالي', en: 'Total' },
+  renewPopupSoonTitle: { ar: 'اشتراكك قارب على الانتهاء', en: 'Your subscription is about to end' },
+  renewPopupExpiredTitle: { ar: 'انتهى اشتراكك', en: 'Your subscription has ended' },
+  renewPopupEndsIn: { ar: 'سينتهي اشتراكك خلال', en: 'Your subscription ends in' },
+  renewPopupToday: { ar: 'اليوم', en: 'today' },
   accSubSubscription: { ar: 'اشتراكاتي', en: 'My subscription' },
   monthlySubTitle: { ar: 'الاشتراك الشهري', en: 'Monthly subscription' },
   subValidUntil: { ar: 'اشتراكك ساري حتى', en: 'Your subscription is valid until' },
@@ -2143,6 +2147,7 @@ async function loadShopInfo() {
     document.getElementById('orderTypeDeliveryEnabled').checked = ot.delivery === true;
 
     renderSubscriptionBanner(info);
+    maybeShowRenewalPopup(info);
 
     if (info.logo) {
       const preview = document.getElementById('logoPreview');
@@ -2166,6 +2171,78 @@ async function loadShopInfo() {
       console.error('QR generation failed:', qrErr);
       document.getElementById('myMenuUrl').insertAdjacentHTML('afterend', `<div class="error-msg">${dt('qrGenerationFailed')}: ${qrErr.message}</div>`);
     }
+  }
+}
+
+// ===================== Renewal reminder popup =====================
+// Shown to the shop OWNER (never staff) when the subscription ends within 3
+// days or has already ended. Deliberately not annoying: at most once per
+// browser session (a page refresh doesn't repeat it; closing the browser/app
+// and coming back shows it once more), and never when a renewal request is
+// already waiting for activation.
+let renewalPopupShownInMemory = false;
+
+function renewalPopupAlreadyShown() {
+  if (renewalPopupShownInMemory) return true;
+  try { return sessionStorage.getItem('renewalPopupShown_' + currentShopId) === '1'; } catch (e) { return false; }
+}
+function markRenewalPopupShown() {
+  renewalPopupShownInMemory = true;
+  try { sessionStorage.setItem('renewalPopupShown_' + currentShopId, '1'); } catch (e) {}
+}
+
+async function maybeShowRenewalPopup(info) {
+  try {
+    if (isEmployee || !info || info.subscriptionStatus !== 'active' || !info.subscriptionEndDate) return;
+    if (renewalPopupAlreadyShown()) return;
+
+    const end = new Date(info.subscriptionEndDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    if (isNaN(end)) return;
+    const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
+    if (daysLeft > 3) return;
+
+    // A renewal already sent and waiting? Then there's nothing to remind about.
+    const pendingSnap = await db.collection('renewalRequests').where('shopId', '==', currentShopId).get();
+    if (pendingSnap.docs.some(d => d.data().status === 'pending')) return;
+    if (renewalPopupAlreadyShown()) return; // re-check after the await
+    markRenewalPopupShown();
+
+    let title, text;
+    if (daysLeft < 0) {
+      title = dt('renewPopupExpiredTitle');
+      text = `${dt('subExpiredOn')} <strong dir="ltr">${escapeHtml(info.subscriptionEndDate)}</strong>`;
+    } else {
+      title = dt('renewPopupSoonTitle');
+      const daysText = daysLeft === 0 ? dt('renewPopupToday') : `${daysLeft} ${dt('subDaysUnit')}`;
+      text = `${dt('renewPopupEndsIn')} <strong>${daysText}</strong>`;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'renewalPopupOverlay';
+    overlay.style.cssText = 'position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; padding:20px;';
+    overlay.innerHTML = `
+      <div style="position:relative; background:var(--paper, #fff); border-radius:20px; padding:28px 22px 22px; width:100%; max-width:360px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,0.25);">
+        <button type="button" id="renewalPopupClose" aria-label="close" style="position:absolute; top:10px; inset-inline-start:12px; background:none; border:none; font-size:1.5rem; line-height:1; cursor:pointer; color:var(--stone);">×</button>
+        <div style="font-size:2.8rem; margin-bottom:8px;">${daysLeft < 0 ? '⚠️' : '⏰'}</div>
+        <h3 style="margin-bottom:8px;">${title}</h3>
+        <p style="color:var(--stone); margin-bottom:20px; line-height:1.7;">${text}</p>
+        <button type="button" class="btn" style="width:100%;" id="renewalPopupRenewBtn">💎 ${dt('renewSubBtn')}</button>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#renewalPopupClose').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('#renewalPopupRenewBtn').addEventListener('click', () => {
+      close();
+      switchTab('account');
+      switchAccountSub('subscription');
+    });
+  } catch (err) {
+    console.error('Renewal popup failed (non-blocking):', err);
   }
 }
 
@@ -2199,15 +2276,8 @@ function renderSubscriptionBanner(info) {
       return;
     }
 
-    if (daysLeft <= 3) {
-      const daysText = daysLeft === 0 ? 'اليوم' : (daysLeft === 1 ? 'يوم واحد' : `${daysLeft} أيام`);
-      bannerEl.innerHTML = `
-        <div class="sub-banner sub-banner-warning">
-          ⏰ اشتراكك سينتهي خلال ${daysText}. جدّد من الحساب ← اشتراكاتي.
-        </div>
-      `;
-      return;
-    }
+    // (The "expires within 3 days" reminder now appears as a once-per-session
+    // popup instead — see maybeShowRenewalPopup.)
   }
 
   bannerEl.innerHTML = '';
