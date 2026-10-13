@@ -1654,6 +1654,7 @@ button, input, select {
 .acc-icon-subnav-btn[data-accsub="ordertypes"] .icon-subnav-icon { background: #F6E2B8; color: #8A6A1E; }
 .acc-icon-subnav-btn[data-accsub="staff"] .icon-subnav-icon { background: #EAD3DC; color: #8A4A63; }
 .acc-icon-subnav-btn[data-accsub="session"] .icon-subnav-icon { background: #D6E0F0; color: #3E5C8A; }
+.acc-icon-subnav-btn[data-accsub="subscription"] .icon-subnav-icon { background: #E3DDF3; color: #5B4A99; }
 
 /* Account tab now has 6 icons — wrap into 2 rows of 3 instead of squeezing
    them into one row. Scoped to .acc-icon-subnav only, so the main

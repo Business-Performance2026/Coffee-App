@@ -326,6 +326,9 @@
       <button class="acc-icon-subnav-btn" data-accsub="expenses" onclick="switchAccountSub('expenses')" id="expensesSubBtn">
         <span class="icon-subnav-icon">💸</span><span class="icon-subnav-label" data-i18n="accSubExpenses">المصاريف</span>
       </button>
+      <button class="acc-icon-subnav-btn" data-accsub="subscription" onclick="switchAccountSub('subscription')" id="subscriptionSubBtn">
+        <span class="icon-subnav-icon">💎</span><span class="icon-subnav-label" data-i18n="accSubSubscription">اشتراكاتي</span>
+      </button>
     </div>
 
     <div id="shopInfoError" class="error-msg"></div>
@@ -611,6 +614,15 @@
       </div>
     </div>
 
+    <!-- ===== اشتراكاتي (owner only): renew the monthly subscription by bank transfer ===== -->
+    <div id="acc-sub-subscription" class="acc-sub-view">
+      <div class="card">
+        <h3 style="margin-bottom:12px;" data-i18n="monthlySubTitle">الاشتراك الشهري</h3>
+        <div id="subscriptionStatusBox"></div>
+        <div id="subscriptionActionBox"><div class="state-msg">جاري التحميل...</div></div>
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -787,6 +799,9 @@ function applyEmployeePermissionsUI() {
   const hasExpensesAccess = employeePermissions.expenses === true;
   const expensesBtn = document.getElementById('expensesSubBtn');
   if (expensesBtn) expensesBtn.style.display = hasExpensesAccess ? '' : 'none';
+  // Subscription renewal is for the shop owner only — never an employee.
+  const subscriptionBtn = document.getElementById('subscriptionSubBtn');
+  if (subscriptionBtn) subscriptionBtn.style.display = 'none';
   // Expenses-only employee: the Account tab shows ONLY the expenses screen —
   // every other account section stays hidden.
   if (hasExpensesAccess && !hasAccountAccess) {
@@ -1365,6 +1380,34 @@ const dashT = {
   coverUploaded: { ar: 'تم رفع الغلاف ✓ — لا تنسى تضغط "حفظ التغييرات"', en: 'Cover uploaded ✓ — don\'t forget to click "Save changes"' },
   coverUploadFailed: { ar: 'فشل رفع الغلاف، حاول مرة أخرى.', en: 'Cover upload failed, please try again.' },
   total: { ar: 'الإجمالي', en: 'Total' },
+  accSubSubscription: { ar: 'اشتراكاتي', en: 'My subscription' },
+  monthlySubTitle: { ar: 'الاشتراك الشهري', en: 'Monthly subscription' },
+  subValidUntil: { ar: 'اشتراكك ساري حتى', en: 'Your subscription is valid until' },
+  subDaysLeft: { ar: 'متبقي', en: 'Remaining' },
+  subDaysUnit: { ar: 'يوم', en: 'days' },
+  subExpiredOn: { ar: 'انتهى اشتراكك بتاريخ', en: 'Your subscription ended on' },
+  subNoEndDate: { ar: 'لا يوجد تاريخ انتهاء محدد', en: 'No end date set' },
+  renewSubBtn: { ar: 'تجديد الاشتراك', en: 'Renew subscription' },
+  renewPendingMsg: { ar: 'تم إرسال طلب التجديد — بانتظار التفعيل', en: 'Renewal request sent — awaiting activation' },
+  renewPendingHint: { ar: 'سيتم تفعيل اشتراكك بعد التحقق من التحويل.', en: 'Your subscription will be activated once the transfer is verified.' },
+  renewSentOn: { ar: 'تاريخ الإرسال', en: 'Sent on' },
+  renewRejectedMsg: { ar: 'تم رفض آخر طلب تجديد', en: 'Your last renewal request was rejected' },
+  renewRejectReason: { ar: 'السبب', en: 'Reason' },
+  renewApprovedMsg: { ar: 'تم تفعيل آخر تجديد ✓', en: 'Your last renewal was activated ✓' },
+  renewTransferTitle: { ar: 'حوّل مبلغ الاشتراك ثم أرفق الإيصال', en: 'Transfer the subscription amount, then attach the receipt' },
+  renewBeneficiaryLbl: { ar: 'اسم المستفيد', en: 'Beneficiary name' },
+  renewTransferNoLbl: { ar: 'رقم التحويل', en: 'Transfer number' },
+  renewAmountLbl: { ar: 'المبلغ', en: 'Amount' },
+  renewReceiptLbl: { ar: 'إرفاق الإيصال', en: 'Attach the receipt' },
+  renewSubmitBtn: { ar: 'إرسال طلب التجديد', en: 'Send renewal request' },
+  renewCancelBtn: { ar: 'إلغاء', en: 'Cancel' },
+  renewCopyBtn: { ar: 'نسخ', en: 'Copy' },
+  renewCopiedMsg: { ar: 'تم النسخ ✓', en: 'Copied ✓' },
+  renewNoDetails: { ar: 'بيانات التحويل غير متوفرة حالياً، تواصل معنا.', en: 'Transfer details are not available yet, please contact us.' },
+  renewNeedReceipt: { ar: 'أرفق صورة الإيصال أولاً.', en: 'Please attach the receipt image first.' },
+  renewSending: { ar: 'جاري الإرسال...', en: 'Sending...' },
+  renewSendError: { ar: 'تعذر إرسال الطلب، حاول مرة ثانية.', en: 'Could not send the request, please try again.' },
+  renewLoadError: { ar: 'تعذر تحميل بيانات الاشتراك.', en: 'Could not load subscription details.' },
   editOrderBtn: { ar: 'تعديل الطلب', en: 'Edit order' },
   editOrderTitle: { ar: 'تعديل الطلب', en: 'Edit order' },
   editOrderSave: { ar: 'حفظ التعديل', en: 'Save changes' },
@@ -1763,6 +1806,158 @@ function switchSubView(name) {
 // Completely separate from switchSubView above — uses its own class names
 // (.acc-sub-view / .acc-icon-subnav-btn) so the two subnavs never interfere
 // with each other's active-button state, regardless of which tab is open.
+// ===================== اشتراكاتي — subscription renewal by bank transfer =====================
+let subscriptionBillingCache = null;
+
+async function loadSubscriptionView() {
+  const statusBox = document.getElementById('subscriptionStatusBox');
+  const actionBox = document.getElementById('subscriptionActionBox');
+  if (!statusBox || !actionBox) return;
+  actionBox.innerHTML = `<div class="state-msg">${dt('loadingExpenses')}</div>`;
+
+  try {
+    const [shopDoc, reqSnap, billingDoc] = await Promise.all([
+      db.collection('shops').doc(currentShopId).get(),
+      db.collection('renewalRequests').where('shopId', '==', currentShopId).get(),
+      db.collection('platform').doc('billing').get()
+    ]);
+    const info = shopDoc.exists ? (shopDoc.data().info || {}) : {};
+    subscriptionBillingCache = billingDoc.exists ? billingDoc.data() : null;
+
+    const requests = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const ts = r => (r.createdAt && r.createdAt.toMillis) ? r.createdAt.toMillis() : 0;
+    requests.sort((a, b) => ts(b) - ts(a));
+    const pending = requests.find(r => r.status === 'pending');
+    const latest = requests[0];
+
+    // ---- current status line ----
+    let statusHtml = '';
+    if (info.subscriptionEndDate) {
+      const end = new Date(info.subscriptionEndDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      const daysLeft = Math.round((end - today) / (1000 * 60 * 60 * 24));
+      statusHtml = daysLeft < 0
+        ? `<div class="sub-banner sub-banner-danger" style="margin-bottom:12px;">⚠️ ${dt('subExpiredOn')} ${escapeHtml(info.subscriptionEndDate)}</div>`
+        : `<div style="margin-bottom:12px;">
+             <div>${dt('subValidUntil')} <strong dir="ltr">${escapeHtml(info.subscriptionEndDate)}</strong></div>
+             <div style="color:var(--stone); font-size:0.88rem; margin-top:4px;">${dt('subDaysLeft')}: ${daysLeft} ${dt('subDaysUnit')}</div>
+           </div>`;
+    } else {
+      statusHtml = `<div style="margin-bottom:12px; color:var(--stone);">${dt('subNoEndDate')}</div>`;
+    }
+    statusBox.innerHTML = statusHtml;
+
+    // ---- action area ----
+    if (pending) {
+      const sent = pending.createdAt && pending.createdAt.toDate ? pending.createdAt.toDate().toLocaleDateString('en-GB') : '';
+      actionBox.innerHTML = `
+        <div class="sub-banner sub-banner-warning" style="text-align:center;">
+          ⏳ <strong>${dt('renewPendingMsg')}</strong>
+          <div style="font-size:0.85rem; margin-top:6px;">${dt('renewPendingHint')}</div>
+          ${sent ? `<div style="font-size:0.8rem; margin-top:6px; color:var(--stone);">${dt('renewSentOn')}: <span dir="ltr">${sent}</span></div>` : ''}
+        </div>`;
+      return;
+    }
+
+    let noteHtml = '';
+    if (latest && latest.status === 'rejected') {
+      noteHtml = `<div class="sub-banner sub-banner-danger" style="margin-bottom:12px;">
+        ❌ <strong>${dt('renewRejectedMsg')}</strong>
+        ${latest.rejectReason ? `<div style="font-size:0.85rem; margin-top:4px;">${dt('renewRejectReason')}: ${escapeHtml(latest.rejectReason)}</div>` : ''}
+      </div>`;
+    } else if (latest && latest.status === 'approved') {
+      noteHtml = `<div style="color:#3D6B4F; font-size:0.88rem; margin-bottom:12px;">${dt('renewApprovedMsg')}</div>`;
+    }
+    actionBox.innerHTML = noteHtml + `<button class="btn" style="width:100%;" onclick="openRenewForm()">${dt('renewSubBtn')}</button><div id="renewFormBox"></div>`;
+  } catch (err) {
+    console.error('loadSubscriptionView failed:', err);
+    actionBox.innerHTML = `<div class="state-msg">${dt('renewLoadError')}</div>`;
+  }
+}
+
+function openRenewForm() {
+  const box = document.getElementById('renewFormBox');
+  if (!box) return;
+  const b = subscriptionBillingCache;
+  const hasDetails = b && (b.beneficiaryName || b.transferNumber);
+  if (!hasDetails) {
+    box.innerHTML = `<div class="state-msg" style="margin-top:12px;">${dt('renewNoDetails')}</div>`;
+    return;
+  }
+  const row = (label, value, copyable) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
+      <span style="color:var(--stone); font-size:0.85rem;">${label}</span>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <strong dir="auto">${escapeHtml(value)}</strong>
+        ${copyable ? `<button type="button" class="btn btn-ghost" style="padding:4px 10px; font-size:0.8rem;" onclick="copyRenewValue(this, '${encodeURIComponent(value)}')">${dt('renewCopyBtn')}</button>` : ''}
+      </span>
+    </div>`;
+  box.innerHTML = `
+    <div style="margin-top:14px;">
+      <div style="font-weight:600; margin-bottom:8px;">${dt('renewTransferTitle')}</div>
+      ${b.beneficiaryName ? row(dt('renewBeneficiaryLbl'), b.beneficiaryName, true) : ''}
+      ${b.transferNumber ? row(dt('renewTransferNoLbl'), String(b.transferNumber), true) : ''}
+      ${typeof b.amount === 'number' ? row(dt('renewAmountLbl'), `${Number(b.amount).toFixed(3)} ${dt('currency')}`, false) : ''}
+      <div class="field" style="margin-top:14px;">
+        <label for="renewReceiptInput">${dt('renewReceiptLbl')}</label>
+        <input type="file" id="renewReceiptInput" accept="image/*">
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" style="flex:1;" id="renewSubmitBtn" onclick="submitRenewalRequest()">${dt('renewSubmitBtn')}</button>
+        <button class="btn btn-ghost" style="flex:1;" onclick="document.getElementById('renewFormBox').innerHTML=''">${dt('renewCancelBtn')}</button>
+      </div>
+      <div id="renewFormError" class="error-msg"></div>
+    </div>`;
+}
+
+async function copyRenewValue(btn, encoded) {
+  try {
+    await navigator.clipboard.writeText(decodeURIComponent(encoded));
+    const old = btn.textContent;
+    btn.textContent = dt('renewCopiedMsg');
+    setTimeout(() => { btn.textContent = old; }, 1500);
+  } catch (e) { console.error('copy failed', e); }
+}
+
+async function submitRenewalRequest() {
+  const errEl = document.getElementById('renewFormError');
+  const btn = document.getElementById('renewSubmitBtn');
+  const file = document.getElementById('renewReceiptInput').files[0];
+  errEl.textContent = '';
+  if (!file) { errEl.textContent = dt('renewNeedReceipt'); return; }
+
+  btn.disabled = true;
+  btn.textContent = dt('renewSending');
+  try {
+    let blob = file;
+    try { blob = await resizeImage(file, 1600, 0.85); } catch (e) { console.error('Resize failed, uploading original:', e); }
+    const ref = storage.ref().child(`shops/${currentShopId}/subscription/receipt_${Date.now()}.jpg`);
+    await ref.put(blob);
+    const receiptUrl = await ref.getDownloadURL();
+
+    const shopDoc = await db.collection('shops').doc(currentShopId).get();
+    const info = shopDoc.exists ? (shopDoc.data().info || {}) : {};
+    const b = subscriptionBillingCache || {};
+
+    await db.collection('renewalRequests').add({
+      shopId: currentShopId,
+      shopName: info.name || '',
+      receiptUrl,
+      amount: typeof b.amount === 'number' ? b.amount : null,
+      status: 'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    loadSubscriptionView(); // flips straight to "awaiting activation"
+  } catch (err) {
+    console.error('submitRenewalRequest failed:', err);
+    errEl.textContent = dt('renewSendError');
+    btn.disabled = false;
+    btn.textContent = dt('renewSubmitBtn');
+  }
+}
+
 // ===================== Expenses (owner-only) =====================
 let expensesData = [];
 
@@ -1853,6 +2048,9 @@ function switchAccountSub(name) {
     const dateInput = document.getElementById('expenseDateInput');
     if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
     loadExpenses();
+  }
+  if (name === 'subscription' && !isEmployee) {
+    loadSubscriptionView();
   }
 }
 
@@ -1995,7 +2193,7 @@ function renderSubscriptionBanner(info) {
     if (daysLeft < 0) {
       bannerEl.innerHTML = `
         <div class="sub-banner sub-banner-danger">
-          ⚠️ انتهى اشتراكك بتاريخ ${info.subscriptionEndDate} — قائمتك غير ظاهرة للعملاء حالياً. تواصل معنا للتجديد.
+          ⚠️ انتهى اشتراكك بتاريخ ${info.subscriptionEndDate} — قائمتك غير ظاهرة للعملاء حالياً. جدّد اشتراكك من الحساب ← اشتراكاتي.
         </div>
       `;
       return;
@@ -2005,7 +2203,7 @@ function renderSubscriptionBanner(info) {
       const daysText = daysLeft === 0 ? 'اليوم' : (daysLeft === 1 ? 'يوم واحد' : `${daysLeft} أيام`);
       bannerEl.innerHTML = `
         <div class="sub-banner sub-banner-warning">
-          ⏰ اشتراكك سينتهي خلال ${daysText}. تواصل معنا للتجديد.
+          ⏰ اشتراكك سينتهي خلال ${daysText}. جدّد من الحساب ← اشتراكاتي.
         </div>
       `;
       return;

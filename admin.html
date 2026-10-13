@@ -82,6 +82,14 @@
         <span class="icon-subnav-icon" style="background:#EDEDED;">📋</span>
         <span class="icon-subnav-label">كل الكوفيات</span>
       </button>
+      <button class="icon-subnav-btn" style="position:relative; flex:1 1 28%; min-width:100px;" onclick="openRenewalsView()">
+        <span class="icon-subnav-icon" style="background:#E3DDF3;">🔄</span><span class="bell-badge" id="iconBadgeRenewals" style="display:none; top:8px; left:8px;">0</span>
+        <span class="icon-subnav-label">طلبات التجديد</span>
+      </button>
+      <button class="icon-subnav-btn" style="position:relative; flex:1 1 28%; min-width:100px;" onclick="openBillingView()">
+        <span class="icon-subnav-icon" style="background:#DDEFF0;">🏦</span>
+        <span class="icon-subnav-label">بيانات التحويل</span>
+      </button>
       <button class="icon-subnav-btn" style="position:relative; flex:1 1 28%; min-width:100px;" onclick="openAddShopView()">
         <span class="icon-subnav-icon" style="background:#E8DFF5;">➕</span>
         <span class="icon-subnav-label">إضافة كوفي</span>
@@ -121,6 +129,35 @@
       <div id="createError" class="error-msg"></div>
       <div id="createSuccess" style="color:#3D6B4F; font-size:0.9rem; margin-top:10px;"></div>
       <div id="qrResult" style="margin-top:16px; text-align:center;"></div>
+    </div>
+  </div>
+
+  <!-- Subscription renewal requests (bank transfer receipts sent by shop owners) -->
+  <div id="adminRenewalsView" style="display:none;">
+    <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="closeSubViews()">→ رجوع</button>
+    <h3 style="margin:0 0 16px;">طلبات التجديد</h3>
+    <div id="renewalsList"><div class="state-msg">جاري التحميل...</div></div>
+  </div>
+
+  <!-- Bank-transfer details shown to shop owners on the renewal screen -->
+  <div id="adminBillingView" style="display:none;">
+    <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="closeSubViews()">→ رجوع</button>
+    <div class="card">
+      <h3 style="margin-bottom:16px;">بيانات التحويل</h3>
+      <div class="field">
+        <label for="billingBeneficiary">اسم المستفيد</label>
+        <input type="text" id="billingBeneficiary">
+      </div>
+      <div class="field">
+        <label for="billingTransferNo">رقم التحويل (الحساب)</label>
+        <input type="text" id="billingTransferNo" dir="ltr">
+      </div>
+      <div class="field">
+        <label for="billingAmount">مبلغ الاشتراك الشهري (ر.ع) — اختياري</label>
+        <input type="number" step="0.001" min="0" id="billingAmount">
+      </div>
+      <button class="btn" onclick="saveBillingSettings()">حفظ</button>
+      <div id="billingMsg" style="font-size:0.9rem; margin-top:10px;"></div>
     </div>
   </div>
 
@@ -264,6 +301,7 @@ async function loadShops() {
   updateIconBadge('iconBadgePending', newCount);
   updateIconBadge('iconBadgeExpiringSoon', expiringSoonCount);
   updateIconBadge('iconBadgeExpired', expiredCount);
+  refreshRenewalsBadge();
 
   renderShopsList();
 }
@@ -313,6 +351,187 @@ function renderExpiringBanner() {
       <div style="margin-top:8px;">${rows}</div>
     </div>
   `;
+}
+
+// ===================== Subscription renewals & transfer details =====================
+function escHtml(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function hideAdminHomeFor(viewId) {
+  document.getElementById('adminHomeView').style.display = 'none';
+  document.getElementById(viewId).style.display = 'block';
+}
+
+function closeSubViews() {
+  document.getElementById('adminRenewalsView').style.display = 'none';
+  document.getElementById('adminBillingView').style.display = 'none';
+  document.getElementById('adminHomeView').style.display = 'block';
+  refreshRenewalsBadge();
+}
+
+async function refreshRenewalsBadge() {
+  try {
+    const snap = await db.collection('renewalRequests').where('status', '==', 'pending').get();
+    updateIconBadge('iconBadgeRenewals', snap.size);
+  } catch (err) {
+    console.error('refreshRenewalsBadge failed:', err);
+  }
+}
+
+async function openBillingView() {
+  hideAdminHomeFor('adminBillingView');
+  document.getElementById('billingMsg').textContent = '';
+  try {
+    const doc = await db.collection('platform').doc('billing').get();
+    const b = doc.exists ? doc.data() : {};
+    document.getElementById('billingBeneficiary').value = b.beneficiaryName || '';
+    document.getElementById('billingTransferNo').value = b.transferNumber || '';
+    document.getElementById('billingAmount').value = typeof b.amount === 'number' ? b.amount : '';
+  } catch (err) {
+    console.error('openBillingView failed:', err);
+    document.getElementById('billingMsg').textContent = 'تعذر تحميل البيانات: ' + err.message;
+  }
+}
+
+async function saveBillingSettings() {
+  const msg = document.getElementById('billingMsg');
+  const amountRaw = document.getElementById('billingAmount').value;
+  const data = {
+    beneficiaryName: document.getElementById('billingBeneficiary').value.trim(),
+    transferNumber: document.getElementById('billingTransferNo').value.trim(),
+    amount: amountRaw === '' ? null : parseFloat(amountRaw),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try {
+    await db.collection('platform').doc('billing').set(data);
+    msg.style.color = '#3D6B4F';
+    msg.textContent = 'تم الحفظ ✓';
+  } catch (err) {
+    console.error('saveBillingSettings failed:', err);
+    msg.style.color = '#B3441E';
+    msg.textContent = 'تعذر الحفظ: ' + err.message;
+  }
+}
+
+async function openRenewalsView() {
+  hideAdminHomeFor('adminRenewalsView');
+  await loadRenewalRequests();
+}
+
+async function loadRenewalRequests() {
+  const listEl = document.getElementById('renewalsList');
+  listEl.innerHTML = '<div class="state-msg">جاري التحميل...</div>';
+  try {
+    const snap = await db.collection('renewalRequests').where('status', '==', 'pending').get();
+    const reqs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const ts = r => (r.createdAt && r.createdAt.toMillis) ? r.createdAt.toMillis() : 0;
+    reqs.sort((a, b) => ts(a) - ts(b)); // oldest first
+    updateIconBadge('iconBadgeRenewals', reqs.length);
+
+    if (reqs.length === 0) {
+      listEl.innerHTML = '<div class="card"><div class="state-msg">لا توجد طلبات تجديد بانتظار التفعيل.</div></div>';
+      return;
+    }
+
+    listEl.innerHTML = reqs.map(r => {
+      const shop = allShopsData.find(s => s.id === r.shopId);
+      const name = (shop && (shop.info.name || shop.info.email)) || r.shopName || '(بدون اسم)';
+      const endDate = shop && shop.info.subscriptionEndDate ? shop.info.subscriptionEndDate : '—';
+      const when = r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().toLocaleString('en-GB') : '';
+      const safeUrl = (typeof r.receiptUrl === 'string' && r.receiptUrl.startsWith('https://')) ? r.receiptUrl : '';
+      return `
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-weight:700; margin-bottom:4px;">${escHtml(name)}</div>
+          <div class="order-items-line">تاريخ الإرسال: <span dir="ltr">${escHtml(when)}</span></div>
+          <div class="order-items-line">ينتهي اشتراكه الحالي: <span dir="ltr">${escHtml(endDate)}</span></div>
+          ${typeof r.amount === 'number' ? `<div class="order-items-line">المبلغ المتوقع: ${Number(r.amount).toFixed(3)} ر.ع</div>` : ''}
+          ${safeUrl ? `<a href="${escHtml(safeUrl)}" target="_blank" rel="noopener"><img src="${escHtml(safeUrl)}" alt="الإيصال" style="max-width:100%; max-height:240px; border-radius:10px; margin:10px 0; border:1px solid var(--line);"></a>` : '<div class="order-items-line">لا يوجد إيصال</div>'}
+          <div class="order-actions" style="margin-top:8px;">
+            <button class="btn" onclick="approveRenewal('${r.id}', '${r.shopId}')">✅ تفعيل (+30 يوم)</button>
+            <button class="btn btn-ghost" style="color:#B3441E;" onclick="rejectRenewal('${r.id}')">❌ رفض</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    console.error('loadRenewalRequests failed:', err);
+    listEl.innerHTML = '<div class="state-msg">تعذر تحميل الطلبات: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+async function approveRenewal(reqId, shopId) {
+  if (!confirm('تأكدت من وصول التحويل؟ بيتم تفعيل الاشتراك 30 يوم.')) return;
+  try {
+    const shopRef = db.collection('shops').doc(shopId);
+    const reqRef = db.collection('renewalRequests').doc(reqId);
+    const [shopDoc, reqDoc] = await Promise.all([shopRef.get(), reqRef.get()]);
+    if (!shopDoc.exists || !reqDoc.exists) { alert('الطلب أو الكوفي غير موجود.'); return; }
+    const info = shopDoc.data().info || {};
+    const reqData = reqDoc.data();
+    if (reqData.status !== 'pending') { alert('هذا الطلب تمت معالجته مسبقاً.'); await loadRenewalRequests(); return; }
+
+    // Extend from the current end date if it's still in the future (so no
+    // paid days are lost), otherwise count 30 days from today.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let base = today;
+    if (info.subscriptionEndDate) {
+      const end = new Date(info.subscriptionEndDate);
+      end.setHours(0, 0, 0, 0);
+      if (!isNaN(end) && end > today) base = end;
+    }
+    const newEnd = new Date(base);
+    newEnd.setDate(newEnd.getDate() + 30);
+    const newEndStr = localDateStr(newEnd);
+
+    const batch = db.batch();
+    batch.update(shopRef, {
+      'info.subscriptionStatus': 'active',
+      'info.subscriptionEndDate': newEndStr,
+      'info.suspensionReason': firebase.firestore.FieldValue.delete()
+    });
+    batch.update(reqRef, {
+      status: 'approved',
+      newEndDate: newEndStr,
+      reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    if (typeof reqData.amount === 'number' && reqData.amount > 0) {
+      batch.set(shopRef.collection('payments').doc(), {
+        amount: reqData.amount,
+        note: 'تجديد اشتراك عبر التحويل',
+        recordedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    await batch.commit();
+    await loadShops();
+    await loadRenewalRequests();
+  } catch (err) {
+    console.error('approveRenewal failed:', err);
+    alert('صار خطأ: ' + (err.message || err));
+  }
+}
+
+async function rejectRenewal(reqId) {
+  const reason = prompt('سبب الرفض؟ (بيظهر لصاحب الكوفي)');
+  if (reason === null) return;
+  try {
+    await db.collection('renewalRequests').doc(reqId).update({
+      status: 'rejected',
+      rejectReason: reason.trim() || 'غير محدد',
+      reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await loadRenewalRequests();
+  } catch (err) {
+    console.error('rejectRenewal failed:', err);
+    alert('صار خطأ: ' + (err.message || err));
+  }
 }
 
 function openAddShopView() {
