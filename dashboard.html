@@ -136,6 +136,7 @@
 
     <!-- Sub-view: Items list -->
     <div id="sub-list" class="sub-view active">
+      <button type="button" class="btn btn-ghost" style="width:100%; margin-bottom:12px;" onclick="openStarterMenu()" data-i18n="starterMenuBtn">✨ إضافة منيو جاهز</button>
       <div class="card" id="itemsList">
         <div class="state-msg">جاري التحميل...</div>
       </div>
@@ -1384,6 +1385,26 @@ const dashT = {
   renewPopupExpiredTitle: { ar: 'انتهى اشتراكك', en: 'Your subscription has ended' },
   renewPopupEndsIn: { ar: 'سينتهي اشتراكك خلال', en: 'Your subscription ends in' },
   renewPopupToday: { ar: 'اليوم', en: 'today' },
+  starterMenuBtn: { ar: '✨ إضافة منيو جاهز', en: '✨ Add a ready-made menu' },
+  starterMenuCta: { ar: '✨ ابدأ بمنيو جاهز في دقايق', en: '✨ Start with a ready-made menu' },
+  starterMenuCtaHint: { ar: 'اختر نوع مقهاك وعدّل الأسعار والصور بعدين', en: 'Pick your cafe type, then adjust prices and photos later' },
+  starterTitle: { ar: 'منيو جاهز', en: 'Ready-made menu' },
+  starterIntro: { ar: 'اختر نوع مقهاك، وعدّل الأسعار اللي تبيها قبل الإضافة. تقدر تعدّل أو تحذف أي صنف أو تغيّر صورته بعدين.', en: 'Pick your cafe type and adjust any prices before adding. You can edit, delete or change any item photo later.' },
+  starterTypeSpecialty: { ar: '☕ قهوة مختصة', en: '☕ Specialty coffee' },
+  starterTypeJuices: { ar: '🥤 عصائر ومشروبات باردة', en: '🥤 Juices & cold drinks' },
+  starterTypeSweets: { ar: '🍰 حلويات ومعجنات', en: '🍰 Desserts & pastries' },
+  starterTypeAll: { ar: '⭐ شامل', en: '⭐ Everything' },
+  starterPickType: { ar: 'اختر نوع مقهاك من فوق لتظهر الأصناف.', en: 'Pick your cafe type above to see the items.' },
+  starterAddBtn: { ar: 'أضف للمنيو', en: 'Add to menu' },
+  starterSelectedCount: { ar: 'صنف محدد', en: 'selected' },
+  starterAlreadyHave: { ar: 'موجود عندك', en: 'Already in your menu' },
+  starterNothingSelected: { ar: 'حدد صنف واحد على الأقل.', en: 'Select at least one item.' },
+  starterBadPrice: { ar: 'تأكد من أن كل سعر رقم أكبر من صفر.', en: 'Make sure every price is a number greater than zero.' },
+  starterAddError: { ar: 'تعذر إضافة الأصناف، حاول مرة ثانية.', en: 'Could not add the items, please try again.' },
+  starterDoneTitle: { ar: 'تمت إضافة المنيو', en: 'Menu added' },
+  starterDoneItems: { ar: 'صنف', en: 'items' },
+  starterDoneHint: { ar: 'عدّل الأسعار وأضف صور منتجاتك من "قائمة الأصناف".', en: 'Adjust prices and add your own product photos from the items list.' },
+  starterDoneBtn: { ar: 'تم', en: 'Done' },
   accSubSubscription: { ar: 'اشتراكاتي', en: 'My subscription' },
   monthlySubTitle: { ar: 'الاشتراك الشهري', en: 'Monthly subscription' },
   subValidUntil: { ar: 'اشتراكك ساري حتى', en: 'Your subscription is valid until' },
@@ -2884,6 +2905,240 @@ async function deleteCategoryConfirm(name) {
   await loadItems();
 }
 
+// ===================== Ready-made starter menu =====================
+// Lets a new cafe fill its menu in minutes: pick the cafe type, tweak prices,
+// add. Items are written to the SAME menu collection as hand-added ones, with a
+// generic category picture (from /seed-*.png) the owner can replace anytime.
+const STARTER_CATEGORIES = {
+  hot:       { ar: 'قهوة ساخنة', en: 'Hot Coffee', img: 'seed-hotcoffee.png' },
+  iced:      { ar: 'قهوة باردة', en: 'Iced Coffee', img: 'seed-icedcoffee.png' },
+  cold:      { ar: 'مشروبات باردة وعصائر', en: 'Cold Drinks & Juices', img: 'seed-colddrinks.png' },
+  desserts:  { ar: 'حلويات', en: 'Desserts', img: 'seed-desserts.png' },
+  pastries:  { ar: 'معجنات', en: 'Pastries', img: 'seed-pastries.png' }
+};
+
+const STARTER_ITEMS = [
+  // cat, Arabic name, English name, suggested price (OMR) — the owner adjusts them
+  ['hot', 'إسبريسو', 'Espresso', 0.8],
+  ['hot', 'أمريكانو', 'Americano', 1.0],
+  ['hot', 'كابتشينو', 'Cappuccino', 1.3],
+  ['hot', 'لاتيه', 'Latte', 1.3],
+  ['hot', 'فلات وايت', 'Flat White', 1.4],
+  ['hot', 'كورتادو', 'Cortado', 1.2],
+  ['hot', 'موكا', 'Mocha', 1.5],
+  ['hot', 'سبانش لاتيه', 'Spanish Latte', 1.5],
+  ['hot', 'هوت شوكليت', 'Hot Chocolate', 1.3],
+  ['hot', 'قهوة عربية', 'Arabic Coffee', 0.5],
+  ['hot', 'شاي كرك', 'Karak Tea', 0.4],
+  ['iced', 'أمريكانو بارد', 'Iced Americano', 1.2],
+  ['iced', 'لاتيه بارد', 'Iced Latte', 1.5],
+  ['iced', 'سبانش لاتيه بارد', 'Iced Spanish Latte', 1.7],
+  ['iced', 'موكا بارد', 'Iced Mocha', 1.7],
+  ['iced', 'كولد برو', 'Cold Brew', 1.6],
+  ['iced', 'كراميل ماكياتو بارد', 'Iced Caramel Macchiato', 1.8],
+  ['cold', 'عصير برتقال طازج', 'Fresh Orange Juice', 1.5],
+  ['cold', 'ليمون بالنعناع', 'Lemon Mint', 1.3],
+  ['cold', 'موهيتو', 'Mojito', 1.5],
+  ['cold', 'سموذي مانجو', 'Mango Smoothie', 1.8],
+  ['cold', 'سموذي فراولة', 'Strawberry Smoothie', 1.8],
+  ['cold', 'عصير أفوكادو', 'Avocado Juice', 2.0],
+  ['cold', 'ميلك شيك شوكولاتة', 'Chocolate Milkshake', 2.0],
+  ['cold', 'ماء', 'Water', 0.2],
+  ['desserts', 'سان سيباستيان تشيز كيك', 'San Sebastian Cheesecake', 2.0],
+  ['desserts', 'براوني', 'Brownie', 1.2],
+  ['desserts', 'كوكيز', 'Cookies', 0.6],
+  ['desserts', 'كيكة الجزر', 'Carrot Cake', 1.8],
+  ['desserts', 'تيراميسو', 'Tiramisu', 1.8],
+  ['desserts', 'كيكة شوكولاتة', 'Chocolate Cake', 1.8],
+  ['pastries', 'كرواسون', 'Croissant', 0.8],
+  ['pastries', 'كرواسون شوكولاتة', 'Chocolate Croissant', 1.0],
+  ['pastries', 'كرواسون جبنة', 'Cheese Croissant', 1.0],
+  ['pastries', 'مافن', 'Muffin', 0.8],
+  ['pastries', 'رول القرفة', 'Cinnamon Roll', 1.2],
+  ['pastries', 'كيكة الموز', 'Banana Bread', 1.0]
+].map((r, i) => ({ key: 'k' + i, cat: r[0], ar: r[1], en: r[2], price: r[3], checked: true }));
+
+// Which categories each cafe type brings in
+const STARTER_TYPES = {
+  specialty: ['hot', 'iced'],
+  juices: ['cold'],
+  sweets: ['desserts', 'pastries']
+};
+
+let starterActiveTypes = new Set();
+let starterExistingNames = new Set();
+
+async function openStarterMenu() {
+  starterActiveTypes = new Set();
+  starterExistingNames = new Set();
+  STARTER_ITEMS.forEach(it => { it.checked = true; });
+  try {
+    const snap = await db.collection('shops').doc(currentShopId).collection('menu').get();
+    snap.forEach(d => { const n = (d.data().name || '').trim(); if (n) starterExistingNames.add(n); });
+  } catch (err) {
+    console.error('Starter menu: could not read existing items (continuing):', err);
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'starterMenuOverlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <button class="close-x" onclick="document.getElementById('starterMenuOverlay').remove()">×</button>
+      <h3 style="margin:8px 0 6px; text-align:center;">✨ ${dt('starterTitle')}</h3>
+      <p style="color:var(--stone); font-size:0.85rem; text-align:center; margin-bottom:14px;">${dt('starterIntro')}</p>
+      <div id="starterTypeChips" style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:14px;"></div>
+      <div id="starterItemsBox"></div>
+      <div id="starterError" class="error-msg"></div>
+      <div id="starterFooter" style="display:none; position:sticky; bottom:-32px; background:var(--paper); padding:12px 0 4px; margin-top:8px; border-top:1px solid var(--line);">
+        <div id="starterCount" style="text-align:center; font-size:0.85rem; color:var(--stone); margin-bottom:8px;"></div>
+        <button type="button" class="btn" style="width:100%;" id="starterAddBtn" onclick="addStarterItems()">${dt('starterAddBtn')}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  renderStarterMenu();
+}
+
+function toggleStarterType(type) {
+  const all = ['specialty', 'juices', 'sweets'];
+  if (type === 'all') {
+    if (all.every(t => starterActiveTypes.has(t))) starterActiveTypes.clear();
+    else all.forEach(t => starterActiveTypes.add(t));
+  } else if (starterActiveTypes.has(type)) {
+    starterActiveTypes.delete(type);
+  } else {
+    starterActiveTypes.add(type);
+  }
+  renderStarterMenu();
+}
+
+function starterVisibleCategories() {
+  const cats = [];
+  Object.keys(STARTER_CATEGORIES).forEach(cat => {
+    const shown = Array.from(starterActiveTypes).some(t => STARTER_TYPES[t].includes(cat));
+    if (shown) cats.push(cat);
+  });
+  return cats;
+}
+
+function renderStarterMenu() {
+  const chipsEl = document.getElementById('starterTypeChips');
+  const boxEl = document.getElementById('starterItemsBox');
+  if (!chipsEl || !boxEl) return;
+
+  const allOn = ['specialty', 'juices', 'sweets'].every(t => starterActiveTypes.has(t));
+  const chip = (type, label, on) => `<button type="button" class="btn ${on ? '' : 'btn-ghost'}" style="padding:8px 14px; font-size:0.88rem;" onclick="toggleStarterType('${type}')">${label}</button>`;
+  chipsEl.innerHTML =
+    chip('specialty', dt('starterTypeSpecialty'), starterActiveTypes.has('specialty')) +
+    chip('juices', dt('starterTypeJuices'), starterActiveTypes.has('juices')) +
+    chip('sweets', dt('starterTypeSweets'), starterActiveTypes.has('sweets')) +
+    chip('all', dt('starterTypeAll'), allOn);
+
+  const cats = starterVisibleCategories();
+  if (cats.length === 0) {
+    boxEl.innerHTML = `<div class="state-msg">${dt('starterPickType')}</div>`;
+    document.getElementById('starterFooter').style.display = 'none';
+    return;
+  }
+
+  boxEl.innerHTML = cats.map(cat => {
+    const c = STARTER_CATEGORIES[cat];
+    const rows = STARTER_ITEMS.filter(it => it.cat === cat).map(it => {
+      const have = starterExistingNames.has(it.ar);
+      return `
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); ${have ? 'opacity:0.5;' : ''}">
+          <input type="checkbox" style="width:auto;" ${(it.checked && !have) ? 'checked' : ''} ${have ? 'disabled' : ''} onchange="starterToggleItem('${it.key}', this.checked)">
+          <div style="flex:1;">
+            <div>${dashLang === 'en' ? it.en : it.ar}</div>
+            ${have ? `<div style="font-size:0.75rem; color:var(--stone);">${dt('starterAlreadyHave')}</div>` : ''}
+          </div>
+          <input type="number" step="0.001" min="0" value="${it.price}" style="width:84px;" ${have ? 'disabled' : ''} oninput="starterSetPrice('${it.key}', this.value)">
+        </div>`;
+    }).join('');
+    return `
+      <div style="display:flex; align-items:center; gap:10px; margin:14px 0 4px;">
+        <img src="${c.img}" alt="" style="width:34px; height:34px; border-radius:8px; object-fit:cover;">
+        <strong>${dashLang === 'en' ? c.en : c.ar}</strong>
+      </div>${rows}`;
+  }).join('');
+
+  document.getElementById('starterFooter').style.display = 'block';
+  updateStarterCount();
+}
+
+function starterToggleItem(key, checked) {
+  const it = STARTER_ITEMS.find(x => x.key === key);
+  if (it) it.checked = checked;
+  updateStarterCount();
+}
+
+function starterSetPrice(key, value) {
+  const it = STARTER_ITEMS.find(x => x.key === key);
+  if (it) it.price = value; // validated when adding
+}
+
+function starterSelectedItems() {
+  const cats = starterVisibleCategories();
+  return STARTER_ITEMS.filter(it => cats.includes(it.cat) && it.checked && !starterExistingNames.has(it.ar));
+}
+
+function updateStarterCount() {
+  const el = document.getElementById('starterCount');
+  if (el) el.textContent = `${starterSelectedItems().length} ${dt('starterSelectedCount')}`;
+}
+
+async function addStarterItems() {
+  const errEl = document.getElementById('starterError');
+  const btn = document.getElementById('starterAddBtn');
+  errEl.textContent = '';
+
+  const chosen = starterSelectedItems();
+  if (chosen.length === 0) { errEl.textContent = dt('starterNothingSelected'); return; }
+  for (const it of chosen) {
+    const price = parseFloat(it.price);
+    if (isNaN(price) || price <= 0) { errEl.textContent = dt('starterBadPrice'); return; }
+  }
+
+  btn.disabled = true;
+  try {
+    const menuRef = db.collection('shops').doc(currentShopId).collection('menu');
+    const batch = db.batch();
+    chosen.forEach(it => {
+      const c = STARTER_CATEGORIES[it.cat];
+      batch.set(menuRef.doc(), {
+        name: it.ar,
+        nameEn: it.en,
+        category: c.ar,
+        categoryEn: c.en,
+        description: '',
+        price: Math.round(parseFloat(it.price) * 1000) / 1000,
+        available: true,
+        suggested: false,
+        image: new URL(c.img, window.location.href).href
+      });
+    });
+    await batch.commit();
+    await loadItems();
+    loadCategoryManager();
+
+    const sheet = document.querySelector('#starterMenuOverlay .modal-sheet');
+    if (sheet) {
+      sheet.innerHTML = `
+        <div style="text-align:center; padding:12px 0;">
+          <div style="font-size:2.6rem; margin-bottom:8px;">✅</div>
+          <h3 style="margin-bottom:6px;">${dt('starterDoneTitle')}</h3>
+          <p style="margin-bottom:6px;"><strong>${chosen.length}</strong> ${dt('starterDoneItems')}</p>
+          <p style="color:var(--stone); font-size:0.85rem; margin-bottom:18px;">${dt('starterDoneHint')}</p>
+          <button type="button" class="btn" style="width:100%;" onclick="document.getElementById('starterMenuOverlay').remove()">${dt('starterDoneBtn')}</button>
+        </div>`;
+    }
+  } catch (err) {
+    console.error('addStarterItems failed:', err);
+    errEl.textContent = dt('starterAddError');
+    btn.disabled = false;
+  }
+}
+
 async function loadItems() {
   const listEl = document.getElementById('itemsList');
   const snap = await db.collection('shops').doc(currentShopId).collection('menu').orderBy('category').get();
@@ -2900,7 +3155,12 @@ async function loadItems() {
   renderCategoryChips('categoryEnChips', 'itemCategoryEn', categoriesEn);
 
   if (snap.empty) {
-    listEl.innerHTML = `<div class="state-msg">${dt('noItemsYet')}</div>`;
+    listEl.innerHTML = `
+      <div class="state-msg">${dt('noItemsYet')}</div>
+      <div style="text-align:center; padding:8px 0 16px;">
+        <button type="button" class="btn" onclick="openStarterMenu()">${dt('starterMenuCta')}</button>
+        <div style="font-size:0.82rem; color:var(--stone); margin-top:8px;">${dt('starterMenuCtaHint')}</div>
+      </div>`;
     return;
   }
 
