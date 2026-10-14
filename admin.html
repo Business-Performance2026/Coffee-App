@@ -468,6 +468,7 @@ async function loadRenewalRequests() {
 
 async function approveRenewal(reqId, shopId) {
   if (!confirm('تأكدت من وصول التحويل؟ بيتم تفعيل الاشتراك 30 يوم.')) return;
+  if (!(await ensureFreshAdminSession())) return;
   try {
     const shopRef = db.collection('shops').doc(shopId);
     const reqRef = db.collection('renewalRequests').doc(reqId);
@@ -514,7 +515,7 @@ async function approveRenewal(reqId, shopId) {
     await loadRenewalRequests();
   } catch (err) {
     console.error('approveRenewal failed:', err);
-    alert('صار خطأ: ' + (err.message || err));
+    alert(adminErrorMessage(err));
   }
 }
 
@@ -682,12 +683,36 @@ function getActivityBadge(info) {
   return `<span style="display:inline-block; font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:999px; margin-top:6px; ${colorStyle}">${dot} آخر طلب: ${label}</span>`;
 }
 
+// Admin writes are rejected as "Missing or insufficient permissions" when the
+// login token has gone stale (e.g. the page stayed open for a long time on a
+// weak mobile connection). Refreshing the token first avoids that, and if it
+// still can't be refreshed we say so clearly instead of showing a raw error.
+async function ensureFreshAdminSession() {
+  try {
+    if (!auth.currentUser) throw new Error('no user');
+    await auth.currentUser.getIdToken(true);
+    return true;
+  } catch (err) {
+    console.error('Admin session refresh failed:', err);
+    alert('انتهت جلسة الأدمن أو الاتصال ضعيف. حدّث الصفحة وسجّل دخول من جديد ثم حاول مرة ثانية.');
+    return false;
+  }
+}
+
+function adminErrorMessage(err) {
+  if (err && err.code === 'permission-denied') {
+    return 'صار خطأ: ما عندك صلاحية لهذي العملية. حدّث الصفحة وسجّل دخول من جديد، ولو استمرت المشكلة تأكد من نشر قواعد Firestore الأخيرة.';
+  }
+  return 'صار خطأ: ' + ((err && err.message) || err);
+}
+
 async function updateEndDate(shopId, value) {
+  if (!(await ensureFreshAdminSession())) return;
   try {
     await db.collection('shops').doc(shopId).update({ 'info.subscriptionEndDate': value || null });
   } catch (err) {
     console.error('updateEndDate failed:', err);
-    alert('صار خطأ: ' + (err.message || err));
+    alert(adminErrorMessage(err));
   }
 }
 
@@ -963,12 +988,20 @@ async function toggleSubscription(shopId, currentlyActive) {
     updateData['info.suspensionReason'] = firebase.firestore.FieldValue.delete();
   }
 
+  if (!(await ensureFreshAdminSession())) return;
   try {
     await db.collection('shops').doc(shopId).update(updateData);
-    await loadShops();
   } catch (err) {
     console.error('toggleSubscription failed:', err);
-    alert('صار خطأ: ' + (err.message || err));
+    alert(adminErrorMessage(err));
+    return;
+  }
+  // The change is saved at this point; a failure while redrawing the list
+  // must never be reported as if the activation itself had failed.
+  try {
+    await loadShops();
+  } catch (err) {
+    console.error('loadShops after toggle failed:', err);
   }
 }
 
