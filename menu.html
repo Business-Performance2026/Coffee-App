@@ -13,6 +13,28 @@
 
 <title>القائمة</title>
 <link rel="stylesheet" href="styles.css">
+<style id="arrival-styles">
+/* Optional arrival time (customer checkout) */
+.arrival-mode { display: flex; gap: 8px; margin-top: 6px; }
+.arrival-mode-btn {
+  flex: 1; padding: 11px 10px; border: 1.5px solid var(--line); border-radius: 12px;
+  background: #fff; color: var(--ink); font-family: inherit; font-size: 0.95rem; font-weight: 700; cursor: pointer;
+}
+.arrival-mode-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+.arrival-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.arrival-chip {
+  padding: 8px 14px; border: 1.5px solid var(--line); border-radius: 999px; background: #fff;
+  color: var(--ink); font-family: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+}
+.arrival-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+.arrival-chip.active::before { content: '\2713\00a0'; }
+.arrival-summary {
+  margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 0.9rem; font-weight: 600;
+  background: var(--paper-dim); color: var(--stone);
+}
+.arrival-summary.ok { background: #E4F1E6; color: #2F6B3A; }
+.arrival-summary.bad { background: #FBEAE5; color: #B3441E; }
+</style>
 </head>
 <body>
 
@@ -185,7 +207,13 @@ const translations = {
   bestSellerTag: { ar: 'الأكثر طلباً', en: 'Best seller' },
   arrivalCarLbl: { ar: 'متى بتوصل للمقهى؟ (اختياري)', en: 'When will you arrive? (optional)' },
   arrivalDeliveryLbl: { ar: 'متى تبي طلبك يوصل؟ (اختياري)', en: 'When do you want your order? (optional)' },
-  arrivalNow: { ar: 'الحين', en: 'Now' },
+  arrivalModeNow: { ar: '⚡ الحين', en: '⚡ Now' },
+  arrivalModeLater: { ar: '⏰ بعد وقت', en: '⏰ Later' },
+  arrivalChipMin: { ar: '{n} دقيقة', en: '{n} min' },
+  arrivalChipHour: { ar: 'ساعة', en: '1 hour' },
+  arrivalPick: { ar: 'اختر الوقت من الخيارات فوق', en: 'Pick a time from the options above' },
+  arrivalChosen: { ar: 'تم اختيار الوقت', en: 'Time selected' },
+  arrivalExpect: { ar: 'نتوقع وصولك حوالي', en: 'Expected arrival around' },
   arrivalInMin: { ar: 'بعد {n} دقيقة', en: 'In {n} min' },
   arrivalInHour: { ar: 'بعد ساعة', en: 'In 1 hour' },
   arrivalCustomChip: { ar: 'وقت محدد', en: 'Pick a time' },
@@ -1350,16 +1378,20 @@ function openCartModal() {
   `;
   document.body.appendChild(overlay);
   onPaymentMethodChange();
+  updateArrivalSummary();
   if (shopInfo.loyaltyEnabled) checkLoyaltyPoints();
 }
 
 let selectedOrderType = 'table';
 
 // ---- Optional arrival time (car / delivery orders only) ----
-// selectedArrival: 'now' (default — behaves exactly like before),
-// a number of minutes, or 'custom' (time typed in by the customer).
 const ARRIVAL_MAX_MINUTES = 120;
-let selectedArrival = 'now';
+// arrivalMode: 'now' (default — behaves exactly like before) or 'later'.
+// arrivalValue (only when 'later'): minutes as a string ('10'…'60') or 'custom'.
+let arrivalMode = 'now';
+let arrivalValue = null;
+
+function resetArrival() { arrivalMode = 'now'; arrivalValue = null; }
 
 function arrivalFeatureOn() {
   return shopInfo.arrivalTimeEnabled === true;
@@ -1378,40 +1410,95 @@ function formatArrivalClock(date) {
   return h + ':' + m + ' ' + suffix;
 }
 
+function arrivalChipLabel(v) {
+  if (v === 'custom') return t('arrivalCustomChip');
+  if (v === '60') return t('arrivalChipHour');
+  return t('arrivalChipMin').replace('{n}', v);
+}
+
+function arrivalInLabel(v) {
+  return v === '60' ? t('arrivalInHour') : t('arrivalInMin').replace('{n}', v);
+}
+
 function buildArrivalHtml() {
-  const mins = [10, 15, 20, 30, 45, 60];
-  const chip = (val, label) =>
-    `<button type="button" class="arrival-chip ${selectedArrival === val ? 'active' : ''}" data-arrival="${val}" onclick="setArrival('${val}')">${label}</button>`;
+  const values = ['10', '15', '20', '30', '45', '60', 'custom'];
+  const later = arrivalMode === 'later';
   return `
     <div id="arrivalFields" class="field" style="display:${arrivalApplies(selectedOrderType) ? 'block' : 'none'};">
       <label id="arrivalLabel">${t(selectedOrderType === 'delivery' ? 'arrivalDeliveryLbl' : 'arrivalCarLbl')}</label>
-      <div class="arrival-chips">
-        ${chip('now', t('arrivalNow'))}
-        ${mins.map(m => chip(String(m), m === 60 ? t('arrivalInHour') : t('arrivalInMin').replace('{n}', m))).join('')}
-        ${chip('custom', t('arrivalCustomChip'))}
+      <div class="arrival-mode">
+        <button type="button" class="arrival-mode-btn ${later ? '' : 'active'}" data-mode="now" onclick="setArrivalMode('now')">${t('arrivalModeNow')}</button>
+        <button type="button" class="arrival-mode-btn ${later ? 'active' : ''}" data-mode="later" onclick="setArrivalMode('later')">${t('arrivalModeLater')}</button>
       </div>
-      <div id="arrivalCustomBox" style="display:${selectedArrival === 'custom' ? 'block' : 'none'}; margin-top:8px;">
-        <input type="time" id="arrivalCustomTime">
+      <div id="arrivalLaterBox" style="display:${later ? 'block' : 'none'};">
+        <div class="arrival-chips">
+          ${values.map(v => `<button type="button" class="arrival-chip ${arrivalValue === v ? 'active' : ''}" data-arrival="${v}" onclick="setArrivalValue('${v}')">${arrivalChipLabel(v)}</button>`).join('')}
+        </div>
+        <div id="arrivalCustomBox" style="display:${arrivalValue === 'custom' ? 'block' : 'none'}; margin-top:8px;">
+          <input type="time" id="arrivalCustomTime" oninput="updateArrivalSummary()" onchange="updateArrivalSummary()">
+        </div>
+        <div id="arrivalSummary" class="arrival-summary"></div>
       </div>
-      <div style="font-size:0.78rem; color:var(--stone); margin-top:6px;">${t('arrivalHint')}</div>
     </div>`;
 }
 
-function setArrival(val) {
-  selectedArrival = val;
-  document.querySelectorAll('#arrivalFields .arrival-chip').forEach(el => {
-    el.classList.toggle('active', el.getAttribute('data-arrival') === val);
+function setArrivalMode(mode) {
+  arrivalMode = mode;
+  if (mode === 'now') arrivalValue = null;
+  document.querySelectorAll('#arrivalFields .arrival-mode-btn').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('data-mode') === mode);
   });
-  const box = document.getElementById('arrivalCustomBox');
-  if (box) box.style.display = val === 'custom' ? 'block' : 'none';
+  const box = document.getElementById('arrivalLaterBox');
+  if (box) box.style.display = mode === 'later' ? 'block' : 'none';
+  syncArrivalChips();
+  updateArrivalSummary();
+}
+
+function setArrivalValue(val) {
+  arrivalMode = 'later';
+  arrivalValue = val;
+  syncArrivalChips();
+  const cb = document.getElementById('arrivalCustomBox');
+  if (cb) cb.style.display = val === 'custom' ? 'block' : 'none';
+  updateArrivalSummary();
+}
+
+function syncArrivalChips() {
+  document.querySelectorAll('#arrivalFields .arrival-chip').forEach(el => {
+    el.classList.toggle('active', arrivalMode === 'later' && el.getAttribute('data-arrival') === arrivalValue);
+  });
+}
+
+// The green confirmation line that makes it obvious a time was really chosen.
+function updateArrivalSummary() {
+  const el = document.getElementById('arrivalSummary');
+  if (!el) return;
+  if (arrivalMode !== 'later') { el.textContent = ''; el.className = 'arrival-summary'; el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  if (!arrivalValue) {
+    el.className = 'arrival-summary';
+    el.textContent = t('arrivalPick');
+    return;
+  }
+  const r = readArrivalChoice();
+  if (r.error) {
+    el.className = 'arrival-summary bad';
+    el.textContent = r.error;
+    return;
+  }
+  el.className = 'arrival-summary ok';
+  el.textContent = arrivalValue === 'custom'
+    ? '✅ ' + t('arrivalChosen') + ': ' + formatArrivalClock(r.date)
+    : '✅ ' + t('arrivalChosen') + ': ' + arrivalInLabel(arrivalValue) + ' — ' + t('arrivalExpect') + ' ' + formatArrivalClock(r.date);
 }
 
 // Returns { date } for a chosen time, { date: null } for "now", or { error } when invalid.
 function readArrivalChoice() {
-  if (!arrivalApplies(selectedOrderType) || selectedArrival === 'now') return { date: null };
+  if (!arrivalApplies(selectedOrderType) || arrivalMode !== 'later') return { date: null };
+  if (!arrivalValue) return { error: t('arrivalEmptyError') };
   const nowMs = Date.now();
   let target;
-  if (selectedArrival === 'custom') {
+  if (arrivalValue === 'custom') {
     const el = document.getElementById('arrivalCustomTime');
     const v = el ? el.value : '';
     if (!v) return { error: t('arrivalEmptyError') };
@@ -1419,7 +1506,7 @@ function readArrivalChoice() {
     target = new Date(); target.setHours(hh, mm, 0, 0);
     if (target.getTime() <= nowMs) return { error: t('arrivalPastError') };
   } else {
-    target = new Date(nowMs + parseInt(selectedArrival, 10) * 60000);
+    target = new Date(nowMs + parseInt(arrivalValue, 10) * 60000);
   }
   if (target.getTime() - nowMs > ARRIVAL_MAX_MINUTES * 60000) return { error: t('arrivalTooFarError') };
   return { date: target };
@@ -1646,7 +1733,7 @@ async function submitOrder() {
     cart = {};
     updateCartBar();
     uploadedReceiptUrl = null;
-    selectedArrival = 'now';
+    resetArrival();
 
     // Best-effort activity tracking for the admin panel — never allowed to
     // interfere with the order itself if it fails for any reason.
