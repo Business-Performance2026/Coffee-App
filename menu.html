@@ -182,7 +182,18 @@ const translations = {
   carColor: { ar: 'لون ونوع السيارة', en: 'Car color & model' },
   carColorPlaceholder: { ar: 'مثال: تويوتا بيضاء', en: 'e.g. White Toyota' },
   carFieldsError: { ar: 'الرجاء إدخال رقم السيارة ولونها.', en: 'Please enter your car plate number and color.' },
-  bestSellerTag: { ar: 'الأكثر طلباً', en: 'Best seller' }
+  bestSellerTag: { ar: 'الأكثر طلباً', en: 'Best seller' },
+  arrivalCarLbl: { ar: 'متى بتوصل للمقهى؟ (اختياري)', en: 'When will you arrive? (optional)' },
+  arrivalDeliveryLbl: { ar: 'متى تبي طلبك يوصل؟ (اختياري)', en: 'When do you want your order? (optional)' },
+  arrivalNow: { ar: 'الحين', en: 'Now' },
+  arrivalInMin: { ar: 'بعد {n} دقيقة', en: 'In {n} min' },
+  arrivalInHour: { ar: 'بعد ساعة', en: 'In 1 hour' },
+  arrivalCustomChip: { ar: 'وقت محدد', en: 'Pick a time' },
+  arrivalHint: { ar: 'نجهّز طلبك ليكون جاهزاً وقت وصولك.', en: 'We will have your order ready when you arrive.' },
+  arrivalPastError: { ar: 'اختر وقتاً بعد الوقت الحالي.', en: 'Please pick a time after the current time.' },
+  arrivalTooFarError: { ar: 'أقصى وقت مسموح هو ساعتين من الآن.', en: 'The latest allowed time is 2 hours from now.' },
+  arrivalEmptyError: { ar: 'الرجاء اختيار الوقت.', en: 'Please choose a time.' },
+  arrivalYourTime: { ar: 'وقت وصولك', en: 'Your arrival time' }
 };
 
 function t(key) {
@@ -1301,6 +1312,8 @@ function openCartModal() {
         </div>
       </div>
 
+      ${buildArrivalHtml()}
+
       ${shopInfo.loyaltyEnabled ? `
       <div class="field">
         <label for="loyaltyPhoneInput">${t('loyaltyPhoneLbl')}</label>
@@ -1341,6 +1354,77 @@ function openCartModal() {
 }
 
 let selectedOrderType = 'table';
+
+// ---- Optional arrival time (car / delivery orders only) ----
+// selectedArrival: 'now' (default — behaves exactly like before),
+// a number of minutes, or 'custom' (time typed in by the customer).
+const ARRIVAL_MAX_MINUTES = 120;
+let selectedArrival = 'now';
+
+function arrivalFeatureOn() {
+  return shopInfo.arrivalTimeEnabled === true;
+}
+
+function arrivalApplies(type) {
+  return arrivalFeatureOn() && (type === 'car' || type === 'delivery');
+}
+
+function formatArrivalClock(date) {
+  let h = date.getHours();
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const isPm = h >= 12;
+  h = h % 12; if (h === 0) h = 12;
+  const suffix = currentLang === 'en' ? (isPm ? 'PM' : 'AM') : (isPm ? 'م' : 'ص');
+  return h + ':' + m + ' ' + suffix;
+}
+
+function buildArrivalHtml() {
+  const mins = [10, 15, 20, 30, 45, 60];
+  const chip = (val, label) =>
+    `<button type="button" class="arrival-chip ${selectedArrival === val ? 'active' : ''}" data-arrival="${val}" onclick="setArrival('${val}')">${label}</button>`;
+  return `
+    <div id="arrivalFields" class="field" style="display:${arrivalApplies(selectedOrderType) ? 'block' : 'none'};">
+      <label id="arrivalLabel">${t(selectedOrderType === 'delivery' ? 'arrivalDeliveryLbl' : 'arrivalCarLbl')}</label>
+      <div class="arrival-chips">
+        ${chip('now', t('arrivalNow'))}
+        ${mins.map(m => chip(String(m), m === 60 ? t('arrivalInHour') : t('arrivalInMin').replace('{n}', m))).join('')}
+        ${chip('custom', t('arrivalCustomChip'))}
+      </div>
+      <div id="arrivalCustomBox" style="display:${selectedArrival === 'custom' ? 'block' : 'none'}; margin-top:8px;">
+        <input type="time" id="arrivalCustomTime">
+      </div>
+      <div style="font-size:0.78rem; color:var(--stone); margin-top:6px;">${t('arrivalHint')}</div>
+    </div>`;
+}
+
+function setArrival(val) {
+  selectedArrival = val;
+  document.querySelectorAll('#arrivalFields .arrival-chip').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('data-arrival') === val);
+  });
+  const box = document.getElementById('arrivalCustomBox');
+  if (box) box.style.display = val === 'custom' ? 'block' : 'none';
+}
+
+// Returns { date } for a chosen time, { date: null } for "now", or { error } when invalid.
+function readArrivalChoice() {
+  if (!arrivalApplies(selectedOrderType) || selectedArrival === 'now') return { date: null };
+  const nowMs = Date.now();
+  let target;
+  if (selectedArrival === 'custom') {
+    const el = document.getElementById('arrivalCustomTime');
+    const v = el ? el.value : '';
+    if (!v) return { error: t('arrivalEmptyError') };
+    const [hh, mm] = v.split(':').map(Number);
+    target = new Date(); target.setHours(hh, mm, 0, 0);
+    if (target.getTime() <= nowMs) return { error: t('arrivalPastError') };
+  } else {
+    target = new Date(nowMs + parseInt(selectedArrival, 10) * 60000);
+  }
+  if (target.getTime() - nowMs > ARRIVAL_MAX_MINUTES * 60000) return { error: t('arrivalTooFarError') };
+  return { date: target };
+}
+
 let uploadedReceiptUrl = null;
 let currentLoyaltyRewardReady = false;
 
@@ -1438,6 +1522,12 @@ function setOrderType(type) {
   document.getElementById('tableFields').style.display = type === 'table' ? 'block' : 'none';
   document.getElementById('carFields').style.display = type === 'car' ? 'block' : 'none';
   document.getElementById('deliveryFields').style.display = type === 'delivery' ? 'block' : 'none';
+  const arrivalEl = document.getElementById('arrivalFields');
+  if (arrivalEl) {
+    arrivalEl.style.display = arrivalApplies(type) ? 'block' : 'none';
+    const lbl = document.getElementById('arrivalLabel');
+    if (lbl) lbl.textContent = t(type === 'delivery' ? 'arrivalDeliveryLbl' : 'arrivalCarLbl');
+  }
 }
 
 function closeCartModal() {
@@ -1481,6 +1571,13 @@ async function submitOrder() {
     errorEl.textContent = t('receiptRequiredError');
     return;
   }
+
+  const arrivalChoice = readArrivalChoice();
+  if (arrivalChoice.error) {
+    errorEl.textContent = arrivalChoice.error;
+    return;
+  }
+  const arrivalDate = arrivalChoice.date; // null = no scheduled time (same as before)
 
   const loyaltyPhoneInput = document.getElementById('loyaltyPhoneInput');
   const loyaltyPhone = (loyaltyPhoneInput && loyaltyPhoneInput.value.trim()) ? loyaltyPhoneInput.value.trim() : null;
@@ -1538,7 +1635,8 @@ async function submitOrder() {
         total,
         stockTracked: true,
         status: 'pending',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        ...(arrivalDate ? { arrivalAt: firebase.firestore.Timestamp.fromDate(arrivalDate) } : {})
       });
     });
 
@@ -1548,6 +1646,7 @@ async function submitOrder() {
     cart = {};
     updateCartBar();
     uploadedReceiptUrl = null;
+    selectedArrival = 'now';
 
     // Best-effort activity tracking for the admin panel — never allowed to
     // interfere with the order itself if it fails for any reason.
@@ -1575,7 +1674,8 @@ async function submitOrder() {
 
     document.querySelector('.modal-sheet').innerHTML = `
       <h3 style="margin:8px 0 12px; text-align:center;">${t('orderSent')}</h3>
-      <p style="text-align:center; color:var(--ink); font-weight:600; margin-bottom:20px;">${paymentInstructions[paymentMethod] || ''}</p>
+      <p style="text-align:center; color:var(--ink); font-weight:600; margin-bottom:${arrivalDate ? '8px' : '20px'};">${paymentInstructions[paymentMethod] || ''}</p>
+      ${arrivalDate ? `<p style="text-align:center; color:var(--stone); font-weight:600; margin-bottom:20px;">⏰ ${t('arrivalYourTime')}: ${formatArrivalClock(arrivalDate)}</p>` : ''}
       <div id="trackerContainer">${renderTracker('pending')}</div>
       <button class="btn" style="width:100%; margin-top:24px;" onclick="closeCartModal()">${t('close')}</button>
     `;

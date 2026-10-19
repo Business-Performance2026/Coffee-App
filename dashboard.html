@@ -518,6 +518,14 @@
         </div>
       </div>
 
+      <div class="field">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="arrivalTimeEnabled" style="width:auto;">
+          <label for="arrivalTimeEnabled" style="margin:0;" data-i18n="arrivalSettingLbl">السماح للعميل بتحديد وقت وصوله (للسيارة والتوصيل)</label>
+        </div>
+        <div style="font-size:0.8rem; color:var(--stone); margin-top:6px;" data-i18n="arrivalSettingHint">يظهر للعميل خيار اختياري "متى بتوصل؟". ينبّهك النظام قبل وصوله بمدة التحضير المحددة في إعدادات المقهى.</div>
+      </div>
+
       <button class="btn" onclick="saveShopInfo()" data-i18n="saveChangesBtn">حفظ التغييرات</button>
     </div>
     </div>
@@ -672,6 +680,53 @@ let currentShopId = null;
 let currentUserEmail = null;
 let shopNameForReceipt = '';
 let cachedLoyaltyRewardText = '';
+let cachedArrivalPrepMin = 10; // lead time (the shop's "prep time") used to flag scheduled orders
+
+// ---- Scheduled arrival (car / delivery orders that picked a time) ----
+function formatArrivalClockDash(date) {
+  let h = date.getHours();
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const isPm = h >= 12;
+  h = h % 12; if (h === 0) h = 12;
+  const suffix = dashLang === 'en' ? (isPm ? 'PM' : 'AM') : (isPm ? 'م' : 'ص');
+  return h + ':' + m + ' ' + suffix;
+}
+
+// null when the order has no scheduled time (all old / table / POS orders).
+function getArrivalInfo(order, nowMs) {
+  if (!order || !order.arrivalAt || typeof order.arrivalAt.toDate !== 'function') return null;
+  const ms = order.arrivalAt.toDate().getTime();
+  const due = (order.status || 'pending') === 'pending' && (ms - nowMs) <= cachedArrivalPrepMin * 60000;
+  return { ms, diffMin: Math.round((ms - nowMs) / 60000), due, clock: formatArrivalClockDash(new Date(ms)) };
+}
+
+// Orders whose time to start preparing has come float to the top (earliest
+// arrival first); everything else keeps its existing order untouched.
+function sortByArrivalDue(list, nowMs) {
+  if (!list.some(o => o.arrivalAt)) return list;
+  const due = [], rest = [];
+  list.forEach(o => { const a = getArrivalInfo(o, nowMs); (a && a.due ? due : rest).push(o); });
+  due.sort((x, y) => getArrivalInfo(x, nowMs).ms - getArrivalInfo(y, nowMs).ms);
+  return due.concat(rest);
+}
+
+// One "ding" alert when a scheduled order becomes due while the dashboard is
+// open. Orders that are already due the first time we see them stay silent
+// (the new-order sound already covered them).
+const _arrivalDueState = new Map();
+function checkArrivalDueAlerts(orders, nowMs) {
+  let fresh = false;
+  orders.forEach(o => {
+    const a = getArrivalInfo(o, nowMs);
+    if (!a) return;
+    const prev = _arrivalDueState.get(o.id);
+    if (prev === false && a.due) fresh = true;
+    _arrivalDueState.set(o.id, a.due);
+  });
+  if (fresh) {
+    try { playAlertSound(); } catch (e) { console.error('Arrival alert sound failed (non-blocking):', e); }
+  }
+}
 let uploadedImageUrl = null;
 let uploadedLogoUrl = null;
 let uploadedCoverUrl = null;
@@ -1457,6 +1512,13 @@ const dashT = {
   colPreparing: { ar: 'قيد التحضير', en: 'Preparing' },
   justNow: { ar: 'الآن', en: 'just now' },
   minutesAgo: { ar: 'دقيقة مضت', en: 'min ago' },
+  arrivalSettingLbl: { ar: 'السماح للعميل بتحديد وقت وصوله (للسيارة والتوصيل)', en: 'Let customers choose their arrival time (car & delivery)' },
+  arrivalSettingHint: { ar: 'يظهر للعميل خيار اختياري "متى بتوصل؟". ينبّهك النظام قبل وصوله بمدة التحضير المحددة في إعدادات المقهى.', en: 'Customers get an optional "When will you arrive?" choice. You are alerted before arrival by the prep time set in the shop settings.' },
+  arrivalCarShort: { ar: 'وصول العميل', en: 'Customer arrival' },
+  arrivalDeliveryShort: { ar: 'الوقت المطلوب', en: 'Requested time' },
+  arrivalInMin: { ar: 'بعد {n} دقيقة', en: 'in {n} min' },
+  arrivalLateMin: { ar: 'متأخر {n} دقيقة', en: '{n} min overdue' },
+  arrivalStartNow: { ar: 'ابدأ التحضير الآن', en: 'Start preparing now' },
   downloadTentBtn: { ar: 'تحميل تصميم الطاولة', en: 'Download table tent' },
   shareLinkTitle: { ar: 'رابط قائمتك', en: 'Your menu link' },
   shareLinkHint: { ar: 'انسخ هذا الرابط وضيفه ببايو انستقرام، تويتر، أو أي حساب سوشيال ميديا', en: 'Copy this link and add it to your Instagram bio, Twitter, or any social account' },
@@ -2146,6 +2208,7 @@ async function loadShopInfo() {
     document.getElementById('shopEmailInput').value = info.email || '';
     document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
     document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
+    cachedArrivalPrepMin = parseInt(info.estimatedMinutes) || 10;
     document.getElementById('showRatingPublicly').checked = info.showRatingPublicly === true;
 
     const pm = info.paymentMethods || {};
@@ -2166,6 +2229,7 @@ async function loadShopInfo() {
     document.getElementById('orderTypeTableEnabled').checked = ot.table !== false;
     document.getElementById('orderTypeCarEnabled').checked = ot.car !== false;
     document.getElementById('orderTypeDeliveryEnabled').checked = ot.delivery === true;
+    document.getElementById('arrivalTimeEnabled').checked = info.arrivalTimeEnabled === true;
 
     renderSubscriptionBanner(info);
     maybeShowRenewalPopup(info);
@@ -2576,6 +2640,7 @@ async function saveShopInfo() {
     car: document.getElementById('orderTypeCarEnabled').checked,
     delivery: document.getElementById('orderTypeDeliveryEnabled').checked
   };
+  const arrivalTimeEnabled = document.getElementById('arrivalTimeEnabled').checked;
   const bankAccountName = document.getElementById('bankAccountNameInput').value.trim();
   const bankTransferNumberDigits = document.getElementById('bankTransferNumberInput').value.trim();
   const bankTransferNumber = bankTransferNumberDigits ? `+968 ${bankTransferNumberDigits}` : '';
@@ -2627,6 +2692,7 @@ async function saveShopInfo() {
       'info.showRatingPublicly': showRatingPublicly,
       'info.paymentMethods': paymentMethods,
       'info.orderTypes': orderTypes,
+      'info.arrivalTimeEnabled': arrivalTimeEnabled,
       'info.bankAccountName': bankAccountName,
       'info.bankTransferNumber': bankTransferNumber,
       'info.loyaltyEnabled': loyaltyEnabled,
@@ -2638,6 +2704,7 @@ async function saveShopInfo() {
 
     await db.collection('shops').doc(currentShopId).update(updateData);
     document.getElementById('shopNameHeader').textContent = name;
+    cachedArrivalPrepMin = prepTime;
     successEl.textContent = dt('savedSuccess');
   } catch (err) {
     console.error(err);
@@ -3628,15 +3695,19 @@ function renderOrdersColumns() {
   if (!newCol || !prepCol) return;
 
   const now = Date.now();
-  const newOrders = lastOrdersData.filter(o => (o.status || 'pending') === 'pending');
+  const newOrders = sortByArrivalDue(lastOrdersData.filter(o => (o.status || 'pending') === 'pending'), now);
   const prepOrders = lastOrdersData.filter(o => (o.status || 'pending') === 'preparing');
+  try { checkArrivalDueAlerts(newOrders, now); } catch (e) { console.error('Arrival check failed (non-blocking):', e); }
 
   function renderTile(order) {
     let elapsedMin = null;
     if (order.createdAt && order.createdAt.toDate) {
       elapsedMin = Math.floor((now - order.createdAt.toDate().getTime()) / 60000);
     }
-    const isUrgent = elapsedMin !== null && elapsedMin >= 10;
+    const arr = getArrivalInfo(order, now);
+    // A scheduled order isn't "urgent" just because it was placed a while ago —
+    // only once its arrival time has passed.
+    const isUrgent = arr ? arr.diffMin < 0 : (elapsedMin !== null && elapsedMin >= 10);
     const label = order.orderType === 'car'
       ? `🚗 ${escapeHtml(order.carNumber || '-')}`
       : order.orderType === 'delivery'
@@ -3644,9 +3715,10 @@ function renderOrdersColumns() {
         : `🍽️ ${escapeHtml(order.tableNumber || '-')}`;
 
     return `
-      <button type="button" class="order-tile ${isUrgent ? 'order-tile-urgent' : ''}" onclick='openOrderDetailModal("${order.id}")'>
+      <button type="button" class="order-tile ${isUrgent ? 'order-tile-urgent' : ''} ${arr ? 'order-tile-has-arrival' : ''} ${arr && arr.due ? 'order-tile-due' : ''}" onclick='openOrderDetailModal("${order.id}")'>
         ${order.loyaltyRewardReady ? '<span class="order-tile-gift">🎁</span>' : ''}
         <span>${label}</span>
+        ${arr ? `<span class="order-tile-arrival">⏰ ${arr.clock}</span>` : ''}
       </button>
     `;
   }
@@ -3676,7 +3748,10 @@ function renderFullOrderCardHtml(order) {
   if (order.createdAt && order.createdAt.toDate) {
     elapsedMin = Math.floor((now - order.createdAt.toDate().getTime()) / 60000);
   }
-  const isUrgent = elapsedMin !== null && elapsedMin >= 10;
+  const arr = getArrivalInfo(order, now);
+  const isUrgent = arr ? arr.diffMin < 0 : (elapsedMin !== null && elapsedMin >= 10);
+  const arrivalLineHtml = arr ? `
+      <div class="order-arrival-line ${arr.due ? 'due' : ''}">⏰ ${dt(order.orderType === 'delivery' ? 'arrivalDeliveryShort' : 'arrivalCarShort')}: ${arr.clock} — ${arr.diffMin >= 0 ? dt('arrivalInMin').replace('{n}', arr.diffMin) : dt('arrivalLateMin').replace('{n}', -arr.diffMin)}${arr.due ? ' · ' + dt('arrivalStartNow') : ''}</div>` : '';
 
   const paymentLabels = { cash: dt('payCash'), transfer: dt('payTransfer'), card: dt('payCard') };
   const paymentLabel = order.isGiftOrder
@@ -3702,6 +3777,7 @@ function renderFullOrderCardHtml(order) {
           <div class="order-items-line">${escapeHtml(order.deliveryWilayat || '')}${order.deliveryArea ? ' - ' + escapeHtml(order.deliveryArea) : ''}${order.deliveryHouseNumber ? ' - ' + dt('houseNoShort') + ' ' + escapeHtml(order.deliveryHouseNumber) : ''}</div>
         </div>
       ` : ''}
+      ${arrivalLineHtml}
       ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
       <div class="order-items-detail">
         ${order.items.map(i => {
