@@ -706,6 +706,25 @@ function adminErrorMessage(err) {
   return 'صار خطأ: ' + ((err && err.message) || err);
 }
 
+// When an admin action is refused, work out WHY so the message tells you what
+// to do (instead of only the raw "Missing or insufficient permissions").
+async function explainPermissionDenied() {
+  try {
+    if (!auth.currentUser) {
+      return 'انتهت جلسة الأدمن في هذا المتصفح. اضغط تسجيل الخروج ثم سجّل دخول من جديد.';
+    }
+    await auth.currentUser.getIdToken(true);
+    const me = await db.collection('admins').doc(auth.currentUser.uid).get();
+    if (me.exists) {
+      return 'حسابك أدمن، لكن قواعد Firestore المنشورة ما تسمح بالمدفوعات. انشر ملف firestore-rules.txt الأخير من Firebase Console.';
+    }
+    return 'هذا الحساب غير معروف كأدمن. سجّل خروج ثم ادخل بحساب الأدمن.';
+  } catch (e) {
+    console.error('explainPermissionDenied:', e);
+    return 'جلسة الأدمن في هذا المتصفح منتهية أو تالفة. سجّل خروج ثم ادخل من جديد، ولو استمرت المشكلة امسح بيانات الموقع من المتصفح.';
+  }
+}
+
 async function updateEndDate(shopId, value) {
   if (!(await ensureFreshAdminSession())) return;
   try {
@@ -776,6 +795,8 @@ async function addPayment(shopId) {
   }
   errorEl.textContent = '';
 
+  if (!(await ensureFreshAdminSession())) return;
+
   try {
     await db.collection('shops').doc(shopId).collection('payments').add({
       amount,
@@ -788,14 +809,28 @@ async function addPayment(shopId) {
     await loadPayments(shopId);
   } catch (err) {
     console.error('addPayment failed:', err);
-    errorEl.textContent = 'تعذر إضافة الدفعة: ' + err.message;
+    if (err && err.code === 'permission-denied') {
+      errorEl.textContent = 'تعذر إضافة الدفعة: ' + (await explainPermissionDenied());
+    } else {
+      errorEl.textContent = 'تعذر إضافة الدفعة: ' + ((err && err.message) || err);
+    }
   }
 }
 
 async function loadPayments(shopId) {
   const listEl = document.getElementById('paymentsList');
-  const snap = await db.collection('shops').doc(shopId).collection('payments')
-    .orderBy('recordedAt', 'desc').get();
+  let snap;
+  try {
+    snap = await db.collection('shops').doc(shopId).collection('payments')
+      .orderBy('recordedAt', 'desc').get();
+  } catch (err) {
+    console.error('loadPayments failed:', err);
+    const msg = (err && err.code === 'permission-denied')
+      ? await explainPermissionDenied()
+      : ((err && err.message) || String(err));
+    if (listEl) listEl.innerHTML = `<div class="state-msg" style="color:#B3441E;">تعذر تحميل السجل: ${msg}</div>`;
+    return;
+  }
 
   if (snap.empty) {
     listEl.innerHTML = '<div class="state-msg">لا توجد دفعات مسجّلة بعد.</div>';
