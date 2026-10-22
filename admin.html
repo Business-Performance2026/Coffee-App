@@ -839,19 +839,90 @@ async function loadPayments(shopId) {
 
   let total = 0;
   let html = '';
+  paymentsCache = {};
+  const iconBtn = 'background:none; border:none; cursor:pointer; font-size:1.05rem; padding:4px 6px; line-height:1;';
   snap.forEach(doc => {
     const p = doc.data();
     total += Number(p.amount) || 0;
+    paymentsCache[doc.id] = { amount: p.amount, note: p.note || '' };
     const dateStr = p.recordedAt ? p.recordedAt.toDate().toLocaleDateString('ar-OM') : '';
     html += `
-      <div class="top-item-row">
-        <span>${dateStr}${p.note ? ' · ' + p.note : ''}</span>
-        <span>${Number(p.amount).toFixed(2)} ر.ع</span>
+      <div class="top-item-row" id="payrow-${doc.id}" style="align-items:center; gap:6px;">
+        <span style="flex:1;">${dateStr}${p.note ? ' · ' + paymentEsc(p.note) : ''}</span>
+        <span style="white-space:nowrap;">${Number(p.amount).toFixed(2)} ر.ع</span>
+        <button type="button" title="تعديل" style="${iconBtn}" onclick="editPayment('${shopId}', '${doc.id}')">✏️</button>
+        <button type="button" title="حذف" style="${iconBtn}" onclick="deletePayment('${shopId}', '${doc.id}')">🗑️</button>
       </div>
     `;
   });
   html = `<div class="top-item-row" style="font-weight:600;"><span>الإجمالي</span><span>${total.toFixed(2)} ر.ع</span></div>` + html;
   listEl.innerHTML = html;
+}
+
+// ---- Edit / delete a payment record ----
+// These only change the payment LOG. They never touch the shop's subscription
+// dates — those are managed separately (renewals / the end-date field).
+let paymentsCache = {}; // paymentId -> { amount, note }
+
+function paymentEsc(v) {
+  return String(v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function editPayment(shopId, id) {
+  const p = paymentsCache[id];
+  const row = document.getElementById('payrow-' + id);
+  if (!p || !row) return;
+  const inputStyle = 'padding:8px; border:1px solid var(--line); border-radius:var(--radius);';
+  row.style.flexWrap = 'wrap';
+  row.innerHTML = `
+    <input type="number" step="0.001" id="payEditAmount-${id}" placeholder="المبلغ" style="flex:1; min-width:90px; ${inputStyle}">
+    <input type="text" id="payEditNote-${id}" placeholder="ملاحظة (اختياري)" style="flex:2; min-width:120px; ${inputStyle}">
+    <button type="button" class="btn" style="padding:8px 16px;" onclick="savePaymentEdit('${shopId}', '${id}')">حفظ</button>
+    <button type="button" class="btn btn-ghost" style="padding:8px 16px;" onclick="loadPayments('${shopId}')">إلغاء</button>
+  `;
+  document.getElementById('payEditAmount-' + id).value = p.amount;
+  document.getElementById('payEditNote-' + id).value = p.note || '';
+}
+
+async function savePaymentEdit(shopId, id) {
+  const errorEl = document.getElementById('paymentError');
+  const amount = parseFloat(document.getElementById('payEditAmount-' + id).value);
+  const note = document.getElementById('payEditNote-' + id).value.trim();
+  if (isNaN(amount) || amount <= 0) {
+    errorEl.textContent = 'أدخل مبلغ صحيح.';
+    return;
+  }
+  errorEl.textContent = '';
+  if (!(await ensureFreshAdminSession())) return;
+  try {
+    await db.collection('shops').doc(shopId).collection('payments').doc(id).update({
+      amount,
+      note: note || null,
+      editedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await loadPayments(shopId);
+  } catch (err) {
+    console.error('savePaymentEdit failed:', err);
+    errorEl.textContent = 'تعذر تعديل الدفعة: ' + ((err && err.code === 'permission-denied')
+      ? await explainPermissionDenied()
+      : ((err && err.message) || err));
+  }
+}
+
+async function deletePayment(shopId, id) {
+  const errorEl = document.getElementById('paymentError');
+  if (!confirm('تحذف هذي الدفعة من السجل؟ (الحذف من السجل فقط، ما يغيّر تاريخ الاشتراك).')) return;
+  errorEl.textContent = '';
+  if (!(await ensureFreshAdminSession())) return;
+  try {
+    await db.collection('shops').doc(shopId).collection('payments').doc(id).delete();
+    await loadPayments(shopId);
+  } catch (err) {
+    console.error('deletePayment failed:', err);
+    errorEl.textContent = 'تعذر حذف الدفعة: ' + ((err && err.code === 'permission-denied')
+      ? await explainPermissionDenied()
+      : ((err && err.message) || err));
+  }
 }
 
 // ---- Edit shop info directly ----
