@@ -12,6 +12,50 @@
 
 <title data-i18n="pageTitle">لوحة التحكم</title>
 <link rel="stylesheet" href="styles.css">
+<style id="home-styles">
+.nav-item[data-tab="home"] .nav-icon { background: #DDE8D2; }
+#view-home { padding-bottom: 8px; }
+.hm-head { display:flex; align-items:center; justify-content:space-between; margin:4px 0 10px; }
+.hm-title { font-size:1.15rem; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:8px; }
+.hm-live { font-size:0.72rem; font-weight:600; color:#3D6B4F; }
+.hm-refresh { border:1px solid var(--line); background:#fff; color:var(--ink); width:36px; height:36px; border-radius:50%; font-size:1.1rem; cursor:pointer; }
+.hm-refresh:disabled { opacity:.5; }
+.hm-tabs { display:flex; gap:6px; margin-bottom:12px; }
+.hm-tab { flex:1; padding:8px 4px; border:1px solid var(--line); background:#fff; border-radius:10px; font:inherit; font-size:0.85rem; color:var(--stone); cursor:pointer; }
+.hm-tab.active { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
+.hm-msg { background:var(--paper-dim); border-radius:10px; padding:10px 12px; font-size:0.85rem; color:var(--ink); margin-bottom:10px; text-align:center; }
+.hm-body { display:grid; grid-template-columns:1fr; gap:10px; }
+.hm-card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; }
+.hm-lbl { font-size:0.78rem; color:var(--stone); }
+.hm-hero-num { font-size:3rem; font-weight:700; line-height:1.1; color:var(--ink); font-variant-numeric:tabular-nums; margin:2px 0; }
+.hm-cur { font-size:0.95rem; font-weight:500; color:var(--stone); }
+.hm-delta { font-size:0.82rem; font-weight:600; color:var(--stone); min-height:1.2em; }
+.hm-delta.up { color:#2F6B45; }
+.hm-delta.down { color:#A6402C; }
+.hm-goal { margin-top:12px; }
+.hm-goal-row { display:flex; justify-content:space-between; font-size:0.78rem; color:var(--stone); margin-bottom:5px; }
+.hm-meter { height:8px; background:var(--paper-dim); border-radius:4px; overflow:hidden; }
+.hm-meter-fill { height:100%; width:0; background:var(--accent); border-radius:4px; transition:width .4s ease; }
+.hm-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.hm-kpi { text-align:center; padding:12px 6px; }
+.hm-kpi-num { font-size:1.35rem; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
+.hm-card-title { font-size:0.9rem; font-weight:700; color:var(--ink); margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.hm-chip { font-size:0.72rem; font-weight:600; color:var(--accent); background:var(--paper-dim); border-radius:10px; padding:2px 8px; }
+.hm-chip:empty { display:none; }
+.hm-svg { width:100%; height:auto; display:block; }
+.hm-row { display:flex; align-items:center; gap:8px; margin-bottom:9px; font-size:0.85rem; }
+.hm-row-name { flex:0 0 38%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); }
+.hm-row-bar { flex:1; height:8px; background:var(--paper-dim); border-radius:4px; overflow:hidden; }
+.hm-row-fill { height:100%; background:var(--accent); border-radius:4px; }
+.hm-row-val { flex:0 0 auto; min-width:28px; text-align:end; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+.hm-empty { font-size:0.82rem; color:var(--stone); text-align:center; padding:6px 0; }
+.hm-alert { display:flex; gap:8px; align-items:flex-start; font-size:0.85rem; padding:8px 10px; border-radius:10px; background:#FDF1DC; color:#7A4E0B; margin-bottom:6px; }
+.hm-foot { font-size:0.72rem; color:var(--stone); text-align:center; padding:4px 0 8px; }
+@media (min-width:900px) {
+  .hm-body { grid-template-columns:1fr 1fr; }
+  .hm-hero, .hm-kpis, #hmHoursCard, .hm-foot { grid-column:1 / -1; }
+}
+</style>
 <style id="arrival-styles">
 /* Scheduled arrival on dashboard order tiles / cards */
 .order-tile.order-tile-has-arrival { flex-direction: column; gap: 4px; }
@@ -247,6 +291,53 @@
     </div>
   </div>
 
+  <!-- ===================== TAB: الملخص (Home summary) ===================== -->
+  <div id="view-home" class="tab-view">
+    <div class="hm-head">
+      <div class="hm-title"><span data-i18n="homeTitle">ملخص اليوم</span> <span class="hm-live" id="hmLive"></span></div>
+      <button class="hm-refresh" id="hmRefresh" onclick="loadHome(homeRange, true)" aria-label="refresh">↻</button>
+    </div>
+    <div class="hm-tabs">
+      <button class="hm-tab active" data-hmrange="today" onclick="loadHome('today')" data-i18n="homeToday">اليوم</button>
+      <button class="hm-tab" data-hmrange="yesterday" onclick="loadHome('yesterday')" data-i18n="homeYesterday">أمس</button>
+      <button class="hm-tab" data-hmrange="week" onclick="loadHome('week')" data-i18n="home7d">7 أيام</button>
+    </div>
+    <div id="hmMsg" class="hm-msg" style="display:none;"></div>
+    <div id="hmBody" class="hm-body">
+      <div class="hm-card hm-hero">
+        <div class="hm-lbl" id="hmHeroLbl" data-i18n="homeSales">المبيعات</div>
+        <div class="hm-hero-num"><span id="hmSales">—</span> <span class="hm-cur" id="hmCur"></span></div>
+        <div class="hm-delta" id="hmDelta"></div>
+        <div class="hm-goal" id="hmGoalWrap" style="display:none;">
+          <div class="hm-goal-row"><span data-i18n="homeGoal">الهدف اليومي</span><span id="hmGoalTxt"></span></div>
+          <div class="hm-meter"><div class="hm-meter-fill" id="hmGoalFill"></div></div>
+        </div>
+      </div>
+      <div class="hm-kpis">
+        <div class="hm-card hm-kpi"><div class="hm-kpi-num" id="hmOrders">—</div><div class="hm-lbl" data-i18n="homeOrders">الطلبات</div></div>
+        <div class="hm-card hm-kpi"><div class="hm-kpi-num" id="hmAvg">—</div><div class="hm-lbl" data-i18n="homeAvg">متوسط الطلب</div></div>
+        <div class="hm-card hm-kpi"><div class="hm-kpi-num" id="hmRating">—</div><div class="hm-lbl" data-i18n="homeRating">التقييم</div></div>
+      </div>
+      <div class="hm-card" id="hmHoursCard">
+        <div class="hm-card-title"><span id="hmHoursTitle" data-i18n="homeByHour">الطلبات حسب الساعة</span><span class="hm-chip" id="hmPeak"></span></div>
+        <div id="hmHours"></div>
+      </div>
+      <div class="hm-card">
+        <div class="hm-card-title" data-i18n="homeTop">الأكثر مبيعاً</div>
+        <div id="hmTop"></div>
+      </div>
+      <div class="hm-card">
+        <div class="hm-card-title" data-i18n="homeTypes">أنواع الطلبات</div>
+        <div id="hmTypes"></div>
+      </div>
+      <div class="hm-card" id="hmAlertsCard" style="display:none;">
+        <div class="hm-card-title" data-i18n="homeAlerts">تنبيهات</div>
+        <div id="hmAlerts"></div>
+      </div>
+      <div class="hm-foot" data-i18n="homeFoot">الأرقام من الطلبات المسجّلة، ولا تشمل الطلبات الملغاة.</div>
+    </div>
+  </div>
+
   <!-- ===================== TAB 4: المبيعات (Sales) ===================== -->
   <div id="view-sales" class="tab-view">
     <div class="range-tabs">
@@ -431,6 +522,11 @@
       <div class="field">
         <label for="shopPrepTimeInput" data-i18n="prepTimeLbl">الوقت التقريبي للتحضير (دقائق)</label>
         <input type="number" id="shopPrepTimeInput" min="1">
+      </div>
+
+      <div class="field">
+        <label for="shopDailyGoalInput" data-i18n="dailyGoalLbl">هدف المبيعات اليومي (اختياري)</label>
+        <input type="number" id="shopDailyGoalInput" min="0" step="0.001" placeholder="0">
       </div>
 
       <div class="field" style="display:flex; align-items:center; gap:8px;">
@@ -663,6 +759,9 @@
   <button class="nav-item" data-tab="sales" onclick="switchTab('sales')">
     <span class="nav-icon">📊</span><span class="nav-label" data-i18n="navSales">المبيعات</span>
   </button>
+  <button class="nav-item" data-tab="home" onclick="switchTab('home')">
+    <span class="nav-icon">📈</span><span class="nav-label" data-i18n="navHome">الملخص</span>
+  </button>
   <button class="nav-item" data-tab="account" onclick="switchTab('account')">
     <span class="nav-icon">👤</span><span class="nav-label" data-i18n="navAccount">الحساب</span>
   </button>
@@ -879,7 +978,7 @@ function applyEmployeePermissionsUI() {
     });
   }
 
-  const tabPermMap = { dashboard: 'dashboard', pos: 'pos', inventory: 'inventory', sales: 'sales', account: 'account' };
+  const tabPermMap = { dashboard: 'dashboard', pos: 'pos', inventory: 'inventory', sales: 'sales', home: 'sales', account: 'account' };
   let firstAllowed = null;
 
   document.querySelectorAll('.nav-item').forEach(btn => {
@@ -1248,6 +1347,39 @@ const dashT = {
   navPos: { ar: 'نقطة البيع', en: 'POS' },
   navInventory: { ar: 'المخزون', en: 'Inventory' },
   navSales: { ar: 'المبيعات', en: 'Sales' },
+  navHome: { ar: 'الملخص', en: 'Summary' },
+  homeTitle: { ar: 'ملخص اليوم', en: "Today's summary" },
+  homeTitleYesterday: { ar: 'ملخص أمس', en: "Yesterday's summary" },
+  homeTitleWeek: { ar: 'ملخص آخر 7 أيام', en: 'Last 7 days summary' },
+  homeToday: { ar: 'اليوم', en: 'Today' },
+  homeYesterday: { ar: 'أمس', en: 'Yesterday' },
+  home7d: { ar: '7 أيام', en: '7 days' },
+  homeSales: { ar: 'المبيعات', en: 'Sales' },
+  homeGoal: { ar: 'الهدف اليومي', en: 'Daily goal' },
+  homeOrders: { ar: 'الطلبات', en: 'Orders' },
+  homeAvg: { ar: 'متوسط الطلب', en: 'Avg order' },
+  homeRating: { ar: 'التقييم', en: 'Rating' },
+  homeByHour: { ar: 'الطلبات حسب الساعة', en: 'Orders by hour' },
+  homeByDay: { ar: 'الطلبات حسب اليوم', en: 'Orders by day' },
+  homeTop: { ar: 'الأكثر مبيعاً', en: 'Top sellers' },
+  homeTypes: { ar: 'أنواع الطلبات', en: 'Order types' },
+  homeAlerts: { ar: 'تنبيهات', en: 'Alerts' },
+  homeFoot: { ar: 'الأرقام من الطلبات المسجّلة، ولا تشمل الطلبات الملغاة.', en: 'Figures come from recorded orders and exclude cancelled ones.' },
+  homeLive: { ar: '● مباشر', en: '● Live' },
+  homePeak: { ar: 'الذروة', en: 'Peak' },
+  homeNoData: { ar: 'لا توجد طلبات في هذه الفترة', en: 'No orders in this period' },
+  homeLoadErr: { ar: 'تعذّر تحميل الملخص. حاول مرة ثانية.', en: 'Could not load the summary. Please try again.' },
+  homeVsWeekday: { ar: 'عن نفس اليوم الأسبوع الماضي', en: 'vs same weekday last week' },
+  homeVsPrev: { ar: 'عن الفترة السابقة', en: 'vs previous period' },
+  homeTypeTable: { ar: '🍽️ طاولة', en: '🍽️ Table' },
+  homeTypeCar: { ar: '🚗 سيارة', en: '🚗 Car' },
+  homeTypeDelivery: { ar: '🛵 توصيل', en: '🛵 Delivery' },
+  homeTypePos: { ar: '🧾 نقطة البيع', en: '🧾 Counter' },
+  homeLowStock: { ar: 'مخزون منخفض: {n}', en: 'Low stock: {n}' },
+  homeOutStock: { ar: 'نفذت الكمية: {n}', en: 'Out of stock: {n}' },
+  homeUpcoming: { ar: 'طلب مجدول الساعة {t}', en: 'Scheduled order at {t}' },
+  homeGoalReached: { ar: 'تم تحقيق الهدف 🎉', en: 'Goal reached 🎉' },
+  dailyGoalLbl: { ar: 'هدف المبيعات اليومي (اختياري)', en: 'Daily sales goal (optional)' },
   navAccount: { ar: 'الحساب', en: 'Account' },
   subQr: { ar: 'الباركود', en: 'QR Code' },
   subAdd: { ar: 'إضافة صنف', en: 'Add Item' },
@@ -1655,6 +1787,9 @@ function toggleDashLang() {
   if (document.getElementById('view-sales').classList.contains('active')) {
     loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
   }
+  if (document.getElementById('view-home').classList.contains('active')) {
+    try { loadHome(homeRange); } catch (e) { console.error(e); }
+  }
 
   // Re-render the hours editor with the SAME values the owner already has
   // on screen (collected first, not re-fetched) — just relabels days/buttons
@@ -1857,7 +1992,9 @@ function switchTab(name, fromPopState) {
       ? (employeePermissions.dashboard === true || employeePermissions.pos === true)
       : name === 'account'
         ? (employeePermissions.account === true || employeePermissions.expenses === true)
-        : employeePermissions[name] === true;
+        : name === 'home'
+          ? employeePermissions.sales === true
+          : employeePermissions[name] === true;
     if (!tabAllowed) return;
   }
 
@@ -1888,6 +2025,217 @@ function switchTab(name, fromPopState) {
   }
   if (name === 'inventory') loadInventory();
   if (name === 'sales') loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
+  if (name === 'home') loadHome(homeRange);
+}
+
+
+// ===================== Home summary (الملخص) =====================
+// Read-only screen: one orders query (createdAt range only, no composite
+// index), everything else is computed in the browser. It never writes data.
+let homeRange = 'today';
+let cachedDailyGoal = null;
+let _homeCache = null; // { range, at, orders }
+
+function homeRangeWindows(range, nowMs) {
+  const n = new Date(nowMs);
+  const day0 = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
+  const D = 86400000;
+  const dayAt = (k) => new Date(n.getFullYear(), n.getMonth(), n.getDate() + k).getTime(); // DST-safe
+  if (range === 'yesterday') {
+    return { cur: { start: dayAt(-1), end: day0 }, prev: { start: dayAt(-8), end: dayAt(-7) }, fetchFrom: dayAt(-8), kind: 'weekday', hourly: true };
+  }
+  if (range === 'week') {
+    return { cur: { start: dayAt(-6), end: dayAt(1) }, prev: { start: dayAt(-13), end: dayAt(-6) }, fetchFrom: dayAt(-13), kind: 'prev', hourly: false };
+  }
+  return { cur: { start: day0, end: dayAt(1) }, prev: { start: dayAt(-7), end: dayAt(-6) }, fetchFrom: dayAt(-7), kind: 'weekday', hourly: true };
+}
+
+// orders: [{ms,total,status,orderType,rating,items:[{name,qty}]}]
+function aggregateHomeOrders(orders, win) {
+  const r = { sales: 0, count: 0, avg: 0, ratingAvg: null, hours: new Array(24).fill(0), days: [], top: [], types: { table: 0, car: 0, delivery: 0, pos: 0 } };
+  const itemCounts = {};
+  let rs = 0, rc = 0;
+  const perDay = {};
+  orders.forEach(o => {
+    if (o.status === 'cancelled') return;
+    if (!(o.ms >= win.start && o.ms < win.end)) return;
+    const total = Number(o.total) || 0;
+    r.sales += total; r.count++;
+    r.hours[new Date(o.ms).getHours()]++;
+    const dk = new Date(o.ms); const key = dk.getFullYear() + '-' + dk.getMonth() + '-' + dk.getDate();
+    perDay[key] = perDay[key] || { ms: new Date(dk.getFullYear(), dk.getMonth(), dk.getDate()).getTime(), n: 0 };
+    perDay[key].n++;
+    (o.items || []).forEach(i => { if (i && i.name) itemCounts[i.name] = (itemCounts[i.name] || 0) + (Number(i.qty) || 0); });
+    if (typeof o.rating === 'number') { rs += o.rating; rc++; }
+    const t = o.orderType === 'car' ? 'car' : o.orderType === 'delivery' ? 'delivery' : o.orderType === 'table' ? 'table' : 'pos';
+    r.types[t]++;
+  });
+  r.avg = r.count ? r.sales / r.count : 0;
+  r.ratingAvg = rc ? rs / rc : null;
+  r.top = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  r.days = Object.values(perDay).sort((a, b) => a.ms - b.ms);
+  return r;
+}
+
+// % change; null when there is no baseline to compare with.
+function homeDeltaPct(cur, prev) {
+  if (!(prev > 0)) return null;
+  return Math.round(((cur - prev) / prev) * 100);
+}
+
+function _hmSetText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+function _hmBars(rows, max) {
+  if (!rows.length) return `<div class="hm-empty">${dt('homeNoData')}</div>`;
+  return rows.map(([name, val]) => `
+    <div class="hm-row">
+      <div class="hm-row-name">${escapeHtml(name)}</div>
+      <div class="hm-row-bar"><div class="hm-row-fill" style="width:${max > 0 ? Math.max(4, Math.round(val / max * 100)) : 0}%"></div></div>
+      <div class="hm-row-val">${val}</div>
+    </div>`).join('');
+}
+
+function _hmChart(values, labels, peakIdx) {
+  const W = 320, H = 120, padB = 18, n = values.length;
+  const max = Math.max(1, ...values);
+  const slot = W / n, bw = Math.max(3, Math.min(14, slot * 0.55));
+  let bars = '';
+  values.forEach((v, i) => {
+    const h = v > 0 ? Math.max(3, (v / max) * (H - padB - 14)) : 0;
+    const x = i * slot + (slot - bw) / 2, y = H - padB - h;
+    const peak = i === peakIdx && v > 0;
+    if (h > 0) bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="var(--accent)" opacity="${peak ? 1 : 0.4}"/>`;
+    if (peak) bars += `<text x="${(x + bw / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">${v}</text>`;
+    if (labels[i]) bars += `<text x="${(i * slot + slot / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="9" fill="var(--stone)">${labels[i]}</text>`;
+  });
+  return `<svg class="hm-svg" viewBox="0 0 ${W} ${H}" direction="ltr" role="img"><line x1="0" y1="${H - padB}" x2="${W}" y2="${H - padB}" stroke="var(--line)" stroke-width="1"/>${bars}</svg>`;
+}
+
+function renderHome(agg, prevAgg, win, nowMs) {
+  const cur = dt('currency');
+  _hmSetText('hmSales', agg.sales.toFixed(2));
+  _hmSetText('hmCur', cur);
+  _hmSetText('hmOrders', agg.count);
+  _hmSetText('hmAvg', agg.count ? agg.avg.toFixed(2) : '—');
+  _hmSetText('hmRating', agg.ratingAvg !== null ? agg.ratingAvg.toFixed(1) + ' ⭐' : '—');
+  _hmSetText('hmLive', homeRange === 'today' ? dt('homeLive') : '');
+  _hmSetText('hmHeroLbl', dt('homeSales'));
+
+  const titleKey = homeRange === 'today' ? 'homeTitle' : homeRange === 'yesterday' ? 'homeTitleYesterday' : 'homeTitleWeek';
+  const titleEl = document.querySelector('#view-home .hm-title [data-i18n]');
+  if (titleEl) { titleEl.setAttribute('data-i18n', titleKey); titleEl.textContent = dt(titleKey); }
+
+  // delta
+  const dEl = document.getElementById('hmDelta');
+  const pct = homeDeltaPct(agg.sales, prevAgg.sales);
+  dEl.className = 'hm-delta';
+  if (pct === null) { dEl.textContent = ''; }
+  else {
+    dEl.classList.add(pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat');
+    dEl.textContent = (pct > 0 ? '▲ ' : pct < 0 ? '▼ ' : '■ ') + Math.abs(pct) + '% ' + dt(win.kind === 'weekday' ? 'homeVsWeekday' : 'homeVsPrev');
+  }
+
+  // daily goal (single-day views only)
+  const gWrap = document.getElementById('hmGoalWrap');
+  if (cachedDailyGoal && homeRange !== 'week') {
+    const gp = Math.round(agg.sales / cachedDailyGoal * 100);
+    gWrap.style.display = '';
+    _hmSetText('hmGoalTxt', gp >= 100 ? dt('homeGoalReached') : gp + '% · ' + cachedDailyGoal.toFixed(2) + ' ' + cur);
+    document.getElementById('hmGoalFill').style.width = Math.min(100, gp) + '%';
+  } else { gWrap.style.display = 'none'; }
+
+  // chart
+  let values, labels, peakIdx = -1;
+  if (win.hourly) {
+    values = agg.hours;
+    labels = values.map((_, i) => (i % 3 === 0 ? String(i) : ''));
+    _hmSetText('hmHoursTitle', dt('homeByHour'));
+  } else {
+    values = []; labels = [];
+    for (let k = 0; k < 7; k++) {
+      const ms = new Date(new Date(win.cur.start).getFullYear(), new Date(win.cur.start).getMonth(), new Date(win.cur.start).getDate() + k).getTime();
+      const hit = agg.days.find(d => d.ms === ms);
+      values.push(hit ? hit.n : 0);
+      labels.push(String(new Date(ms).getDate()));
+    }
+    _hmSetText('hmHoursTitle', dt('homeByDay'));
+  }
+  const maxV = Math.max(...values);
+  if (maxV > 0) peakIdx = values.indexOf(maxV);
+  document.getElementById('hmHours').innerHTML = maxV > 0 ? _hmChart(values, labels, peakIdx) : `<div class="hm-empty">${dt('homeNoData')}</div>`;
+  _hmSetText('hmPeak', maxV > 0 && win.hourly ? dt('homePeak') + ' ' + String(peakIdx).padStart(2, '0') + ':00' : '');
+
+  // top items + types
+  const topMax = agg.top.length ? agg.top[0][1] : 0;
+  document.getElementById('hmTop').innerHTML = _hmBars(agg.top, topMax);
+  const typeRows = [['homeTypeTable', agg.types.table], ['homeTypeCar', agg.types.car], ['homeTypeDelivery', agg.types.delivery], ['homeTypePos', agg.types.pos]]
+    .filter(r => r[1] > 0).map(r => [dt(r[0]), r[1]]);
+  document.getElementById('hmTypes').innerHTML = _hmBars(typeRows, typeRows.length ? Math.max(...typeRows.map(r => r[1])) : 0);
+}
+
+async function loadHomeAlerts(nowMs) {
+  const items = [];
+  try {
+    const snap = await db.collection('shops').doc(currentShopId).collection('menu').get();
+    let low = 0, out = 0;
+    snap.forEach(doc => {
+      const st = doc.data().stock;
+      if (typeof st !== 'number') return;
+      if (st === 0) out++; else if (st > 0 && st <= 3) low++;
+    });
+    if (out) items.push('⛔ ' + dt('homeOutStock').replace('{n}', out));
+    if (low) items.push('⚠️ ' + dt('homeLowStock').replace('{n}', low));
+  } catch (e) { console.error('Home alerts (stock) failed:', e); }
+  try {
+    (Array.isArray(lastOrdersData) ? lastOrdersData : []).forEach(o => {
+      const a = getArrivalInfo(o, nowMs);
+      if (a && (o.status || 'pending') === 'pending' && a.diffMin >= 0 && a.diffMin <= 120) {
+        items.push('🕐 ' + dt('homeUpcoming').replace('{t}', a.clock));
+      }
+    });
+  } catch (e) { console.error('Home alerts (arrival) failed:', e); }
+  const card = document.getElementById('hmAlertsCard');
+  if (!items.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  document.getElementById('hmAlerts').innerHTML = items.map(t => `<div class="hm-alert">${escapeHtml(t)}</div>`).join('');
+}
+
+let _homeReq = 0;
+async function loadHome(range, force) {
+  if (range) homeRange = range;
+  document.querySelectorAll('.hm-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-hmrange') === homeRange));
+  const myReq = ++_homeReq;
+  const msgEl = document.getElementById('hmMsg');
+  const btn = document.getElementById('hmRefresh');
+  const nowMs = Date.now();
+  const win = homeRangeWindows(homeRange, nowMs);
+  msgEl.style.display = 'none';
+  try {
+    let orders;
+    if (!force && _homeCache && _homeCache.range === homeRange && nowMs - _homeCache.at < 60000 && _homeCache.shop === currentShopId) {
+      orders = _homeCache.orders;
+    } else {
+      if (btn) btn.disabled = true;
+      const snap = await db.collection('shops').doc(currentShopId).collection('orders')
+        .where('createdAt', '>=', new Date(win.fetchFrom))
+        .get();
+      orders = [];
+      snap.forEach(doc => {
+        const o = doc.data();
+        if (!o.createdAt || typeof o.createdAt.toDate !== 'function') return;
+        orders.push({ ms: o.createdAt.toDate().getTime(), total: o.total, status: o.status, orderType: o.orderType, rating: o.rating, items: o.items });
+      });
+      _homeCache = { range: homeRange, at: nowMs, orders, shop: currentShopId };
+    }
+    if (myReq !== _homeReq) return; // a newer request superseded this one
+    renderHome(aggregateHomeOrders(orders, win.cur), aggregateHomeOrders(orders, win.prev), win, nowMs);
+    loadHomeAlerts(nowMs);
+  } catch (err) {
+    console.error('Loading home summary failed:', err);
+    if (myReq === _homeReq) { msgEl.textContent = dt('homeLoadErr'); msgEl.style.display = ''; }
+  } finally {
+    if (btn && myReq === _homeReq) btn.disabled = false;
+  }
 }
 
 // ===================== Sub-view switching (inside "لوحة التحكم") =====================
@@ -2222,6 +2570,8 @@ async function loadShopInfo() {
     document.getElementById('shopColorInput').value = info.primaryColor || '#8B5A2B';
     document.getElementById('shopPrepTimeInput').value = info.estimatedMinutes || 10;
     cachedArrivalPrepMin = parseInt(info.estimatedMinutes) || 10;
+    cachedDailyGoal = Number(info.dailySalesGoal) > 0 ? Number(info.dailySalesGoal) : null;
+    document.getElementById('shopDailyGoalInput').value = cachedDailyGoal || '';
     document.getElementById('showRatingPublicly').checked = info.showRatingPublicly === true;
 
     const pm = info.paymentMethods || {};
@@ -2642,6 +2992,8 @@ async function saveShopInfo() {
   const color = document.getElementById('shopColorInput').value;
   const prepTime = parseInt(document.getElementById('shopPrepTimeInput').value) || 10;
   const showRatingPublicly = document.getElementById('showRatingPublicly').checked;
+  const dailyGoalRaw = parseFloat(document.getElementById('shopDailyGoalInput').value);
+  const dailyGoal = dailyGoalRaw > 0 ? dailyGoalRaw : null;
 
   const paymentMethods = {
     cash: document.getElementById('payCashEnabled').checked,
@@ -2703,6 +3055,7 @@ async function saveShopInfo() {
       'info.primaryColor': color,
       'info.estimatedMinutes': prepTime,
       'info.showRatingPublicly': showRatingPublicly,
+      'info.dailySalesGoal': dailyGoal,
       'info.paymentMethods': paymentMethods,
       'info.orderTypes': orderTypes,
       'info.arrivalTimeEnabled': arrivalTimeEnabled,
@@ -2718,6 +3071,7 @@ async function saveShopInfo() {
     await db.collection('shops').doc(currentShopId).update(updateData);
     document.getElementById('shopNameHeader').textContent = name;
     cachedArrivalPrepMin = prepTime;
+    cachedDailyGoal = dailyGoal;
     successEl.textContent = dt('savedSuccess');
   } catch (err) {
     console.error(err);
