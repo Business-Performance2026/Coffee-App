@@ -221,7 +221,9 @@ const translations = {
   arrivalPastError: { ar: 'اختر وقتاً بعد الوقت الحالي.', en: 'Please pick a time after the current time.' },
   arrivalTooFarError: { ar: 'أقصى وقت مسموح هو ساعتين من الآن.', en: 'The latest allowed time is 2 hours from now.' },
   arrivalEmptyError: { ar: 'الرجاء اختيار الوقت.', en: 'Please choose a time.' },
-  arrivalYourTime: { ar: 'وقت وصولك', en: 'Your arrival time' }
+  arrivalYourTime: { ar: 'وقت وصولك', en: 'Your arrival time' },
+  phoneDigitsOnlyArabic: { ar: 'الرجاء كتابة الرقم بالأرقام الإنجليزية (0-9).', en: 'Please enter the number using English digits (0-9).' },
+  phoneDigitsOnly: { ar: 'أدخل أرقاماً فقط (0-9).', en: 'Please enter digits only (0-9).' }
 };
 
 function t(key) {
@@ -988,7 +990,7 @@ function openGiftModal() {
         <label for="giftBuyerPhone">${t('giftBuyerPhoneLbl')}</label>
         <div style="display:flex; gap:8px;">
           <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
-          <input type="text" inputmode="numeric" id="giftBuyerPhone" placeholder="9xxxxxxx" style="flex:1;">
+          <input type="text" inputmode="numeric" id="giftBuyerPhone" placeholder="9xxxxxxx" style="flex:1;" oninput="checkPhoneField(this)">
         </div>
       </div>
 
@@ -1001,7 +1003,7 @@ function openGiftModal() {
         <label for="giftRecipientPhone">${t('giftRecipientPhoneLbl')}</label>
         <div style="display:flex; gap:8px;">
           <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
-          <input type="text" inputmode="numeric" id="giftRecipientPhone" placeholder="9xxxxxxx" style="flex:1;">
+          <input type="text" inputmode="numeric" id="giftRecipientPhone" placeholder="9xxxxxxx" style="flex:1;" oninput="checkPhoneField(this)">
         </div>
       </div>
       <div class="field">
@@ -1064,6 +1066,11 @@ async function submitGiftOrder() {
   }
   if (!recipientName || !recipientPhoneDigits) {
     errorEl.textContent = t('giftFieldsError');
+    return;
+  }
+  const giftPhoneMsg = phoneProblemMessage(buyerPhoneDigits) || phoneProblemMessage(recipientPhoneDigits);
+  if (giftPhoneMsg) {
+    errorEl.textContent = giftPhoneMsg;
     return;
   }
   if (!giftReceiptUrl) {
@@ -1319,7 +1326,7 @@ function openCartModal() {
           <label for="deliveryPhoneInput">${t('deliveryPhoneLbl')}</label>
           <div style="display:flex; gap:8px;">
             <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
-            <input type="text" inputmode="numeric" id="deliveryPhoneInput" placeholder="9xxxxxxx" style="flex:1;">
+            <input type="text" inputmode="numeric" id="deliveryPhoneInput" placeholder="9xxxxxxx" style="flex:1;" oninput="checkPhoneField(this)">
           </div>
         </div>
         <div class="field">
@@ -1347,7 +1354,7 @@ function openCartModal() {
         <label for="loyaltyPhoneInput">${t('loyaltyPhoneLbl')}</label>
         <div style="display:flex; gap:8px;">
           <span style="padding:10px 14px; background:var(--paper-dim); border:1px solid var(--line); border-radius:var(--radius); font-weight:600; flex-shrink:0;">+968</span>
-          <input type="text" inputmode="numeric" id="loyaltyPhoneInput" placeholder="9xxxxxxx" style="flex:1;" value="${(localStorage.getItem('loyaltyPhone_' + shopId) || '')}" onblur="checkLoyaltyPoints()">
+          <input type="text" inputmode="numeric" id="loyaltyPhoneInput" placeholder="9xxxxxxx" style="flex:1;" value="${(localStorage.getItem('loyaltyPhone_' + shopId) || '')}" oninput="checkPhoneField(this)" onblur="checkLoyaltyPoints()">
         </div>
         <div id="loyaltyPointsDisplay" style="font-size:0.85rem; margin-top:8px;"></div>
       </div>
@@ -1380,9 +1387,46 @@ function openCartModal() {
   onPaymentMethodChange();
   updateArrivalSummary();
   if (shopInfo.loyaltyEnabled) checkLoyaltyPoints();
+  checkPhoneField(document.getElementById('loyaltyPhoneInput'));
 }
 
 let selectedOrderType = 'table';
+
+// ---- Phone numbers must use English digits (0-9) ----
+// Arabic-Indic digits (٠١٢…) would be saved as a different phone number
+// (e.g. a second loyalty account), so we ask the customer to retype them.
+const ARABIC_DIGITS_RE = /[\u0660-\u0669\u06F0-\u06F9]/;
+
+function phoneProblem(value) {
+  const v = String(value || '').replace(/\s+/g, '');
+  if (!v) return null;
+  if (ARABIC_DIGITS_RE.test(v)) return 'arabic';
+  if (!/^[0-9]+$/.test(v)) return 'other';
+  return null;
+}
+
+function phoneProblemMessage(value) {
+  const p = phoneProblem(value);
+  return p === 'arabic' ? t('phoneDigitsOnlyArabic') : (p === 'other' ? t('phoneDigitsOnly') : '');
+}
+
+// Live note under a phone field while the customer types.
+function checkPhoneField(input) {
+  if (!input) return;
+  const msg = phoneProblemMessage(input.value);
+  let note = document.getElementById(input.id + 'Note');
+  if (!note) {
+    if (!msg) return;
+    note = document.createElement('div');
+    note.id = input.id + 'Note';
+    note.style.cssText = 'color:#B3441E; font-size:0.82rem; font-weight:600; margin-top:6px;';
+    const anchor = input.parentElement || input;
+    anchor.insertAdjacentElement('afterend', note);
+  }
+  note.textContent = msg;
+  note.style.display = msg ? 'block' : 'none';
+  input.style.borderColor = msg ? '#B3441E' : '';
+}
 
 // ---- Optional arrival time (car / delivery orders only) ----
 const ARRIVAL_MAX_MINUTES = 120;
@@ -1543,6 +1587,11 @@ async function checkLoyaltyPoints() {
     displayEl.textContent = '';
     return;
   }
+  // Never look up / remember a number typed with Arabic digits or symbols
+  if (phoneProblem(phone)) {
+    displayEl.textContent = '';
+    return;
+  }
 
   localStorage.setItem('loyaltyPhone_' + shopId, phone);
   const threshold = shopInfo.loyaltyThreshold || 6;
@@ -1650,6 +1699,10 @@ async function submitOrder() {
       errorEl.textContent = t('deliveryFieldsError');
       return;
     }
+    if (phoneProblem(deliveryPhone)) {
+      errorEl.textContent = phoneProblemMessage(deliveryPhone);
+      return;
+    }
   } else {
     table = document.getElementById('tableNum').value.trim();
   }
@@ -1668,6 +1721,10 @@ async function submitOrder() {
 
   const loyaltyPhoneInput = document.getElementById('loyaltyPhoneInput');
   const loyaltyPhone = (loyaltyPhoneInput && loyaltyPhoneInput.value.trim()) ? loyaltyPhoneInput.value.trim() : null;
+  if (loyaltyPhone && phoneProblem(loyaltyPhone)) {
+    errorEl.textContent = phoneProblemMessage(loyaltyPhone);
+    return;
+  }
 
   const cartEntries = Object.entries(cart); // [itemId, {name, nameEn, price, qty}]
   const items = cartEntries.map(([id, i]) => ({ id, name: i.name, nameEn: i.nameEn || null, price: i.price, qty: i.qty }));
