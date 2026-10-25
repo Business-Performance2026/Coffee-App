@@ -2201,6 +2201,15 @@ async function loadHomeAlerts(nowMs) {
 }
 
 let _homeReq = 0;
+// Keep the summary live: while the Summary tab is open and the page visible,
+// re-read every 30s (and when the app returns to the foreground).
+function _homeAutoRefresh() {
+  const v = document.getElementById('view-home');
+  if (!v || !v.classList.contains('active') || document.hidden || !currentShopId) return;
+  loadHome(homeRange, true);
+}
+setInterval(_homeAutoRefresh, 30000);
+document.addEventListener('visibilitychange', _homeAutoRefresh);
 async function loadHome(range, force) {
   if (range) homeRange = range;
   document.querySelectorAll('.hm-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-hmrange') === homeRange));
@@ -2212,7 +2221,7 @@ async function loadHome(range, force) {
   msgEl.style.display = 'none';
   try {
     let orders;
-    if (!force && _homeCache && _homeCache.range === homeRange && nowMs - _homeCache.at < 60000 && _homeCache.shop === currentShopId) {
+    if (!force && _homeCache && _homeCache.range === homeRange && nowMs - _homeCache.at < 3000 && _homeCache.shop === currentShopId) {
       orders = _homeCache.orders;
     } else {
       if (btn) btn.disabled = true;
