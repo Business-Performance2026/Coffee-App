@@ -56,6 +56,10 @@
   .hm-hero, .hm-kpis, #hmHoursCard, .hm-foot { grid-column:1 / -1; }
 }
 </style>
+<style id="order-time-styles">
+.order-placed-row { margin: 2px 0 4px; }
+.order-placed-badge { display: inline-block; font-size: 0.78rem; font-weight: 700; color: #B3261E; background: #FDECEA; border: 1.5px solid #B3261E; border-radius: 6px; padding: 1px 8px; line-height: 1.5; }
+</style>
 <style id="arrival-styles">
 /* Scheduled arrival on dashboard order tiles / cards */
 .order-tile.order-tile-has-arrival { flex-direction: column; gap: 4px; }
@@ -2201,6 +2205,15 @@ async function loadHomeAlerts(nowMs) {
 }
 
 let _homeReq = 0;
+// Keep the summary live: while the Summary tab is open and the page visible,
+// re-read every 30s (and when the app returns to the foreground).
+function _homeAutoRefresh() {
+  const v = document.getElementById('view-home');
+  if (!v || !v.classList.contains('active') || document.hidden || !currentShopId) return;
+  loadHome(homeRange, true);
+}
+setInterval(_homeAutoRefresh, 30000);
+document.addEventListener('visibilitychange', _homeAutoRefresh);
 async function loadHome(range, force) {
   if (range) homeRange = range;
   document.querySelectorAll('.hm-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-hmrange') === homeRange));
@@ -2212,7 +2225,7 @@ async function loadHome(range, force) {
   msgEl.style.display = 'none';
   try {
     let orders;
-    if (!force && _homeCache && _homeCache.range === homeRange && nowMs - _homeCache.at < 60000 && _homeCache.shop === currentShopId) {
+    if (!force && _homeCache && _homeCache.range === homeRange && nowMs - _homeCache.at < 3000 && _homeCache.shop === currentShopId) {
       orders = _homeCache.orders;
     } else {
       if (btn) btn.disabled = true;
@@ -4145,6 +4158,7 @@ function renderFullOrderCardHtml(order) {
         </div>
       ` : ''}
       ${arrivalLineHtml}
+      ${(() => { try { return (order.createdAt && order.createdAt.toDate) ? `<div class="order-placed-row"><span class="order-placed-badge">🕐 ${formatArrivalClockDash(order.createdAt.toDate())}</span></div>` : ''; } catch (e) { return ''; } })()}
       ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
       <div class="order-items-detail">
         ${order.items.map(i => {
