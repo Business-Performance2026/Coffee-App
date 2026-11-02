@@ -2000,7 +2000,8 @@ function renderTracker(status) {
   if (status === 'ready') {
     doneBtnHtml = `<button class="btn" style="width:100%; margin-top:20px;" onclick="showRatingPrompt()">${t('orderPickedUp')}</button>`;
   } else if (status === 'pending') {
-    const canEdit = activeOrderDoc && !activeOrderDoc.isGiftOrder && !activeOrderDoc.loyaltyRewardReady;
+    // activeOrderDoc can still be empty right after sending (first snapshot not in yet); openEditOrder re-checks the real order anyway
+    const canEdit = !activeOrderDoc || (!activeOrderDoc.isGiftOrder && !activeOrderDoc.loyaltyRewardReady);
     doneBtnHtml = (canEdit ? `<button class="btn btn-ghost" style="width:100%; margin-top:20px;" onclick="openEditOrder()">${t('editOrderBtn')}</button>` : '')
       + `<button class="btn btn-ghost" style="width:100%; margin-top:${canEdit ? '10' : '20'}px; color:#B3441E;" onclick="cancelOrder()">${t('cancelOrderBtn')}</button>`;
   }
@@ -2061,6 +2062,7 @@ function editRenderRows() {
       <button type="button" class="btn btn-ghost" style="width:38px; padding:6px 0;" onclick="editChangeQty(${idx}, -1)">−</button>
       <span style="min-width:22px; text-align:center; font-weight:700;">${r.qty}</span>
       <button type="button" class="btn btn-ghost" style="width:38px; padding:6px 0;" onclick="editChangeQty(${idx}, 1)">+</button>
+      <button type="button" class="btn btn-ghost" style="width:38px; padding:6px 0; color:#B3441E;" onclick="editRemoveRow(${idx})" aria-label="delete">🗑️</button>
     </div>`).join('');
   const total = editWorking.reduce((sum, r) => sum + r.qty * Number(r.price), 0);
   overlay.querySelector('#editTotal').textContent = `${total.toFixed(2)} ${t('currency')}`;
@@ -2069,7 +2071,12 @@ function editRenderRows() {
 function editChangeQty(idx, delta) {
   const r = editWorking[idx];
   if (!r) return;
-  r.qty = Math.max(0, r.qty + delta);
+  r.qty = Math.max(1, r.qty + delta); // use the trash icon to remove an item
+  editRenderRows();
+}
+
+function editRemoveRow(idx) {
+  editWorking.splice(idx, 1);
   editRenderRows();
 }
 
@@ -2086,7 +2093,14 @@ function editAddItem() {
 }
 
 async function openEditOrder() {
-  if (!activeOrderId || !activeOrderDoc) return;
+  if (!activeOrderId) return;
+  if (!activeOrderDoc) {
+    try {
+      const fresh = await db.collection('shops').doc(shopId).collection('orders').doc(activeOrderId).get();
+      if (fresh.exists) activeOrderDoc = fresh.data();
+    } catch (e) { console.error('Loading order for edit failed:', e); }
+    if (!activeOrderDoc) return;
+  }
   if ((activeOrderDoc.status || 'pending') !== 'pending') { alert(t('editOrderTooLate')); return; }
   if (activeOrderDoc.isGiftOrder || activeOrderDoc.loyaltyRewardReady) return;
 
