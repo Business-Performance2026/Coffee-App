@@ -56,6 +56,12 @@
   .hm-hero, .hm-kpis, #hmHoursCard, .hm-foot { grid-column:1 / -1; }
 }
 </style>
+<style id="order-edit-styles">
+.order-tile-edited { font-size: 0.68rem; font-weight: 700; color: #7A4E0B; background: #FDF1DC; border: 1px solid #D98A1B; border-radius: 6px; padding: 0 6px; line-height: 1.5; margin-top: 2px; }
+.order-edited-box { background: #FDF1DC; border: 1.5px solid #D98A1B; border-radius: 10px; padding: 8px 12px; margin: 6px 0 8px; font-size: 0.85rem; color: #7A4E0B; }
+.order-edited-box .oe-title { font-weight: 700; margin-bottom: 4px; }
+.order-edited-box .oe-line { line-height: 1.7; }
+</style>
 <style id="order-time-styles">
 .order-placed-row { margin: 2px 0 4px; }
 .order-placed-badge { display: inline-block; font-size: 0.78rem; font-weight: 700; color: #B3261E; background: #FDECEA; border: 1.5px solid #B3261E; border-radius: 6px; padding: 1px 8px; line-height: 1.5; }
@@ -1555,6 +1561,13 @@ const dashT = {
   yesCancelBtn: { ar: 'نعم، ألغِ الطلب', en: 'Yes, cancel it' },
   noKeepBtn: { ar: 'تراجع', en: 'No, keep it' },
   okBtn: { ar: 'حسناً', en: 'OK' },
+  editedBadge: { ar: '✏️ معدّل', en: '✏️ Edited' },
+  editedByCustomerTitle: { ar: '✏️ العميل عدّل طلبه', en: '✏️ Customer edited the order' },
+  editedByStaffTitle: { ar: '✏️ تم تعديل الطلب', en: '✏️ Order was edited' },
+  editedPopupTitle: { ar: 'العميل عدّل طلبه', en: 'Customer edited their order' },
+  editAddLbl: { ar: 'إضافة صنف', en: 'Add an item' },
+  editAddChoose: { ar: 'اختر صنف...', en: 'Choose an item...' },
+  editAddBtn: { ar: 'إضافة', en: 'Add' },
   atLeastOneOrderTypeError: { ar: 'لازم تفعّل نوع طلب واحد على الأقل.', en: 'Please enable at least one order type.' },
   paymentBreakdownTitle: { ar: 'حسب طريقة الدفع', en: 'By payment method' },
   staffBreakdownTitle: { ar: 'حسب البائع', en: 'By staff member' },
@@ -3989,6 +4002,7 @@ async function sweepCancelledOrdersStock() {
       if (!d.data().stockRestored) {
         try { await restoreOrderStock(d.id); } catch (e) { console.error('Stock restore failed:', e); }
       }
+      if (d.data().stockReturn) processStockReturn(d.id);
     }
   } catch (err) {
     console.error('Cancelled-orders stock sweep failed (non-blocking):', err);
@@ -4017,6 +4031,24 @@ function listenToOrders() {
           });
         }
 
+        // A customer edited their still-pending order: same urgency as a new
+        // order (sound + bell) plus a popup listing exactly what changed.
+        try {
+          snap.docChanges().forEach(change => {
+            if (change.type !== 'modified') return;
+            const d = change.doc.data();
+            if (d.editedBy !== 'customer' || !d.editedAt || typeof d.editedAt.toMillis !== 'function') return;
+            const prev = lastOrdersData.find(o => o.id === change.doc.id);
+            const prevMs = (prev && prev.editedAt && typeof prev.editedAt.toMillis === 'function') ? prev.editedAt.toMillis() : 0;
+            if (d.editedAt.toMillis() > prevMs) {
+              playAlertSound();
+              const bell = document.querySelector('.bell-wrap');
+              if (bell) { bell.classList.remove('bell-shake'); void bell.offsetWidth; bell.classList.add('bell-shake'); }
+              showEditedOrderPopup(d);
+            }
+          });
+        } catch (e) { console.error('Edited-order alert failed (non-blocking):', e); }
+
         // A cancelled order exits this pending/preparing query, showing up
         // as a "removed" change — with a distinct sound and a clear popup
         // so it's never mistaken for an order that was simply completed.
@@ -4027,6 +4059,7 @@ function listenToOrders() {
             playCancelSound();
             showCancelledOrderPopup(data);
             restoreOrderStock(change.doc.id).catch(e => console.error('Stock restore failed:', e));
+            processStockReturn(change.doc.id);
           }
         });
       }
@@ -4043,6 +4076,10 @@ function listenToOrders() {
 
       lastOrdersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderOrdersColumns();
+      snap.docs.forEach(d => {
+        const sr = d.data().stockReturn;
+        if (sr && typeof sr === 'object' && Object.keys(sr).length) processStockReturn(d.id);
+      });
     }, err => {
       console.error(err);
       document.getElementById('ordersColNew').innerHTML = `<div class="state-msg">${dt('ordersLoadError')}</div>`;
@@ -4099,6 +4136,7 @@ function renderOrdersColumns() {
         ${order.loyaltyRewardReady ? '<span class="order-tile-gift">🎁</span>' : ''}
         <span>${label}</span>
         ${arr ? `<span class="order-tile-arrival">⏰ ${arr.clock}</span>` : ''}
+        ${order.editChanges ? `<span class="order-tile-edited">${dt('editedBadge')}</span>` : ''}
       </button>
     `;
   }
@@ -4160,6 +4198,7 @@ function renderFullOrderCardHtml(order) {
       ${arrivalLineHtml}
       ${(() => { try { return (order.createdAt && order.createdAt.toDate) ? `<div class="order-placed-row"><span class="order-placed-badge">🕐 ${formatArrivalClockDash(order.createdAt.toDate())}</span></div>` : ''; } catch (e) { return ''; } })()}
       ${elapsedMin !== null ? `<div class="order-elapsed">${isUrgent ? '⚠️ ' : ''}${formatElapsed(elapsedMin)}</div>` : ''}
+      ${renderEditedBoxHtml(order)}
       <div class="order-items-detail">
         ${order.items.map(i => {
           const iName = (dashLang === 'en' && i.nameEn) ? i.nameEn : i.name;
@@ -4184,10 +4223,82 @@ function renderFullOrderCardHtml(order) {
         <button class="btn btn-ghost" onclick='printReceipt("${order.id}")'>🖨️ ${dt('printReceiptBtn')}</button>
         ${order.loyaltyPhone ? `<button class="btn btn-ghost" onclick='sendWhatsAppInvoice("${order.id}")'>💬 ${dt('sendWhatsappBtn')}</button>` : ''}
         ${order.receiptUrl ? `<button class="btn btn-ghost" onclick='window.open("${order.receiptUrl}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button>` : ''}
+        ${order.isGiftOrder ? '' : `<button class="btn btn-ghost" title="${dt('editOrderBtn')}" onclick='openEditOrderModal("${order.id}"); closeOrderDetailModalIfOpen();'>✏️</button>`}
         <button class="btn btn-ghost" style="color:#B3441E;" onclick='staffCancelOrder("${order.id}", ${order.isGiftOrder ? 'true' : 'false'}, "${order.giftId || ''}"); closeOrderDetailModalIfOpen();'>❌ ${dt('cancelOrderBtn')}</button>
       </div>
     </div>
   `;
+}
+
+// "What changed" box shown on an edited active order (customer or staff edit).
+function renderEditedBoxHtml(order) {
+  const st = order.status || 'pending';
+  if (!order.editChanges || !Array.isArray(order.editChanges) || order.editChanges.length === 0) return '';
+  if (st !== 'pending' && st !== 'preparing') return '';
+  const lines = order.editChanges.map(c => {
+    const nm = escapeHtml((dashLang === 'en' && c.ne) ? c.ne : (c.n || ''));
+    if (!c.f) return `➕ ${nm} ×${c.t}`;
+    if (!c.t) return `➖ ${nm}`;
+    return `🔄 ${nm}: ${c.f} ← ${c.t}`;
+  });
+  return `<div class="order-edited-box"><div class="oe-title">${dt(order.editedBy === 'customer' ? 'editedByCustomerTitle' : 'editedByStaffTitle')}</div>${lines.map(l => `<div class="oe-line">${l}</div>`).join('')}</div>`;
+}
+
+function showEditedOrderPopup(order) {
+  const typeLabel = order.orderType === 'car'
+    ? `🚗 ${escapeHtml(translateCarColor(order.carColor) || '')} (${escapeHtml(order.carNumber || '')})`
+    : order.orderType === 'delivery'
+      ? dt('orderFromDelivery')
+      : `🍽️ ${dt('tableLabel')} ${escapeHtml(order.tableNumber || '-')}`;
+  const lines = (order.editChanges || []).map(c => {
+    const nm = escapeHtml((dashLang === 'en' && c.ne) ? c.ne : (c.n || ''));
+    return !c.f ? `➕ ${nm} ×${c.t}` : !c.t ? `➖ ${nm}` : `🔄 ${nm}: ${c.f} ← ${c.t}`;
+  });
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'editedOrderOverlay-' + Date.now();
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="text-align:center;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">✏️</div>
+      <h3 style="margin-bottom:12px; color:#A6650D;">${dt('editedPopupTitle')}</h3>
+      <p style="color:var(--ink); margin-bottom:8px;">${typeLabel}</p>
+      <div class="order-edited-box" style="text-align:start;">${lines.map(l => `<div class="oe-line">${l}</div>`).join('')}</div>
+      <p style="color:var(--stone); margin:8px 0 16px;">${Number(order.total).toFixed(2)} ${dt('currency')}</p>
+      <button class="btn" style="width:100%;" onclick="this.closest('.modal-overlay').remove()">${dt('okBtn')}</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+// Customers can only TAKE stock, never give it back, so when a customer lowers
+// a quantity the order records "stockReturn" and this (staff-side) transaction
+// puts the stock back, then clears the field so it only happens once.
+const _stockReturnBusy = new Set();
+async function processStockReturn(orderId) {
+  if (_stockReturnBusy.has(orderId)) return;
+  _stockReturnBusy.add(orderId);
+  try {
+    const orderRef = db.collection('shops').doc(currentShopId).collection('orders').doc(orderId);
+    await db.runTransaction(async (tx) => {
+      const od = await tx.get(orderRef);
+      if (!od.exists) return;
+      const sr = od.data().stockReturn;
+      if (!sr || typeof sr !== 'object' || Object.keys(sr).length === 0) return;
+      const ids = Object.keys(sr);
+      const refs = ids.map(id => db.collection('shops').doc(currentShopId).collection('menu').doc(id));
+      const docs = await Promise.all(refs.map(r => tx.get(r)));
+      docs.forEach((d, idx) => {
+        if (!d.exists) return;
+        const cur = d.data().stock;
+        if (typeof cur === 'number') tx.update(refs[idx], { stock: cur + (Number(sr[ids[idx]]) || 0) });
+      });
+      tx.update(orderRef, { stockReturn: firebase.firestore.FieldValue.delete() });
+    });
+  } catch (e) {
+    console.error('Stock return failed (will retry next time):', e);
+  } finally {
+    _stockReturnBusy.delete(orderId);
+  }
 }
 
 function openOrderDetailModal(orderId) {
@@ -4454,30 +4565,28 @@ function renderCompletedOrders() {
   }).join('');
 }
 
-// Edit a completed order (item quantities + payment method). The total is
-// recomputed from the items, and since every report reads the orders live,
-// the sales figures update automatically.
+// Edit any order (active or completed): item quantities, add/remove items and
+// payment method. The total is recomputed from the items, stock is adjusted in
+// the same transaction, and every report reads orders live so figures follow.
 function openEditOrderModal(orderId) {
-  const order = completedOrdersData.find(o => o.id === orderId);
+  const order = lastOrdersData.find(o => o.id === orderId) || completedOrdersData.find(o => o.id === orderId);
   if (!order || order.isGiftOrder) return;
 
+  const working = (order.items || []).map(i => Object.assign({}, i, { qty: Number(i.qty) || 0 }));
+  let menuItems = [];
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'editOrderOverlay';
   const pm = order.paymentMethod || '';
-  const rows = (order.items || []).map((i, idx) => {
-    const iName = (dashLang === 'en' && i.nameEn) ? i.nameEn : i.name;
-    return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-      <span style="flex:1;">${escapeHtml(iName)} <span style="color:var(--stone); font-size:0.82rem;">(${Number(i.price).toFixed(2)})</span></span>
-      <input type="number" min="0" step="1" value="${i.qty}" data-idx="${idx}" class="edit-order-qty" style="width:70px;">
-    </div>`;
-  }).join('');
-
   overlay.innerHTML = `
     <div class="modal-sheet">
       <button class="close-x" onclick="document.getElementById('editOrderOverlay').remove()">×</button>
       <h3 style="margin:8px 0 12px; text-align:center;">✏️ ${dt('editOrderTitle')}</h3>
-      ${rows}
+      <div id="editOrderRows"></div>
+      <div id="editOrderAddWrap" style="display:none; gap:8px; margin:6px 0 10px;">
+        <select id="editOrderAddSelect" style="flex:1;"></select>
+        <button type="button" class="btn btn-ghost" id="editOrderAddBtn">${dt('editAddBtn')}</button>
+      </div>
       <div class="field" style="margin-top:10px;">
         <label>${dt('paymentMethodLbl')}</label>
         <select id="editOrderPayment">
@@ -4497,23 +4606,50 @@ function openEditOrderModal(orderId) {
     </div>`;
   document.body.appendChild(overlay);
 
-  const inputs = Array.from(overlay.querySelectorAll('.edit-order-qty'));
-  const calc = () => inputs.reduce((sum, inp) => {
-    const q = Math.max(0, parseInt(inp.value, 10) || 0);
-    return sum + q * Number(order.items[inp.dataset.idx].price);
-  }, 0);
   const totalEl = overlay.querySelector('#editOrderTotal');
-  const refresh = () => { totalEl.textContent = `${calc().toFixed(2)} ${dt('currency')}`; };
-  inputs.forEach(inp => inp.addEventListener('input', refresh));
-  refresh();
+  const rowsEl = overlay.querySelector('#editOrderRows');
+  const refresh = () => {
+    totalEl.textContent = `${working.reduce((sum, i) => sum + Math.max(0, i.qty) * Number(i.price), 0).toFixed(2)} ${dt('currency')}`;
+  };
+  const renderRows = () => {
+    rowsEl.innerHTML = working.map((i, idx) => {
+      const iName = (dashLang === 'en' && i.nameEn) ? i.nameEn : i.name;
+      return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <span style="flex:1;">${escapeHtml(iName)} <span style="color:var(--stone); font-size:0.82rem;">(${Number(i.price).toFixed(2)})</span></span>
+        <input type="number" min="0" step="1" value="${i.qty}" data-idx="${idx}" class="edit-order-qty" style="width:70px;">
+      </div>`;
+    }).join('');
+    rowsEl.querySelectorAll('.edit-order-qty').forEach(inp => {
+      inp.addEventListener('input', () => { working[inp.dataset.idx].qty = Math.max(0, parseInt(inp.value, 10) || 0); refresh(); });
+    });
+    refresh();
+  };
+  renderRows();
+
+  // Optional "add an item" row — loaded in the background; the rest of the
+  // editor works even if this fails.
+  db.collection('shops').doc(currentShopId).collection('menu').get().then(snap => {
+    menuItems = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.available !== false);
+    if (!menuItems.length || !document.body.contains(overlay)) return;
+    const sel = overlay.querySelector('#editOrderAddSelect');
+    sel.innerHTML = `<option value="">${dt('editAddChoose')}</option>` + menuItems.map(m =>
+      `<option value="${escapeHtml(m.id)}">${escapeHtml((dashLang === 'en' && m.nameEn) ? m.nameEn : m.name)} — ${Number(m.price).toFixed(2)}</option>`).join('');
+    overlay.querySelector('#editOrderAddWrap').style.display = 'flex';
+  }).catch(e => console.error('Loading menu for order edit failed (non-blocking):', e));
+  overlay.querySelector('#editOrderAddBtn').addEventListener('click', () => {
+    const sel = overlay.querySelector('#editOrderAddSelect');
+    const m = menuItems.find(x => x.id === sel.value);
+    if (!m) return;
+    const ex = working.find(i => i.id === m.id);
+    if (ex) ex.qty += 1;
+    else working.push({ id: m.id, name: m.name, nameEn: m.nameEn || null, price: Number(m.price) || 0, qty: 1 });
+    sel.value = '';
+    renderRows();
+  });
 
   overlay.querySelector('#editOrderSaveBtn').addEventListener('click', async () => {
     const errEl = overlay.querySelector('#editOrderError');
-    const newItems = [];
-    inputs.forEach(inp => {
-      const q = Math.max(0, parseInt(inp.value, 10) || 0);
-      if (q > 0) newItems.push({ ...order.items[inp.dataset.idx], qty: q });
-    });
+    const newItems = working.filter(i => i.qty > 0).map(i => Object.assign({}, i));
     if (newItems.length === 0) { errEl.textContent = dt('editOrderNoItems'); return; }
     const newTotal = newItems.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
     const btn = overlay.querySelector('#editOrderSaveBtn');
@@ -4526,9 +4662,12 @@ function openEditOrderModal(orderId) {
         const cur = fresh.data();
         // Stock difference (old qty - new qty) per menu item, for tracked orders only
         const delta = {};
+        const oldQty = {}, newQty = {}, names = {};
+        (cur.items || []).forEach(i => { if (i.id) { oldQty[i.id] = (oldQty[i.id] || 0) + (Number(i.qty) || 0); names[i.id] = i; } });
+        newItems.forEach(i => { if (i.id) { newQty[i.id] = (newQty[i.id] || 0) + (Number(i.qty) || 0); if (!names[i.id]) names[i.id] = i; } });
         if (cur.stockTracked && !cur.stockRestored) {
-          (cur.items || []).forEach(i => { if (i.id) delta[i.id] = (delta[i.id] || 0) + (Number(i.qty) || 0); });
-          newItems.forEach(i => { if (i.id) delta[i.id] = (delta[i.id] || 0) - (Number(i.qty) || 0); });
+          Object.keys(oldQty).forEach(id => { delta[id] = (delta[id] || 0) + oldQty[id]; });
+          Object.keys(newQty).forEach(id => { delta[id] = (delta[id] || 0) - newQty[id]; });
         }
         const ids = Object.keys(delta).filter(id => delta[id] !== 0);
         const refs = ids.map(id => db.collection('shops').doc(currentShopId).collection('menu').doc(id));
@@ -4540,12 +4679,20 @@ function openEditOrderModal(orderId) {
             tx.update(refs[idx], { stock: Math.max(0, stock + delta[ids[idx]]) });
           }
         });
-        tx.update(orderRef, {
+        // What changed, so the kitchen sees it on the order card
+        const changes = [];
+        Array.from(new Set(Object.keys(oldQty).concat(Object.keys(newQty)))).forEach(id => {
+          const o = oldQty[id] || 0, n = newQty[id] || 0;
+          if (o !== n) changes.push({ n: names[id].name || '', ne: names[id].nameEn || null, f: o, t: n });
+        });
+        const upd = {
           items: newItems,
           total: Math.round(newTotal * 1000) / 1000,
           paymentMethod: overlay.querySelector('#editOrderPayment').value,
           editedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
+        if (changes.length) { upd.editedBy = 'staff'; upd.editChanges = changes; }
+        tx.update(orderRef, upd);
       });
       overlay.remove();
     } catch (err) {
@@ -4611,6 +4758,7 @@ async function advanceOrder(orderId, newStatus) {
   const orderBeforeUpdate = lastOrdersData.find(o => o.id === orderId);
 
   await db.collection('shops').doc(currentShopId).collection('orders').doc(orderId).update({ status: newStatus });
+  processStockReturn(orderId); // no-op unless a customer edit left stock to give back
 
   if (newStatus === 'ready' && orderBeforeUpdate) {
     if (orderBeforeUpdate.loyaltyPhone) {
