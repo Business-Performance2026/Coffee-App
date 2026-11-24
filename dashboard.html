@@ -56,6 +56,11 @@
   .hm-hero, .hm-kpis, #hmHoursCard, .hm-foot { grid-column:1 / -1; }
 }
 </style>
+<style id="gift-history-styles">
+.gift-tabs { display:flex; gap:6px; margin-bottom:12px; }
+.gift-tab { flex:1; padding:8px 4px; border:1px solid var(--line); background:#fff; border-radius:10px; font:inherit; font-size:0.85rem; color:var(--stone); cursor:pointer; }
+.gift-tab.active { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
+</style>
 <style id="order-edit-styles">
 .order-tile-edited { font-size: 0.68rem; font-weight: 700; color: #7A4E0B; background: #FDF1DC; border: 1px solid #D98A1B; border-radius: 6px; padding: 0 6px; line-height: 1.5; margin-top: 2px; }
 .order-edited-box { background: #FDF1DC; border: 1.5px solid #D98A1B; border-radius: 10px; padding: 8px 12px; margin: 6px 0 8px; font-size: 0.85rem; color: #7A4E0B; }
@@ -257,8 +262,19 @@
       <p style="color:var(--stone); font-size:0.85rem; margin-bottom:16px;" data-i18n="giftsIntro">
         الهدايا اللي اشتراها عملاء لأصدقائهم وما تسلّمت بعد.
       </p>
+      <div class="gift-tabs">
+        <button class="gift-tab active" id="giftTabPending" onclick="showGiftsTab('pending')" data-i18n="giftsTabPending">قيد التسليم</button>
+        <button class="gift-tab" id="giftTabDelivered" onclick="showGiftsTab('delivered')" data-i18n="giftsTabDelivered">المسلّمة</button>
+      </div>
       <div id="pendingGiftsList">
         <div class="state-msg">جاري التحميل...</div>
+      </div>
+      <div id="deliveredGiftsWrap" style="display:none;">
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input type="text" id="deliveredGiftsSearch" oninput="renderDeliveredGifts()" placeholder="ابحث بالاسم أو رقم الهاتف" style="flex:1;">
+          <button class="btn btn-ghost" style="width:44px; padding:6px 0;" onclick="loadDeliveredGifts()" aria-label="refresh">↻</button>
+        </div>
+        <div id="deliveredGiftsList"></div>
       </div>
     </div>
 
@@ -1702,6 +1718,12 @@ const dashT = {
   hoursLbl: { ar: 'ساعات العمل', en: 'Opening hours' },
   subReservations: { ar: 'الحجوزات', en: 'Reservations' },
   subGifts: { ar: 'الهدايا', en: 'Gifts' },
+  giftsTabPending: { ar: 'قيد التسليم', en: 'To deliver' },
+  giftsTabDelivered: { ar: 'المسلّمة', en: 'Delivered' },
+  giftsSearchPh: { ar: 'ابحث بالاسم أو رقم الهاتف', en: 'Search by name or phone' },
+  noDeliveredGifts: { ar: 'لا توجد هدايا مسلّمة.', en: 'No delivered gifts.' },
+  deliveredGiftsErr: { ar: 'تعذّر تحميل الهدايا المسلّمة. حاول مرة ثانية.', en: 'Could not load delivered gifts. Please try again.' },
+  deliveredOnLbl: { ar: 'سُلّمت', en: 'Delivered' },
   giftsIntro: { ar: 'الهدايا اللي اشتراها عملاء لأصدقائهم وما تسلّمت بعد.', en: "Gifts customers bought for friends that haven't been picked up yet." },
   noPendingGifts: { ar: 'لا توجد هدايا حالياً.', en: 'No pending gifts right now.' },
   deliverGiftBtn: { ar: 'تسليم الهدية', en: 'Deliver gift' },
@@ -1777,6 +1799,7 @@ function applyDashLang() {
     el.textContent = dt(key);
   });
   document.getElementById('dashLangToggle').textContent = dashLang === 'ar' ? 'EN' : 'عربي';
+  const _gs = document.getElementById('deliveredGiftsSearch'); if (_gs) _gs.placeholder = dt('giftsSearchPh');
   document.documentElement.dir = dashLang === 'ar' ? 'rtl' : 'ltr';
   if (currentUserEmail) {
     document.getElementById('loggedInAsText').textContent = `${dt('loggedInAs')}: ${currentUserEmail}`;
@@ -1804,6 +1827,7 @@ function toggleDashLang() {
   if (document.getElementById('view-sales').classList.contains('active')) {
     loadSales('day', document.querySelector('.range-tab[data-range="day"]'));
   }
+  try { if (deliveredGiftsLoaded) renderDeliveredGifts(); } catch (e) { console.error(e); }
   if (document.getElementById('view-home').classList.contains('active')) {
     try { loadHome(homeRange); } catch (e) { console.error(e); }
   }
@@ -3860,6 +3884,71 @@ function renderPendingGifts() {
         </div>
       </div>
     `;
+  }).join('');
+}
+
+// ---- Delivered gifts history -------------------------------------------
+// Delivering a gift only flips redeemed:true on its giftCards document — the
+// document (items, total, people, receipt) is kept forever, so history is just
+// a read of redeemed==true. Loaded on demand (not live) to keep reads low.
+let deliveredGiftsData = [];
+let deliveredGiftsLoaded = false;
+
+function showGiftsTab(which) {
+  const delivered = which === 'delivered';
+  document.getElementById('giftTabPending').classList.toggle('active', !delivered);
+  document.getElementById('giftTabDelivered').classList.toggle('active', delivered);
+  document.getElementById('pendingGiftsList').style.display = delivered ? 'none' : '';
+  document.getElementById('deliveredGiftsWrap').style.display = delivered ? '' : 'none';
+  if (delivered) loadDeliveredGifts();
+}
+
+async function loadDeliveredGifts() {
+  const el = document.getElementById('deliveredGiftsList');
+  if (!el) return;
+  if (!deliveredGiftsLoaded) el.innerHTML = `<div class="state-msg">${dt('loadingGeneric')}</div>`;
+  try {
+    const snap = await db.collection('shops').doc(currentShopId).collection('giftCards')
+      .where('redeemed', '==', true)
+      .get();
+    deliveredGiftsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const ms = g => (g.redeemedAt && g.redeemedAt.toMillis) ? g.redeemedAt.toMillis() : ((g.createdAt && g.createdAt.toMillis) ? g.createdAt.toMillis() : 0);
+    deliveredGiftsData.sort((a, b) => ms(b) - ms(a));
+    deliveredGiftsLoaded = true;
+    renderDeliveredGifts();
+  } catch (err) {
+    console.error('Loading delivered gifts failed:', err);
+    el.innerHTML = `<div class="card"><div class="state-msg">${dt('deliveredGiftsErr')}</div></div>`;
+  }
+}
+
+function renderDeliveredGifts() {
+  const el = document.getElementById('deliveredGiftsList');
+  if (!el || !deliveredGiftsLoaded) return;
+  const q = ((document.getElementById('deliveredGiftsSearch') || {}).value || '').trim().toLowerCase();
+  const list = deliveredGiftsData.filter(g => !q || [g.recipientName, g.recipientPhone, g.buyerName, g.buyerPhone]
+    .some(v => String(v || '').toLowerCase().includes(q)));
+  if (list.length === 0) {
+    el.innerHTML = `<div class="card"><div class="state-msg">${dt('noDeliveredGifts')}</div></div>`;
+    return;
+  }
+  const fmt = (ts) => {
+    if (!ts || !ts.toDate) return '';
+    return ts.toDate().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+  el.innerHTML = list.map(gift => {
+    const itemsText = (gift.items || []).map(i => `${escapeHtml((dashLang === 'en' && i.nameEn) ? i.nameEn : i.name)} ×${i.qty}`).join('، ');
+    const when = fmt(gift.redeemedAt);
+    return `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-weight:700; margin-bottom:4px;">🎁 ${escapeHtml(gift.recipientName || '')}</div>
+        <div class="order-items-line">${escapeHtml(gift.recipientPhone || '')}</div>
+        <div class="order-items-line">${itemsText} — ${Number(gift.total).toFixed(2)} ${dt('currency')}</div>
+        ${gift.personalMessage ? `<div class="order-items-line" style="font-style:italic;">💬 "${escapeHtml(gift.personalMessage)}"</div>` : ''}
+        <div class="order-items-line" style="color:var(--stone); font-size:0.82rem;">👤 ${dt('giftFromLabel')}: ${escapeHtml(gift.buyerName || '')} — ${escapeHtml(gift.buyerPhone || '')}</div>
+        ${when ? `<div class="order-items-line" style="color:#2E7D4F; font-size:0.82rem;">✅ ${dt('deliveredOnLbl')}: ${when}</div>` : ''}
+        ${gift.receiptUrl ? `<div class="order-actions" style="margin-top:8px;"><button class="btn btn-ghost" onclick='window.open("${escapeHtml(gift.receiptUrl)}", "_blank")'>📎 ${dt('viewReceiptBtn')}</button></div>` : ''}
+      </div>`;
   }).join('');
 }
 
