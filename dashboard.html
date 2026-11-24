@@ -4597,6 +4597,19 @@ function toggleCompletedOrders() {
   chevron.textContent = isOpen ? '▾' : '▴';
 }
 
+// Small red badge with when the order was placed (adds the date when it is
+// not from today, since the completed list can span several days).
+function completedTimeBadgeHtml(order) {
+  try {
+    if (!order.createdAt || typeof order.createdAt.toDate !== 'function') return '';
+    const d = order.createdAt.toDate();
+    const now = new Date();
+    const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    const datePart = sameDay ? '' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' · ';
+    return `<div class="order-placed-row"><span class="order-placed-badge">🕐 ${datePart}${formatArrivalClockDash(d)}</span></div>`;
+  } catch (e) { return ''; }
+}
+
 function renderCompletedOrders() {
   const el = document.getElementById('completedOrdersList');
   if (!el) return;
@@ -4618,6 +4631,7 @@ function renderCompletedOrders() {
           <strong>${typeLabel}</strong>
           <span class="order-status status-ready">${dt('statusReady')}</span>
         </div>
+        ${completedTimeBadgeHtml(order)}
         ${order.orderType === 'delivery' ? `
           <div class="delivery-details-box">
             <a href="https://wa.me/${(order.deliveryPhone || '').replace(/\D/g, '')}" target="_blank" class="delivery-link-row">📱 ${escapeHtml(order.deliveryPhone || '')}</a>
